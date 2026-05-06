@@ -1,12 +1,27 @@
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../store/AppContext';
+import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
+
+const DOWNLOAD_BASE = import.meta.env.VITE_DOWNLOAD_LINK ?? 'https://myphoto.com';
+
+function formatDate(iso) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function formatRp(amount) {
+  return `Rp ${Number(amount ?? 0).toLocaleString('id-ID')}`;
+}
 
 export default function Download() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
-  const { order } = state;
+  const { order, deviceConfig, selectedPhotos } = state;
 
   if (!order) {
     navigate('/');
@@ -18,62 +33,195 @@ export default function Download() {
     navigate('/');
   }
 
-  return (
-    <div className="flex flex-col items-center gap-8 max-w-lg mx-auto w-full py-12">
-      {/* Success icon */}
-     
+  const isCash = order.cash === true;
+  const trxCode = order.trx_code ?? order.orderId ?? '-';
+  const downloadUrl = `${DOWNLOAD_BASE}/myqr/${trxCode}`;
+  const photos = order.photos ?? selectedPhotos ?? [];
+  const finalPrice = order.final_price ?? order.total ?? selectedPhotos?.reduce((s, p) => s + p.price, 0) ?? 0;
+  const discount = order.discount_amount ?? 0;
+  const unitName = deviceConfig?.unit?.name ?? order.photos?.[0]?.unit?.name ?? '';
+  const outletName = deviceConfig?.outlet?.name ?? '';
 
-      <div className="text-center">
-        <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-          Payment Successful!
-        </h1>
-        <p className="mt-2 text-lg" style={{ color: 'var(--color-neutral-500)' }}>
-          Scan the QR code below to download your photos
+  return (
+    <div className="flex gap-8 items-start justify-center w-full max-w-4xl mx-auto py-8">
+
+      {/* ── Left: QR download ── */}
+      <div className="flex flex-col items-center gap-5 shrink-0">
+        <div className="text-center">
+          <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
+            Pembayaran Berhasil!
+          </h1>
+          <p className="mt-1 text-base" style={{ color: 'var(--color-neutral-500)' }}>
+            Scan QR di bawah untuk mengunduh foto Anda
+          </p>
+        </div>
+
+        <div
+          className="flex flex-col items-center gap-4 p-6 rounded-3xl"
+          style={{
+            background: '#fff',
+            boxShadow: 'var(--shadow-xl)',
+            border: '2px solid var(--color-primary-100)',
+            minWidth: 280,
+          }}
+        >
+          <div
+            className="p-4 rounded-2xl"
+            style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}
+          >
+            <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#013F65" />
+          </div>
+
+          <p className="font-mono text-xs text-center break-all" style={{ color: 'var(--color-neutral-400)' }}>
+            {trxCode}
+          </p>
+
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
+            style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+          >
+            <span>⏱</span> Berlaku 24 jam
+          </div>
+        </div>
+
+        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-400)' }}>
+          Arahkan kamera HP ke QR code untuk mengunduh foto langsung.
         </p>
+
+        <Button size="xl" onClick={handleRestart} className="w-full">
+          Transaksi Baru
+        </Button>
       </div>
 
-      {/* QR card */}
+      {/* ── Right: Receipt ── */}
       <div
-        className="flex flex-col items-center gap-4 p-8 rounded-3xl w-full"
+        className="flex-1 rounded-3xl overflow-hidden"
         style={{
           background: '#fff',
           boxShadow: 'var(--shadow-xl)',
-          border: '2px solid var(--color-primary-100)',
+          border: '2px solid var(--color-neutral-100)',
+          minWidth: 0,
         }}
       >
-        {/* Branded QR frame */}
+        {/* Receipt header */}
         <div
-          className="p-4 rounded-2xl"
-          style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}
+          className="px-6 py-5"
+          style={{
+            background: 'var(--color-primary)',
+            color: '#fff',
+          }}
         >
-          <QRCodeSVG
-            value={order.downloadUrl}
-            size={240}
-            level="H"
-            fgColor="#013F65"
-          />
+          <div className="flex items-center gap-3 mb-3">
+            <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
+            <div>
+              <p className="font-black text-xl leading-tight">Ownize Face Finder</p>
+              {unitName && (
+                <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between text-sm opacity-80">
+            <span>Kode: <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
+            <span>{formatDate(order.created_at ?? order.paid_at)}</span>
+          </div>
         </div>
 
-        <p className="font-mono text-xs" style={{ color: 'var(--color-neutral-400)' }}>
-          {order.orderId}
-        </p>
+        {/* Items */}
+        <div className="px-6 py-4">
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-400)' }}>
+            Item yang dibeli
+          </p>
 
-        {/* Validity note */}
+          <div className="flex flex-col gap-2">
+            {photos.length > 0 ? photos.map((photo, i) => {
+              const name = photo.filename ?? photo.name ?? `Foto ${i + 1}`;
+              const price = photo.price ?? (finalPrice / photos.length);
+              return (
+                <div
+                  key={photo.id ?? i}
+                  className="flex items-center justify-between py-2"
+                  style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
+                      style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                    >
+                      {i + 1}
+                    </div>
+                    <span
+                      className="text-sm truncate"
+                      style={{ color: 'var(--color-neutral-700)' }}
+                      title={name}
+                    >
+                      {name}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
+                    {formatRp(price)}
+                  </span>
+                </div>
+              );
+            }) : (
+              <p className="text-sm" style={{ color: 'var(--color-neutral-400)' }}>Tidak ada data item.</p>
+            )}
+          </div>
+
+          {/* Totals */}
+          <div className="mt-4 flex flex-col gap-1.5">
+            {discount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span style={{ color: 'var(--color-neutral-500)' }}>Diskon</span>
+                <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
+              </div>
+            )}
+            {order.promo_code_used && (
+              <div className="flex justify-between text-sm">
+                <span style={{ color: 'var(--color-neutral-500)' }}>Kode promo</span>
+                <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
+              </div>
+            )}
+            <div
+              className="flex justify-between items-center pt-3 mt-1"
+              style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
+            >
+              <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>Total</span>
+              <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
+                {formatRp(finalPrice)}
+              </span>
+            </div>
+          </div>
+
+          {/* Payment method badge */}
+          <div className="mt-4 flex items-center gap-2">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold"
+              style={{
+                background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
+                color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
+              }}
+            >
+              {isCash ? '💵 Cash' : '📱 QRIS'}
+            </span>
+            {order.paid && (
+              <span
+                className="px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+              >
+                ✓ Lunas
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
         <div
-          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
-          style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+          className="px-6 py-4 text-center text-xs"
+          style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-400)', borderTop: '1px solid var(--color-neutral-100)' }}
         >
-          <span>⏱</span> Valid for 24 hours
+          Terima kasih telah menggunakan Ownize Face Finder!
         </div>
       </div>
-
-      <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-400)' }}>
-        Scan with any phone camera to download your photos directly.
-      </p>
-
-      <Button size="xl" onClick={handleRestart} className="w-64">
-         Buat Transaksi Baru
-      </Button>
     </div>
   );
 }

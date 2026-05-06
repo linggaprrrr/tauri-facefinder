@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "face-finder",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.tauri.dev",
   "build": {
     "frontendDist": "../dist",
@@ -16,11 +16,19 @@
         "width": 1920,
         "height": 1080,
         "resizable": true,
-        "fullscreen": true
+        "fullscreen": false
       }
     ],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVCQzlCMUEzQ0FGMUU2NDMKUldSRDV2SEtvN0hKV3doWG5FN05EUkdpS25wR1NiY0NBUHRoSWhiOThLTTNlS0YrdGFoTmVIQ0cK",
+      "endpoints": [
+        "https://github.com/linggaprrrr/tauri-facefinder/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {

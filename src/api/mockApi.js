@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001';
+const KIOSK_API_KEY = import.meta.env.VITE_KIOSK_API_KEY ?? '';
 
 function base64ToBlob(base64) {
   const [meta, data] = base64.split(',');
@@ -49,22 +50,41 @@ export async function scanFace(base64Image) {
   return { photos };
 }
 
-// Simulate payment confirmation
-export async function confirmPayment({ method, photos }) {
-  await delay(1500);
-  return {
-    success: true,
-    orderId: `ORDER-${Date.now()}`,
-    downloadUrl: `https://example.com/download/${Date.now()}`,
-  };
+// Fetch all units
+export async function getUnits() {
+  const res = await fetch(`${API_BASE}/units/?page=1&limit=100`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const json = await res.json();
+  return json.data ?? [];
 }
 
-// Simulate getting a download QR
-export async function getDownloadQr(orderId) {
-  await delay(500);
-  return { qrValue: `https://example.com/download/${orderId}` };
+// Fetch outlets for a given unit
+export async function getOutletsByUnit(unitId) {
+  const res = await fetch(`${API_BASE}/outlets/get-outlets-by-unit/${unitId}`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const json = await res.json();
+  return json.outlets ?? [];
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// Create kiosk transaction — returns full transaction object from backend
+export async function createTransaction({ outletId, photos }) {
+  const res = await fetch(`${API_BASE}/transactions/kiosk/pay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({
+      device_id: outletId,
+      photos: photos.map((p) => ({ photo_id: p.photo_id })),
+    }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+// Get transaction status by ID
+export async function getTransaction(transactionId) {
+  const res = await fetch(`${API_BASE}/transactions/${transactionId}`, {
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
