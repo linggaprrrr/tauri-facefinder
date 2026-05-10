@@ -18,10 +18,18 @@ function formatRp(amount) {
   return `Rp ${Number(amount ?? 0).toLocaleString('id-ID')}`;
 }
 
+function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
+}
+
 export default function Download() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
-  const { order, deviceConfig, selectedPhotos } = state;
+  const { order, deviceConfig, selectedPhotos, photoEdits } = state;
+  const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
 
   if (!order) {
     navigate('/');
@@ -87,6 +95,55 @@ export default function Download() {
         <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-400)' }}>
           Arahkan kamera HP ke QR code untuk mengunduh foto langsung.
         </p>
+
+        {/* Locally-edited photos download */}
+        {editedPhotos.length > 0 && (
+          <div
+            className="w-full rounded-2xl p-4 flex flex-col gap-3"
+            style={{
+              background: '#fff',
+              border: '1.5px solid var(--color-neutral-200)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-500)' }}>
+              FOTO HASIL EDITAN
+            </p>
+            <div className="flex flex-col gap-2">
+              {editedPhotos.map((p, i) => (
+                <div key={p.id} className="flex items-center gap-3">
+                  <img
+                    src={photoEdits[p.id].dataUrl}
+                    alt=""
+                    className="rounded-lg object-cover shrink-0"
+                    style={{ width: 56, height: 40 }}
+                  />
+                  <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--color-neutral-700)' }}>
+                    Foto {i + 1}
+                  </span>
+                  <button
+                    onClick={() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`)}
+                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                  >
+                    ⬇ Save
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                editedPhotos.forEach((p, i) => {
+                  setTimeout(() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`), i * 300);
+                });
+              }}
+              className="w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
+              style={{ background: 'var(--color-primary)', color: '#fff' }}
+            >
+              ⬇ Download Semua ({editedPhotos.length} foto)
+            </button>
+          </div>
+        )}
 
         <Button size="xl" onClick={handleRestart} className="w-full">
           Transaksi Baru

@@ -1,41 +1,71 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../store/AppContext';
-import { createTransaction, getTransaction } from '../../api/mockApi';
+import { createTransaction, getTransaction, cancelTransaction } from '../../api/mockApi';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
-const METHODS = [
-  { id: 'qris', label: 'QRIS', sub: 'Scan QR untuk bayar', icon: '📱' },
-  { id: 'cash', label: 'Cash', sub: 'Bayar di kasir', icon: '💵' },
-];
-
 const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+function formatCountdown(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
 
 export default function Checkout() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
 
-  const [method, setMethod] = useState(null);
-  // 'idle' | 'creating' | 'waiting' | 'success' | 'error'
+  // 'idle' | 'creating' | 'waiting' | 'error'
   const [status, setStatus] = useState('idle');
   const [transaction, setTransaction] = useState(null);
+  const [countdown, setCountdown] = useState(300);
   const [errorMsg, setErrorMsg] = useState('');
+  // null | 'back' | 'cancel-only'
+  const [confirmMode, setConfirmMode] = useState(null);
 
   const pollRef = useRef(null);
-  const timeoutRef = useRef(null);
+  const countdownRef = useRef(null);
+  // Keep refs in sync for unmount cleanup
+  const transactionRef = useRef(null);
+  const statusRef = useRef('idle');
+
+  useEffect(() => { transactionRef.current = transaction; }, [transaction]);
+  useEffect(() => { statusRef.current = status; }, [status]);
 
   const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
   const { deviceConfig } = state;
 
   function stopPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
   }
 
-  useEffect(() => () => stopPolling(), []);
+  // Auto-cancel on unmount if still waiting (e.g. user navigates via browser back)
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      if (statusRef.current === 'waiting' && transactionRef.current?.id) {
+        cancelTransaction(transactionRef.current.id).catch(() => {});
+      }
+    };
+  }, []);
+
+  const handleCancel = useCallback(async (mode) => {
+    setConfirmMode(null);
+    stopPolling();
+    const trxId = transactionRef.current?.id;
+    setStatus('idle');
+    setTransaction(null);
+    setCountdown(300);
+    setErrorMsg('');
+    if (trxId) {
+      try { await cancelTransaction(trxId); } catch { /* silent */ }
+    }
+    if (mode === 'back') navigate('/');
+  }, [navigate]);
 
   async function handleQrisPay() {
     if (!deviceConfig.unit || !deviceConfig.outlet) {
@@ -51,44 +81,46 @@ export default function Checkout() {
         photos: state.selectedPhotos,
       });
       setTransaction(trx);
+      const dueSeconds = (trx.payment_due_minutes ?? 5) * 60;
+      setCountdown(dueSeconds);
       setStatus('waiting');
-      startPolling(trx.id);
-    } catch {
-      setErrorMsg('Gagal membuat transaksi. Coba lagi.');
+      startPolling(trx.id, dueSeconds);
+    } catch (err) {
+      setErrorMsg(`Gagal membuat transaksi: ${err.message}`);
       setStatus('error');
     }
   }
 
-  function startPolling(transactionId) {
+  function startPolling(transactionId, dueSeconds) {
+    // Poll for payment status
     pollRef.current = setInterval(async () => {
       try {
         const trx = await getTransaction(transactionId);
         if (trx.paid) {
           stopPolling();
-          setTransaction(trx);
           dispatch({ type: 'SET_ORDER', payload: trx });
-          setStatus('success');
           navigate('/download');
         }
-      } catch {
-        // silent — keep polling
-      }
+      } catch { /* silent */ }
     }, POLL_INTERVAL_MS);
 
-    timeoutRef.current = setTimeout(() => {
-      stopPolling();
-      setErrorMsg('Waktu pembayaran habis. Silakan coba lagi.');
-      setStatus('error');
-    }, POLL_TIMEOUT_MS);
+    // Countdown tick
+    let remaining = dueSeconds;
+    countdownRef.current = setInterval(() => {
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        stopPolling();
+        setErrorMsg('Waktu pembayaran habis. Transaksi dibatalkan otomatis.');
+        setStatus('error');
+        if (transactionRef.current?.id) {
+          cancelTransaction(transactionRef.current.id).catch(() => {});
+        }
+      }
+    }, 1000);
   }
 
-  function handleCashConfirm() {
-    // Cash is handled manually at counter — just navigate forward
-    dispatch({ type: 'SET_ORDER', payload: { cash: true, selectedPhotos: state.selectedPhotos, total } });
-    navigate('/download');
-  }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (status === 'creating') {
     return (
@@ -98,148 +130,297 @@ export default function Checkout() {
     );
   }
 
+  const countdownColor = countdown <= 60
+    ? 'var(--color-error)'
+    : countdown <= 120
+      ? 'var(--color-warning)'
+      : 'var(--color-primary)';
+
   return (
-    <div className="flex flex-col items-center gap-8 max-w-lg mx-auto w-full py-8">
-      {/* Amount */}
-      <div className="text-center">
-        <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-          Pilih Pembayaran
-        </h1>
-        <p className="text-4xl font-black mt-2" style={{ color: 'var(--color-primary)' }}>
-          Rp {total.toLocaleString('id-ID')}
-        </p>
-        <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-500)' }}>
-          {state.selectedPhotos.length} foto
-        </p>
-      </div>
+    <div className="flex flex-col items-center gap-8 max-w-3xl mx-auto w-full py-8">
 
-      {/* Method cards — only shown when not waiting for payment */}
-      {status !== 'waiting' && (
-        <div className="flex gap-4 w-full">
-          {METHODS.map(({ id, icon, label, sub }) => (
-            <button
-              key={id}
-              className="flex-1 py-6 rounded-xl font-bold text-lg transition-all active:scale-97"
-              style={{
-                background: method === id ? 'var(--color-primary-50)' : '#fff',
-                border: method === id
-                  ? '2.5px solid var(--color-primary)'
-                  : '2px solid var(--color-neutral-200)',
-                color: method === id ? 'var(--color-primary)' : 'var(--color-neutral-700)',
-                boxShadow: method === id ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-              }}
-              onClick={() => { setMethod(id); setStatus('idle'); setErrorMsg(''); }}
-            >
-              <div className="text-3xl mb-1">{icon}</div>
-              <div>{label}</div>
-              <div className="text-sm font-normal mt-1" style={{ color: 'var(--color-neutral-500)' }}>
-                {sub}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── QRIS panel ── */}
-      {method === 'qris' && status === 'idle' && (
-        <div
-          className="flex flex-col items-center gap-4 p-6 rounded-2xl w-full"
-          style={{ background: '#fff', boxShadow: 'var(--shadow-lg)', border: '1.5px solid var(--color-neutral-100)' }}
-        >
-          <p className="text-sm text-center" style={{ color: 'var(--color-neutral-600)' }}>
-            Klik tombol di bawah untuk membuat tagihan QRIS.
-          </p>
-          <Button size="lg" onClick={handleQrisPay} className="w-full">
-            Bayar dengan QRIS →
-          </Button>
-        </div>
-      )}
-
-      {/* ── Waiting for QRIS payment ── */}
-      {status === 'waiting' && transaction && (
-        <div
-          className="flex flex-col items-center gap-5 p-6 rounded-2xl w-full"
-          style={{ background: '#fff', boxShadow: 'var(--shadow-xl)', border: '2px solid var(--color-primary-100)' }}
-        >
-          <p className="font-bold text-lg" style={{ color: 'var(--color-neutral-800)' }}>
-            Scan QR untuk membayar
-          </p>
-
-          <div
-            className="p-4 rounded-2xl"
-            style={{ background: 'var(--color-neutral-50)', border: '1.5px solid var(--color-neutral-200)' }}
-          >
-            <QRCodeSVG
-              value={transaction.payment_url}
-              size={220}
-              level="H"
-              fgColor="#013F65"
-            />
-          </div>
-
+      {/* ── Idle: summary + pay button ── */}
+      {status === 'idle' && (
+        <div className="flex flex-col gap-5 w-full max-w-md">
           <div className="text-center">
-            <p className="text-xs font-mono" style={{ color: 'var(--color-neutral-400)' }}>
-              {transaction.trx_code}
-            </p>
-            <p className="text-sm mt-2" style={{ color: 'var(--color-neutral-500)' }}>
-              Total: <strong style={{ color: 'var(--color-primary)' }}>Rp {total.toLocaleString('id-ID')}</strong>
+            <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
+              Konfirmasi Pembayaran
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-500)' }}>
+              {state.selectedPhotos.length} foto dipilih
             </p>
           </div>
 
           <div
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
-            style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
           >
-            <span className="animate-pulse">⏳</span> Menunggu pembayaran…
+            {state.selectedPhotos.map((photo, i) => (
+              <div
+                key={photo.id}
+                className="flex items-center justify-between px-4 py-3"
+                style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                    style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                  >
+                    {i + 1}
+                  </div>
+                  <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
+                    {photo.filename ?? `Foto ${i + 1}`}
+                  </span>
+                </div>
+                <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
+                  Rp {photo.price.toLocaleString('id-ID')}
+                </span>
+              </div>
+            ))}
+            <div
+              className="flex items-center justify-between px-4 py-4"
+              style={{ background: 'var(--color-primary-50)' }}
+            >
+              <span className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>Total</span>
+              <span className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
+                Rp {total.toLocaleString('id-ID')}
+              </span>
+            </div>
           </div>
 
-          <button
-            className="text-sm underline"
-            style={{ color: 'var(--color-neutral-400)' }}
-            onClick={() => { stopPolling(); setStatus('idle'); setTransaction(null); }}
-          >
-            Batalkan
-          </button>
-        </div>
-      )}
-
-      {/* ── Cash panel ── */}
-      {method === 'cash' && status === 'idle' && (
-        <div
-          className="flex flex-col items-center gap-5 p-6 rounded-2xl w-full text-center"
-          style={{ background: '#fff', boxShadow: 'var(--shadow-lg)', border: '1.5px solid var(--color-neutral-100)' }}
-        >
-          <p className="text-lg font-medium" style={{ color: 'var(--color-neutral-700)' }}>
-            Bayar{' '}
-            <strong style={{ color: 'var(--color-primary)' }}>
-              Rp {total.toLocaleString('id-ID')}
-            </strong>{' '}
-            di kasir, lalu tekan Konfirmasi.
-          </p>
-          <Button size="lg" onClick={handleCashConfirm} className="w-full">
-            Konfirmasi Pembayaran ✓
+          <Button size="lg" onClick={handleQrisPay} className="w-full">
+            📱 Bayar dengan QRIS →
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/cart')} className="w-full">
+            ← Kembali ke Keranjang
           </Button>
         </div>
       )}
 
-      {/* Error */}
-      {status === 'error' && (
-        <div
-          className="flex flex-col items-center gap-3 w-full px-4 py-4 rounded-xl text-center"
-          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
-        >
-          <p className="font-semibold">{errorMsg || 'Terjadi kesalahan.'}</p>
-          <button
-            className="text-sm underline font-medium"
-            onClick={() => { setStatus('idle'); setErrorMsg(''); }}
+      {/* ── QRIS Payment Screen ── */}
+      {status === 'waiting' && transaction && (
+        <div className="flex gap-6 w-full items-start">
+
+          {/* Left: QR Code card */}
+          <div
+            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0"
+            style={{
+              background: '#fff',
+              boxShadow: 'var(--shadow-xl)',
+              border: '2px solid var(--color-primary-100)',
+              minWidth: 300,
+            }}
           >
-            Coba lagi
-          </button>
+            {/* QRIS badge */}
+            <div className="flex items-center gap-2">
+              <div
+                className="px-3 py-1 rounded-full text-xs font-black tracking-widest"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
+              >
+                QRIS
+              </div>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+              >
+                <span className="animate-pulse">●</span> Menunggu pembayaran
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div
+              className="p-4 rounded-2xl"
+              style={{ background: 'var(--color-neutral-50)', border: '1.5px solid var(--color-neutral-200)' }}
+            >
+              <QRCodeSVG
+                value={transaction.payment_url}
+                size={220}
+                level="H"
+                fgColor="#013F65"
+              />
+            </div>
+
+            {/* Countdown */}
+            <div className="flex flex-col items-center gap-1 w-full">
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
+                Batas waktu pembayaran
+              </p>
+              <div
+                className="text-4xl font-black font-mono tabular-nums"
+                style={{ color: countdownColor, transition: 'color 0.5s' }}
+              >
+                {formatCountdown(countdown)}
+              </div>
+              {/* Progress bar */}
+              <div
+                className="w-full rounded-full overflow-hidden mt-1"
+                style={{ height: 6, background: 'var(--color-neutral-200)' }}
+              >
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(countdown / ((transaction.payment_due_minutes ?? 5) * 60)) * 100}%`,
+                    background: countdownColor,
+                    transition: 'width 1s linear, background 0.5s',
+                  }}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-center" style={{ color: 'var(--color-neutral-500)' }}>
+              Buka e-wallet atau mobile banking,<br />lalu scan QR di atas.
+            </p>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2 w-full">
+              <button
+                onClick={() => setConfirmMode('back')}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{
+                  background: 'var(--color-neutral-100)',
+                  color: 'var(--color-neutral-600)',
+                  border: '1.5px solid var(--color-neutral-200)',
+                }}
+              >
+                ← Kembali &amp; Batalkan
+              </button>
+              <button
+                onClick={() => setConfirmMode('cancel-only')}
+                className="w-full py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}
+              >
+                Batalkan transaksi
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Order summary */}
+          <div
+            className="flex-1 flex flex-col rounded-3xl overflow-hidden"
+            style={{
+              background: '#fff',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1.5px solid var(--color-neutral-100)',
+            }}
+          >
+            <div className="px-6 py-4" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+              <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Kode Transaksi</p>
+              <p className="font-mono font-black text-lg">{transaction.trx_code}</p>
+            </div>
+
+            <div className="px-6 pt-4 flex flex-col gap-2">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-400)' }}>
+                Rincian Pesanan
+              </p>
+              {state.selectedPhotos.map((photo, i) => (
+                <div
+                  key={photo.id}
+                  className="flex items-center justify-between py-2.5"
+                  style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                      style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                    >
+                      {i + 1}
+                    </div>
+                    <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
+                      {photo.filename ?? `Foto ${i + 1}`}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
+                    Rp {photo.price.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="mx-6 my-5 p-4 rounded-2xl flex items-center justify-between"
+              style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary-400)' }}>
+                  Total Pembayaran
+                </p>
+                <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
+                  Rp {total.toLocaleString('id-ID')}
+                </p>
+              </div>
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
+              >
+                📱
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {status !== 'waiting' && (
-        <Button variant="ghost" onClick={() => navigate('/cart')}>← Kembali ke Keranjang</Button>
+      {/* ── Confirm cancel modal ── */}
+      {confirmMode && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="flex flex-col gap-5 p-8 rounded-3xl w-full max-w-sm mx-4 text-center"
+            style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}
+          >
+            <div className="text-4xl">⚠️</div>
+            <div>
+              <p className="text-lg font-black" style={{ color: 'var(--color-neutral-900)' }}>
+                Batalkan Pembayaran?
+              </p>
+              <p className="text-sm mt-2" style={{ color: 'var(--color-neutral-500)' }}>
+                {confirmMode === 'back'
+                  ? 'Transaksi akan dibatalkan dan kamu akan kembali ke halaman awal.'
+                  : 'Transaksi ini akan dibatalkan. Kamu bisa membuat tagihan baru.'}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmMode(null)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{
+                  background: 'var(--color-neutral-100)',
+                  color: 'var(--color-neutral-700)',
+                  border: '1.5px solid var(--color-neutral-200)',
+                }}
+              >
+                Lanjut Bayar
+              </button>
+              <button
+                onClick={() => handleCancel(confirmMode)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+              >
+                Ya, Batalkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Error ── */}
+      {status === 'error' && (
+        <div className="flex flex-col items-center gap-4 w-full max-w-md">
+          <div
+            className="flex flex-col items-center gap-3 w-full px-6 py-5 rounded-2xl text-center"
+            style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+          >
+            <span className="text-3xl">⚠️</span>
+            <p className="font-semibold">{errorMsg || 'Terjadi kesalahan.'}</p>
+          </div>
+          <Button onClick={() => { setStatus('idle'); setErrorMsg(''); }} className="w-full">
+            Coba Lagi
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/cart')} className="w-full">
+            ← Kembali ke Keranjang
+          </Button>
+        </div>
       )}
     </div>
   );

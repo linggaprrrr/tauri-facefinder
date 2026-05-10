@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage, Text, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import { useNavigate } from 'react-router-dom';
@@ -7,12 +7,25 @@ import { useHistory } from '../../hooks/useHistory';
 import StickerPanel from './StickerPanel';
 import TextPanel from './TextPanel';
 import FilterPanel from './FilterPanel';
+import FramePanel, { generateFrameDataUri } from './FramePanel';
 import EditorToolbar from './EditorToolbar';
 import Button from '../common/Button';
 
-const LANDSCAPE = { width: 800, height: 533 };
-const PORTRAIT  = { width: 533, height: 800 };
+const MAX_CANVAS_W = 780;
+const MAX_CANVAS_H = 520;
 const DEFAULT_FILTERS = { list: [], brightness: 0, contrast: 0 };
+
+function fitDimensions(natW, natH) {
+  if (!natW || !natH) return { width: MAX_CANVAS_W, height: Math.round(MAX_CANVAS_W * 0.667) };
+  const ratio = natW / natH;
+  let w = MAX_CANVAS_W;
+  let h = Math.round(w / ratio);
+  if (h > MAX_CANVAS_H) {
+    h = MAX_CANVAS_H;
+    w = Math.round(h * ratio);
+  }
+  return { width: w, height: h };
+}
 
 function CanvasElement({ element, isSelected, onSelect, onChange }) {
   const shapeRef = useRef(null);
@@ -110,13 +123,16 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
   );
 }
 
-function BackgroundImage({ src, filters, canvasW, canvasH }) {
-  const [image] = useImage(src, 'anonymous');
+function BackgroundImage({ src, filters, canvasW, canvasH, onLoad }) {
+  const [image, status] = useImage(src, 'anonymous');
   const imageRef = useRef(null);
 
   useEffect(() => {
-    if (imageRef.current) imageRef.current.cache();
-  }, [image, filters]);
+    if (status === 'loaded') {
+      if (imageRef.current) imageRef.current.cache();
+      onLoad?.();
+    }
+  }, [image, status, filters, onLoad]);
 
   return (
     <KonvaImage
@@ -131,83 +147,128 @@ function BackgroundImage({ src, filters, canvasW, canvasH }) {
   );
 }
 
+function FrameOverlay({ src, canvasW, canvasH }) {
+  const [image] = useImage(src);
+  if (!image) return null;
+  return (
+    <KonvaImage
+      image={image}
+      x={0} y={0}
+      width={canvasW}
+      height={canvasH}
+      listening={false}
+    />
+  );
+}
+
 const PANEL_TABS = [
   { id: 'stickers', label: '😀  Stickers' },
-  { id: 'text',     label: '✏️  Text' },
-  { id: 'filters',  label: '🎨  Filters' },
+  { id: 'text',     label: '✏️  Text'     },
+  { id: 'filters',  label: '🎨  Filters'  },
+  { id: 'frames',   label: '🖼  Bingkai'  },
 ];
 
 export default function PhotoEditor() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const stageRef = useRef(null);
 
   const selectedPhotos = state.selectedPhotos;
-
-  // Which photo in the queue we're currently editing
   const [photoIndex, setPhotoIndex] = useState(0);
   const currentPhoto = selectedPhotos[photoIndex];
 
-  // Per-photo saved edits: { [photoId]: { elements, filters } }
-  const savedEditsRef = useRef({});
+  // Initialize savedEditsRef from AppContext so back-navigation restores edits
+  const savedEditsRef = useRef({ ...state.photoEdits });
 
-  const { state: elements, push: pushHistory, undo, redo, reset: resetHistory, canUndo, canRedo } = useHistory([]);
+  // Lazy-init each piece of state from persisted edits for the first photo
+  const initEdit = state.photoEdits[currentPhoto?.id] ?? {};
+  const { state: elements, push: pushHistory, undo, redo, reset: resetHistory, canUndo, canRedo } = useHistory(initEdit.elements ?? []);
   const [selectedId, setSelectedId] = useState(null);
   const [activePanel, setActivePanel] = useState('stickers');
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [canvas, setCanvas] = useState(LANDSCAPE);
+  const [filters, setFilters] = useState(initEdit.filters ?? DEFAULT_FILTERS);
+  const [frame, setFrame] = useState(initEdit.frame ?? 'none');
+  const [canvas, setCanvas] = useState(fitDimensions(null, null));
+  const [isLoading, setIsLoading] = useState(false);
+  const handleImageLoad = useCallback(() => setIsLoading(false), []);
 
   const photoUrl = currentPhoto?.url;
-
-  // Cache of photoId → canvas dimensions, populated eagerly for all selected photos
   const orientationCache = useRef({});
 
+  // Eagerly load dimensions for all selected photos
   useEffect(() => {
     selectedPhotos.forEach((photo) => {
       if (!photo.url || orientationCache.current[photo.id]) return;
       const img = new Image();
       img.onload = () => {
-        orientationCache.current[photo.id] =
-          img.naturalHeight > img.naturalWidth ? PORTRAIT : LANDSCAPE;
+        orientationCache.current[photo.id] = fitDimensions(img.naturalWidth, img.naturalHeight);
       };
       img.src = photo.url;
     });
   }, [selectedPhotos]);
 
-  // Sync canvas orientation whenever the current photo changes
+  // Sync canvas dimensions + loading state when current photo changes
   useEffect(() => {
     if (!photoUrl) return;
+    setIsLoading(true);
     const cached = orientationCache.current[currentPhoto.id];
     if (cached) { setCanvas(cached); return; }
     const img = new Image();
     img.onload = () => {
-      const dims = img.naturalHeight > img.naturalWidth ? PORTRAIT : LANDSCAPE;
+      const dims = fitDimensions(img.naturalWidth, img.naturalHeight);
       orientationCache.current[currentPhoto.id] = dims;
       setCanvas(dims);
     };
+    img.onerror = () => setIsLoading(false);
     img.src = photoUrl;
   }, [photoUrl, currentPhoto?.id]);
 
-  // Navigate to a photo by index, saving current edits first
+  const frameDataUri = useMemo(
+    () => generateFrameDataUri(frame, canvas.width, canvas.height),
+    [frame, canvas.width, canvas.height]
+  );
+
+  // Export the current stage and persist edits to AppContext
+  function exportAndSave() {
+    const dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+    const edit = { elements, filters, frame, dataUrl };
+    savedEditsRef.current[currentPhoto.id] = edit;
+    dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
+    return dataUrl;
+  }
+
   function navigateTo(newIndex) {
     if (newIndex < 0 || newIndex >= selectedPhotos.length) return;
 
-    // Persist current photo's edits
-    savedEditsRef.current[currentPhoto.id] = { elements, filters };
+    exportAndSave();
 
-    // Restore saved edits for the target photo (or use defaults)
     const saved = savedEditsRef.current[selectedPhotos[newIndex].id];
     resetHistory(saved?.elements ?? []);
     setFilters(saved?.filters ?? DEFAULT_FILTERS);
+    setFrame(saved?.frame ?? 'none');
     setSelectedId(null);
     setActivePanel('stickers');
 
-    // Update canvas orientation synchronously if already cached — prevents
-    // the Stage from briefly rendering the new photo at the wrong dimensions
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(cached);
 
     setPhotoIndex(newIndex);
+  }
+
+  function handleDone() {
+    exportAndSave();
+    navigate('/cart');
+  }
+
+  function downloadCurrentPhoto() {
+    const dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.92 });
+    if (!dataUrl) return;
+    const edit = { elements, filters, frame, dataUrl };
+    savedEditsRef.current[currentPhoto.id] = edit;
+    dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `edited_photo_${photoIndex + 1}.jpg`;
+    a.click();
   }
 
   function handleStageClick(e) {
@@ -229,11 +290,11 @@ export default function PhotoEditor() {
     }]);
   }
 
-  function addText({ text, fontSize, color, fontFamily }) {
+  function addText({ text, fontSize, color, fontFamily, fontStyle = 'normal', align = 'center' }) {
     pushHistory([...elements, {
       id: `text-${Date.now()}`,
       type: 'text',
-      attrs: { text, fontSize, fill: color, fontFamily, x: 80, y: 80, rotation: 0, scaleX: 1, scaleY: 1 },
+      attrs: { text, fontSize, fill: color, fontFamily, fontStyle, align, x: 80, y: 80, rotation: 0, scaleX: 1, scaleY: 1 },
     }]);
   }
 
@@ -264,7 +325,10 @@ export default function PhotoEditor() {
   if (!currentPhoto) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p style={{ color: 'var(--color-neutral-500)' }}>No photos selected. <button onClick={() => navigate('/gallery')} style={{ color: 'var(--color-primary)' }}>Go back</button></p>
+        <p style={{ color: 'var(--color-neutral-500)' }}>
+          No photos selected.{' '}
+          <button onClick={() => navigate('/gallery')} style={{ color: 'var(--color-primary)' }}>Go back</button>
+        </p>
       </div>
     );
   }
@@ -302,10 +366,10 @@ export default function PhotoEditor() {
           </button>
         </div>
 
-        <div className="flex gap-3 shrink-0">
+        <div className="flex gap-2 shrink-0">
           <Button variant="ghost" onClick={() => navigate('/gallery')}>← Gallery</Button>
-          <Button onClick={() => navigate('/cart')}>
-            {isLast ? 'Done ✓' : `Next →`}
+          <Button onClick={handleDone}>
+            {isLast ? 'Done ✓' : 'Next →'}
           </Button>
         </div>
       </div>
@@ -323,15 +387,30 @@ export default function PhotoEditor() {
 
           {/* Canvas */}
           <div
-            className="overflow-hidden shrink-0"
+            className="relative overflow-hidden shrink-0"
             style={{
               width: canvas.width,
               height: canvas.height,
               boxShadow: 'var(--shadow-xl)',
               border: '2px solid var(--color-neutral-200)',
-              alignSelf: 'center'
+              alignSelf: 'center',
+              transition: 'width 0.2s ease, height 0.2s ease',
             }}
           >
+            {isLoading && (
+              <div
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
+                style={{ background: 'var(--color-neutral-100)' }}
+              >
+                <div
+                  className="w-10 h-10 rounded-full border-4 animate-spin"
+                  style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }}
+                />
+                <span className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
+                  Loading photo…
+                </span>
+              </div>
+            )}
             <Stage
               key={`${canvas.width}x${canvas.height}`}
               width={canvas.width}
@@ -341,7 +420,15 @@ export default function PhotoEditor() {
               onTouchStart={handleStageClick}
             >
               <Layer>
-                {photoUrl && <BackgroundImage src={photoUrl} filters={filters} canvasW={canvas.width} canvasH={canvas.height} />}
+                {photoUrl && (
+                  <BackgroundImage
+                    src={photoUrl}
+                    filters={filters}
+                    canvasW={canvas.width}
+                    canvasH={canvas.height}
+                    onLoad={handleImageLoad}
+                  />
+                )}
                 {elements.map((el) => (
                   <CanvasElement
                     key={el.id}
@@ -351,6 +438,10 @@ export default function PhotoEditor() {
                     onChange={handleChange}
                   />
                 ))}
+                {/* Frame sits on top of everything, non-interactive */}
+                {frameDataUri && (
+                  <FrameOverlay src={frameDataUri} canvasW={canvas.width} canvasH={canvas.height} />
+                )}
               </Layer>
             </Stage>
           </div>
@@ -377,7 +468,7 @@ export default function PhotoEditor() {
           </div>
         </div>
 
-        {/* Right: photo queue strip + active panel */}
+        {/* Right: photo queue + active panel */}
         <div className="w-64 shrink-0 flex flex-col gap-3 min-h-0">
           {/* Photo queue */}
           <div
@@ -388,10 +479,7 @@ export default function PhotoEditor() {
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <p
-              className="text-xs font-bold px-3 pt-3 pb-2"
-              style={{ color: 'var(--color-neutral-500)' }}
-            >
+            <p className="text-xs font-bold px-3 pt-3 pb-2" style={{ color: 'var(--color-neutral-500)' }}>
               SELECTED PHOTOS
             </p>
             <div className="flex flex-col gap-1 px-2 pb-2 overflow-y-auto no-scrollbar" style={{ maxHeight: 300, paddingTop: 10 }}>
@@ -418,10 +506,12 @@ export default function PhotoEditor() {
                     >
                       Photo {i + 1}
                     </p>
-                    {p.label && (
-                      <p className="text-xs truncate" style={{ color: 'var(--color-neutral-400)' }}>
-                        {p.label}
-                      </p>
+                    {/* Saved edit indicator */}
+                    {savedEditsRef.current[p.id]?.dataUrl && i !== photoIndex && (
+                      <p className="text-xs" style={{ color: 'var(--color-success)' }}>✓ Saved</p>
+                    )}
+                    {p.label && !savedEditsRef.current[p.id]?.dataUrl && (
+                      <p className="text-xs truncate" style={{ color: 'var(--color-neutral-400)' }}>{p.label}</p>
                     )}
                   </div>
                 </button>
@@ -434,6 +524,7 @@ export default function PhotoEditor() {
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
+            {activePanel === 'frames'   && <FramePanel activeFrame={frame} onSelect={setFrame} />}
             {!activePanel && (
               <div
                 className="rounded-2xl p-6 flex flex-col items-center justify-center h-32 text-center"

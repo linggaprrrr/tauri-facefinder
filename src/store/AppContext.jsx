@@ -18,6 +18,7 @@ const initialState = {
   editingPhoto: null,       // photo currently open in editor
   order: null,              // order details after payment
   deviceConfig: loadDeviceConfig(), // persisted unit + outlet selection
+  photoEdits: {},           // { [photoId]: { elements, filters, frame, dataUrl } }
 };
 
 function reducer(state, action) {
@@ -39,6 +40,11 @@ function reducer(state, action) {
       return { ...state, editingPhoto: action.payload };
     case 'SET_ORDER':
       return { ...state, order: action.payload };
+    case 'SET_PHOTO_EDIT':
+      return {
+        ...state,
+        photoEdits: { ...state.photoEdits, [action.payload.id]: action.payload.data },
+      };
     case 'SET_DEVICE_CONFIG': {
       localStorage.setItem('deviceConfig', JSON.stringify(action.payload));
       return { ...state, deviceConfig: action.payload };

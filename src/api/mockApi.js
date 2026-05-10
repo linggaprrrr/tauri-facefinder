@@ -44,7 +44,7 @@ export async function scanFace(base64Image) {
     outlet_name: item.outlet_name ?? 'Unknown',
     bounding_box: item.bounding_box,
     uploaded_at: item.uploaded_at,
-    price: 15000,
+    price: item.photo_price ?? 0,
   }));
 
   return { photos };
@@ -76,8 +76,25 @@ export async function createTransaction({ outletId, photos }) {
       photos: photos.map((p) => ({ photo_id: p.photo_id })),
     }),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  return res.json();
+
+  if (!res.ok) {
+    let detail = `Server error ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? body.message ?? body.error ?? JSON.stringify(body);
+    } catch { /* non-JSON body, keep default */ }
+    throw new Error(detail);
+  }
+
+  const json = await res.json();
+  // Backend wraps the transaction: { transaction: {...}, payment_url, token_id, ... }
+  // Flatten so callers get one consistent object
+  return {
+    ...(json.transaction ?? json),
+    payment_url: json.payment_url ?? json.transaction?.payment_url,
+    token_id: json.token_id,
+    payment_due_minutes: json['doku response']?.payment?.payment_due_date ?? 5,
+  };
 }
 
 // Get transaction status by ID
@@ -86,5 +103,15 @@ export async function getTransaction(transactionId) {
     headers: { 'api-key': KIOSK_API_KEY },
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+// Cancel a pending transaction
+export async function cancelTransaction(transactionId) {
+  const res = await fetch(`${API_BASE}/transactions/${transactionId}/cancel`, {
+    method: 'PATCH',
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new Error(`Cancel error ${res.status}`);
   return res.json();
 }
