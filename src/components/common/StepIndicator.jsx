@@ -1,4 +1,4 @@
-const STEPS = ['Scan', 'Gallery', 'Editor', 'Cart', 'Download'];
+const STEPS = ['Scan', 'Gallery', 'Download'];
 
 export default function StepIndicator({ current }) {
   return (

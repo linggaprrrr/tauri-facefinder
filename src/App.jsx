@@ -5,10 +5,7 @@ import { AppProvider } from './store/AppContext';
 import StepIndicator from './components/common/StepIndicator';
 import FaceScan from './components/FaceScan/FaceScan';
 import Gallery from './components/Gallery/Gallery';
-import Cart from './components/Cart/Cart';
-import Checkout from './components/Cart/Checkout';
 import Download from './components/Download/Download';
-import Editor from './components/Editor/PhotoEditor';
 import SettingsModal from './components/Settings/SettingsModal';
 import AboutModal from './components/Settings/AboutModal';
 import { useApp } from './store/AppContext';
@@ -16,10 +13,7 @@ import { useApp } from './store/AppContext';
 const ROUTE_STEP = {
   '/': 0,
   '/gallery': 1,
-  '/editor': 2,
-  '/cart': 3,
-  '/checkout': 3,
-  '/download': 4,
+  '/download': 2,
 };
 
 function Layout() {
@@ -119,9 +113,6 @@ function Layout() {
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />
-          <Route path="/editor" element={<Editor />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
           <Route path="/download" element={<Download />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

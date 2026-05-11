@@ -73,8 +73,6 @@ export default function Gallery() {
     });
   }
 
-  const totalPrice = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  
   return (
     <div className="flex flex-col h-full gap-5 max-w-8xl mx-auto w-full">
       {/* Page header */}
@@ -137,16 +135,11 @@ export default function Gallery() {
             boxShadow: 'var(--shadow-lg)',
           }}
         >
-          <div>
-            <p className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>
-              {selectedPhotos.length} photo{selectedPhotos.length > 1 ? 's' : ''} selected
-            </p>
-            <p className="text-lg font-black" style={{ color: 'var(--color-primary)' }}>
-              Rp {totalPrice.toLocaleString('id-ID')}
-            </p>
-          </div>
-          <Button size="lg" onClick={() => navigate('/editor')}>
-            Continue →
+          <p className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>
+            {selectedPhotos.length} photo{selectedPhotos.length > 1 ? 's' : ''} selected
+          </p>
+          <Button size="lg" onClick={() => navigate('/download')}>
+            Download →
           </Button>
         </div>
       )}
