@@ -11,18 +11,25 @@ export default function Gallery() {
   const { photos, selectedPhotos } = state;
   const ratioRequests = useRef(new Set());
 
+  const configuredOutlet = state.deviceConfig?.outlet?.name ?? null;
+
+  const basePhotos = useMemo(
+    () => configuredOutlet ? photos.filter((p) => p.outlet_name === configuredOutlet) : photos,
+    [photos, configuredOutlet]
+  );
+
   const outlets = useMemo(() => {
-    const names = photos.map((p) => p.outlet_name).filter(Boolean);
+    const names = basePhotos.map((p) => p.outlet_name).filter(Boolean);
     return ['All', ...Array.from(new Set(names))];
-  }, [photos]);
+  }, [basePhotos]);
 
   const [activeOutlet, setActiveOutlet] = useState('All');
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [photoRatios, setPhotoRatios] = useState({});
 
   const visiblePhotos = useMemo(
-    () => activeOutlet === 'All' ? photos : photos.filter((p) => p.outlet_name === activeOutlet),
-    [photos, activeOutlet]
+    () => activeOutlet === 'All' ? basePhotos : basePhotos.filter((p) => p.outlet_name === activeOutlet),
+    [basePhotos, activeOutlet]
   );
 
   useEffect(() => {
@@ -82,7 +89,7 @@ export default function Gallery() {
             Your Photos
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-500)' }}>
-            {photos.length} photos found — tap to preview and select
+            {basePhotos.length} photos found — tap to preview and select
           </p>
         </div>
         <Button variant="ghost" onClick={() => navigate('/')}>← Rescan</Button>
