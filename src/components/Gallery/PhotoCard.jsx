@@ -169,7 +169,7 @@ export default function PhotoCard({
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)' }}
         >
           <span className="text-white text-sm font-bold">
-            Rp {photo.price.toLocaleString('id-ID')}
+            
           </span>
         </div>
       </div>
