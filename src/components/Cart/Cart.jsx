@@ -18,7 +18,7 @@ export default function Cart() {
         <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
           Your Cart
         </h1>
-        <Button variant="ghost" onClick={() => navigate('/gallery')}>← Gallery</Button>
+        <Button variant="ghost" onClick={() => navigate('/editor')}>← Editor</Button>
       </div>
 
       {selectedPhotos.length === 0 ? (

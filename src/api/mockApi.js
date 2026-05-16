@@ -38,6 +38,9 @@ export async function scanFace(base64Image) {
     photo_id: item.photo_id,
     filename: item.filename,
     url: item.original_path,
+    // proxy_url = backend-resized version for safe editor preview.
+    // Falls back to original so the editor stays usable when no proxy is available.
+    proxyUrl: item.proxy_url ?? item.original_path,
     thumbnail: item.thumbnail_path,
     similarity: item.similarity,
     label: similarityLabel(item.similarity),

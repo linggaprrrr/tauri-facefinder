@@ -46,6 +46,11 @@ function reducer(state, action) {
         ...state,
         photoEdits: { ...state.photoEdits, [action.payload.id]: action.payload.data },
       };
+    case 'CLEAR_PHOTO_EDIT': {
+      const next = { ...state.photoEdits };
+      delete next[action.payload.id];
+      return { ...state, photoEdits: next };
+    }
     case 'SET_LAYOUT_EDIT':
       return {
         ...state,

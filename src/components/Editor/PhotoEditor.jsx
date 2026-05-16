@@ -189,6 +189,59 @@ function FrameOverlay({ src, canvasW, canvasH }) {
   );
 }
 
+// DOM-based watermark — lives outside the Konva canvas so stage.toDataURL()
+// can never capture it. Repositions randomly every 1.2 s and pulses opacity.
+function WatermarkOverlay({ canvasW, canvasH }) {
+  const [pos, setPos] = useState({ x: 60, y: 60 });
+  const [opacity, setOpacity] = useState(0.35);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const col = Math.floor(Math.random() * 3);
+      const row = Math.floor(Math.random() * 3);
+      setPos({ x: (canvasW / 3) * col + 20, y: (canvasH / 3) * row + 20 });
+    }, 1200);
+    return () => clearInterval(iv);
+  }, [canvasW, canvasH]);
+
+  useEffect(() => {
+    let t = 0;
+    const iv = setInterval(() => {
+      t += 0.12;
+      setOpacity(0.25 + 0.15 * Math.abs(Math.sin(t)));
+    }, 80);
+    return () => clearInterval(iv);
+  }, []);
+
+  const offsets = [-240, -120, 0, 120, 240, 360];
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6, overflow: 'hidden' }}>
+      {offsets.map((offset) => (
+        <span
+          key={offset}
+          style={{
+            position: 'absolute',
+            left: pos.x + offset * 0.9,
+            top: pos.y + offset * 0.5,
+            transform: 'rotate(-28deg)',
+            transformOrigin: '0 0',
+            fontSize: 32,
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold',
+            color: 'white',
+            opacity,
+            textShadow: '0 0 6px rgba(0,0,0,0.6)',
+            userSelect: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          OWNIZE PHOTO
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Clamp photo offset so it always covers the slot (no gray gaps).
 function clampOffset(x, y, imgW, imgH, slotW, slotH) {
   return {
@@ -217,7 +270,7 @@ function getTouchDist(touches) {
 }
 
 function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
-  const [image] = useImage(photo?.url, 'anonymous');
+  const [image] = useImage(photo?.proxyUrl ?? photo?.url, 'anonymous');
   const slotPx = toSlotPx(slot, canvasW, canvasH);
   const lastPinchDist = useRef(null);
 
@@ -309,9 +362,9 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
 
 const PANEL_TABS = [
   { id: 'stickers', label: '😀  Stickers' },
+  { id: 'frames',   label: '🖼  Frame'  },  
   { id: 'text',     label: '✏️  Text'     },
-  { id: 'filters',  label: '🎨  Filters'  },
-  { id: 'frames',   label: '🖼  Bingkai'  },
+  { id: 'filters',  label: '🎨  Filters'  },  
 ];
 
 export default function PhotoEditor() {
@@ -320,6 +373,7 @@ export default function PhotoEditor() {
   const stageRef = useRef(null);
 
   const selectedPhotos = state.selectedPhotos;
+  const photoEdits = state.photoEdits;
   const [photoIndex, setPhotoIndex] = useState(0);
   const currentPhoto = selectedPhotos[photoIndex];
 
@@ -345,6 +399,7 @@ export default function PhotoEditor() {
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
 
+
   const frameSlots = isLayoutFrame ? (frame.slots ?? []) : [];
   const frameAspectRatio = isLayoutFrame ? (frame.aspectRatio ?? frame.aspect_ratio ?? null) : null;
   const slotsLoading = false;
@@ -361,25 +416,26 @@ export default function PhotoEditor() {
   const [isLoading, setIsLoading] = useState(false);
   const handleImageLoad = useCallback(() => setIsLoading(false), []);
 
-  const photoUrl = currentPhoto?.url;
+  // Use proxyUrl (~800px degraded version) for editor display — never render the full-res original on screen.
+  const photoUrl = currentPhoto?.proxyUrl ?? currentPhoto?.url;
   const orientationCache = useRef({});
 
-  // Eagerly load dimensions for all selected photos
+  // Eagerly load dimensions for all selected photos using proxy (not full-res)
   useEffect(() => {
     selectedPhotos.forEach((photo) => {
-      if (!photo.url || orientationCache.current[photo.id]) return;
+      const src = photo.proxyUrl ?? photo.url;
+      if (!src || orientationCache.current[photo.id]) return;
       const img = new Image();
       img.onload = () => {
         orientationCache.current[photo.id] = fitDimensions(img.naturalWidth, img.naturalHeight);
       };
-      img.src = photo.url;
+      img.src = src;
     });
   }, [selectedPhotos]);
 
   // Sync canvas dimensions + loading state when current photo changes
   useEffect(() => {
     if (!photoUrl) return;
-    setIsLoading(true);
     const cached = orientationCache.current[currentPhoto.id];
     if (cached) { setCanvas(cached); return; }
     const img = new Image();
@@ -387,8 +443,10 @@ export default function PhotoEditor() {
       const dims = fitDimensions(img.naturalWidth, img.naturalHeight);
       orientationCache.current[currentPhoto.id] = dims;
       setCanvas(dims);
+      setIsLoading(false);
     };
     img.onerror = () => setIsLoading(false);
+    setIsLoading(true);
     img.src = photoUrl;
   }, [photoUrl, currentPhoto?.id]);
 
@@ -406,6 +464,22 @@ export default function PhotoEditor() {
 
   // Export the current stage and persist edits to AppContext
   function exportAndSave() {
+    // Determine whether user has actually made any edits
+    const hasEdits =
+      isLayoutFrame ||
+      elements.length > 0 ||
+      (typeof frame === 'string' ? frame !== 'none' : !!frame) ||
+      filters.brightness !== 0 ||
+      filters.contrast !== 0 ||
+      (filters.list?.length ?? 0) > 0;
+
+    if (!hasEdits) {
+      if (currentPhoto && state.photoEdits[currentPhoto.id]) {
+        dispatch({ type: 'CLEAR_PHOTO_EDIT', payload: { id: currentPhoto.id } });
+      }
+      return undefined;
+    }
+
     let dataUrl;
     try {
       dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
@@ -415,7 +489,6 @@ export default function PhotoEditor() {
 
     if (isLayoutFrame) {
       dispatch({ type: 'SET_LAYOUT_EDIT', payload: { frameId: frame.id, slots: layoutSlots, elements, dataUrl } });
-      // Also save to photoEdits so Download page can access the composite
       if (dataUrl && currentPhoto) {
         const edit = { elements, filters, frame, dataUrl };
         savedEditsRef.current[currentPhoto.id] = edit;
@@ -631,6 +704,7 @@ export default function PhotoEditor() {
               ref={stageRef}
               onMouseDown={handleStageClick}
               onTouchStart={handleStageClick}
+              onContextMenu={(e) => e.evt.preventDefault()}
             >
               <Layer>
                 {/* ── Normal single-photo mode ── */}
@@ -691,6 +765,25 @@ export default function PhotoEditor() {
               </Layer>
             </Stage>
 
+            <WatermarkOverlay canvasW={activeCanvas.width} canvasH={activeCanvas.height} />
+
+            {/* Moiré pattern — degrades phone camera captures of the screen */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                zIndex: 5,
+                background: `repeating-linear-gradient(
+                  45deg,
+                  rgba(0,0,0,0.045) 0px,
+                  transparent 1px,
+                  transparent 4px,
+                  rgba(0,0,0,0.045) 5px
+                )`,
+              }}
+            />
+
             {/* Loading overlay while JSON slot config is being fetched */}
             {isLayoutFrame && slotsLoading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.3)' }}>
@@ -716,7 +809,7 @@ export default function PhotoEditor() {
                   const oldY = slotData?.offsetY ?? (px.h - img.naturalHeight * oldScale) / 2;
                   updateLayoutSlot(i, zoomToCenter(oldScale, newScale, oldX, oldY, px.w, px.h, img.naturalWidth, img.naturalHeight));
                 };
-                img.src = photo.url;
+                img.src = photo.proxyUrl ?? photo.url;
               }
 
               return (
@@ -843,10 +936,10 @@ export default function PhotoEditor() {
                       Photo {i + 1}
                     </p>
                     {/* Saved edit indicator */}
-                    {savedEditsRef.current[p.id]?.dataUrl && i !== photoIndex && (
+                    {photoEdits[p.id]?.dataUrl && i !== photoIndex && (
                       <p className="text-xs" style={{ color: 'var(--color-success)' }}>✓ Saved</p>
                     )}
-                    {p.label && !savedEditsRef.current[p.id]?.dataUrl && (
+                    {p.label && !photoEdits[p.id]?.dataUrl && (
                       <p className="text-xs truncate" style={{ color: 'var(--color-neutral-400)' }}>{p.label}</p>
                     )}
                   </div>
@@ -857,10 +950,11 @@ export default function PhotoEditor() {
 
           {/* Tool panel content */}
           <div className="flex-1 overflow-y-auto no-scrollbar">
+            {activePanel === 'frames'   && <FramePanel activeFrame={frame} onSelect={setFrame} layoutFrames={layoutFrames} layoutLoading={layoutFramesLoading} />}
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
-            {activePanel === 'frames'   && <FramePanel activeFrame={frame} onSelect={setFrame} layoutFrames={layoutFrames} layoutLoading={layoutFramesLoading} />}
+            
             {!activePanel && (
               <div
                 className="rounded-2xl p-6 flex flex-col items-center justify-center h-32 text-center"
