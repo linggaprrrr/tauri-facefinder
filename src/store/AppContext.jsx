@@ -5,9 +5,9 @@ const AppContext = createContext(null);
 function loadDeviceConfig() {
   try {
     const raw = localStorage.getItem('deviceConfig');
-    return raw ? JSON.parse(raw) : { unit: null, outlet: null };
+    return raw ? JSON.parse(raw) : { unit: null, outlet: null, helpNumber: '' };
   } catch {
-    return { unit: null, outlet: null };
+    return { unit: null, outlet: null, helpNumber: '' };
   }
 }
 
@@ -19,6 +19,7 @@ const initialState = {
   order: null,              // order details after payment
   deviceConfig: loadDeviceConfig(), // persisted unit + outlet selection
   photoEdits: {},           // { [photoId]: { elements, filters, frame, dataUrl } }
+  layoutEdits: {},          // { [frameId]: { slots, elements, dataUrl } }
 };
 
 function reducer(state, action) {
@@ -44,6 +45,11 @@ function reducer(state, action) {
       return {
         ...state,
         photoEdits: { ...state.photoEdits, [action.payload.id]: action.payload.data },
+      };
+    case 'SET_LAYOUT_EDIT':
+      return {
+        ...state,
+        layoutEdits: { ...state.layoutEdits, [action.payload.frameId]: action.payload },
       };
     case 'SET_DEVICE_CONFIG': {
       localStorage.setItem('deviceConfig', JSON.stringify(action.payload));

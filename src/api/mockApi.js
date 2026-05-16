@@ -115,3 +115,21 @@ export async function cancelTransaction(transactionId) {
   if (!res.ok) throw new Error(`Cancel error ${res.status}`);
   return res.json();
 }
+
+export async function getStickers(outletId) {
+  const url = outletId
+    ? `${API_BASE}/stickers/?outlet_id=${outletId}`
+    : `${API_BASE}/stickers/`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return (await res.json()).data ?? [];
+}
+
+export async function getLayoutFrames(outletId) {
+  const url = outletId
+    ? `${API_BASE}/templates/?outlet_id=${outletId}`
+    : `${API_BASE}/templates/`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return (await res.json()).data ?? [];
+}

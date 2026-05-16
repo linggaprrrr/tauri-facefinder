@@ -17,6 +17,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [outlets, setOutlets] = useState([]);
   const [selectedUnit, setSelectedUnit] = useState(state.deviceConfig.unit);
   const [selectedOutlet, setSelectedOutlet] = useState(state.deviceConfig.outlet);
+  const [helpNumber, setHelpNumber] = useState(state.deviceConfig.helpNumber ?? '');
 
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(false);
@@ -82,7 +83,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -224,6 +225,24 @@ export default function SettingsModal({ onClose, forced = false }) {
                     ))}
                   </select>
                 )}
+              </div>
+
+              {/* Help number */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
+                  Nomor Bantuan / Pengaduan
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 0811-2345-6789"
+                  value={helpNumber}
+                  onChange={(e) => setHelpNumber(e.target.value)}
+                  className="border rounded-lg px-4 py-3 text-base w-full outline-none focus:ring-2"
+                  style={{
+                    borderColor: 'var(--color-neutral-300)',
+                    '--tw-ring-color': 'var(--color-primary)',
+                  }}
+                />
               </div>
 
               {/* Current saved info (only when editing, not forced) */}
