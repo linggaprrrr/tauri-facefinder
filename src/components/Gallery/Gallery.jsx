@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, SearchX, X } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
@@ -30,18 +30,36 @@ export default function Gallery() {
 
   const [activeOutlet, setActiveOutlet] = useState('All');
   const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [photoRatios, setPhotoRatios] = useState({});
 
   const visiblePhotos = useMemo(
     () => activeOutlet === 'All' ? photos : photos.filter((p) => p.outlet_name === activeOutlet),
     [photos, activeOutlet]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    visiblePhotos.forEach((photo) => {
+      if (photoRatios[photo.id] || !photo.thumbnail) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        if (cancelled || !img.naturalWidth || !img.naturalHeight) return;
+        setPhotoRatios((cur) => cur[photo.id] ? cur : { ...cur, [photo.id]: img.naturalWidth / img.naturalHeight });
+      };
+      img.src = photo.thumbnail;
+    });
+    return () => { cancelled = true; };
+  }, [visiblePhotos, photoRatios]);
+
   function handleToggle(photo) {
     dispatch({ type: 'TOGGLE_PHOTO', payload: photo });
   }
 
-  // Dummy ratio change handler — kept for PhotoCard API compat
-  function handleRatioChange() {}
+  function handleRatioChange(photoId, ratio) {
+    if (!ratio) return;
+    setPhotoRatios((cur) => cur[photoId] === ratio ? cur : { ...cur, [photoId]: ratio });
+  }
 
   const totalPrice = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
 
@@ -131,16 +149,8 @@ export default function Gallery() {
           </div>
         </div>
       ) : (
-        /* 3-column uniform grid */
-        <div
-          className="flex-1 overflow-y-auto no-scrollbar pb-2"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 12,
-            alignContent: 'start',
-          }}
-        >
+        /* Masonry grid — restored original layout */
+        <div className="gallery-masonry flex-1 overflow-y-auto pb-4 no-scrollbar">
           {visiblePhotos.map((photo) => {
             const orderIdx = selectedPhotos.findIndex((p) => p.id === photo.id);
             const isSelected = orderIdx !== -1;
@@ -148,6 +158,7 @@ export default function Gallery() {
               <PhotoCard
                 key={photo.id}
                 photo={photo}
+                aspectRatio={photoRatios[photo.id]}
                 selected={isSelected}
                 selectionOrder={isSelected ? orderIdx + 1 : null}
                 onPreview={setPreviewPhoto}

@@ -64,8 +64,11 @@ function normalizeBoundingBox(rawBox, dimensions) {
   };
 }
 
+const FALLBACK_RATIO = 1;
+
 export default function PhotoCard({
   photo,
+  aspectRatio,
   selected,
   selectionOrder,
   onPreview,
@@ -74,6 +77,7 @@ export default function PhotoCard({
 }) {
   const [loaded, setLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const resolvedAspectRatio = aspectRatio || FALLBACK_RATIO;
 
   const boundingBoxStyle = useMemo(
     () => normalizeBoundingBox(photo.bounding_box, imageDimensions),
@@ -81,14 +85,19 @@ export default function PhotoCard({
   );
 
   return (
+    <div className="mb-4 break-inside-avoid">
     <div
-      className="relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-200 bg-neutral-100"
+      className="relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-200"
       style={{
-        aspectRatio: '3 / 4',
         boxShadow: selected
           ? '0 0 0 3px var(--color-primary), 0 4px 20px rgba(1,125,197,0.25)'
           : 'var(--shadow-sm)',
         transform: selected ? 'translateY(-2px)' : 'none',
+        aspectRatio: `${resolvedAspectRatio}`,
+        background: 'var(--color-neutral-100)',
+        width: '100%',
+        maxWidth: '22rem',
+        maxHeight: '42rem',
       }}
       onClick={() => onPreview(photo)}
     >
@@ -186,6 +195,7 @@ export default function PhotoCard({
           Rp {photo.price.toLocaleString('id-ID')}
         </span>
       </div>
+    </div>
     </div>
   );
 }
