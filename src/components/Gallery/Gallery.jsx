@@ -182,12 +182,14 @@ export default function Gallery() {
       >
         {selectedPhotos.length === 0 ? (
           /* Hint state — no selection yet */
-          <p className="flex-1 text-sm font-medium" style={{ color: 'var(--color-neutral-400)' }}>
+          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
+          <p className="flex-1 text-sm font-medium" style={{ paddingLeft: 148, color: 'var(--color-neutral-400)' }}>
             {t('gallery.footerEmpty')}
           </p>
         ) : (
           /* Thumbnail strip */
-          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
+          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden" style={{ paddingLeft: 148 }}>
             {stripPhotos.map((p) => (
               <div key={p.id} className="relative shrink-0 group">
                 <img
