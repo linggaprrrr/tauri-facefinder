@@ -164,6 +164,26 @@ export const translations = {
   'editor.tabFrame':       { id: 'Bingkai', en: 'Frame' },
   'editor.tabText':        { id: 'Teks', en: 'Text' },
   'editor.tabFilters':     { id: 'Filter', en: 'Filters' },
+  'editor.tabAi':          { id: 'AI', en: 'AI' },
+
+  // ── AI Transform (Nano Banana) ───────────────────────────────────────────────
+  'ai.title':           { id: 'AI Transform', en: 'AI Transform' },
+  'ai.subtitle':        { id: 'Ubah fotomu menjadi karya seni dengan AI', en: 'Transform your photo into art with AI' },
+  'ai.comingSoon':      { id: 'Segera Hadir', en: 'Coming Soon' },
+  'ai.previewBtn':      { id: 'Lihat Preview', en: 'Preview' },
+  'ai.previewTitle':    { id: 'Preview Transformasi', en: 'Transform Preview' },
+  'ai.before':          { id: 'Sebelum', en: 'Before' },
+  'ai.after':           { id: 'Sesudah', en: 'After' },
+  'ai.applyBtn':        { id: 'Terapkan', en: 'Apply' },
+  'ai.closeBtn':        { id: 'Tutup', en: 'Close' },
+  'ai.demoNote':        { id: 'Hasil nyata dari Nano Banana API akan tampil di sini', en: 'Real result from Nano Banana API will appear here' },
+  'ai.comingSoonNote':  { id: 'Fitur AI Transform akan segera tersedia. Integrasi dengan Nano Banana API sedang dalam pengembangan.', en: 'AI Transform feature is coming soon. Integration with Nano Banana API is under development.' },
+  'ai.tpl.3dtoy':       { id: 'Boneka 3D', en: '3D Toy' },
+  'ai.tpl.ghibsky':     { id: 'Ghibli Art', en: 'Ghibli Art' },
+  'ai.tpl.caricature':  { id: 'Karikatur', en: 'Caricature' },
+  'ai.tpl.caricature3d':{ id: 'Karikatur 3D', en: '3D Caricature' },
+  'ai.tpl.halloween':   { id: 'Halloween Poster', en: 'Halloween Poster' },
+  'ai.tpl.minecraft':   { id: 'Filter Minecraft', en: 'Minecraft Filter' },
 
   // ── Editor toolbar ──────────────────────────────────────────────────────────
   'toolbar.undo':     { id: 'Urungkan', en: 'Undo' },

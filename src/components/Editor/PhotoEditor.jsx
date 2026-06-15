@@ -3,7 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Text, Transformer, Group, Rect } fro
 import useImage from 'use-image';
 import { useNavigate } from 'react-router-dom';
 import {
-  Smile, Image as ImageIcon, Type, SlidersHorizontal,
+  Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
   Plus, Minus, Pencil,
 } from 'lucide-react';
@@ -19,6 +19,8 @@ import EditorToolbar from './EditorToolbar';
 import Button from '../common/Button';
 import { useStickers } from '../../hooks/useStickers';
 import { useLayoutFrames } from '../../hooks/useLayoutFrames';
+import AiTransformPanel from './AiTransformPanel';
+import AiTransformPreview from './AiTransformPreview';
 
 const MAX_CANVAS_W = 780;
 const MAX_CANVAS_H = 520;
@@ -367,10 +369,11 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
 }
 
 const PANEL_TABS = [
-  { id: 'stickers', icon: Smile,            labelKey: 'editor.tabStickers' },
-  { id: 'frames',   icon: ImageIcon,        labelKey: 'editor.tabFrame' },
-  { id: 'text',     icon: Type,             labelKey: 'editor.tabText' },
-  { id: 'filters',  icon: SlidersHorizontal,labelKey: 'editor.tabFilters' },
+  { id: 'stickers', icon: Smile,             labelKey: 'editor.tabStickers' },
+  { id: 'frames',   icon: ImageIcon,         labelKey: 'editor.tabFrame' },
+  { id: 'text',     icon: Type,              labelKey: 'editor.tabText' },
+  { id: 'filters',  icon: SlidersHorizontal, labelKey: 'editor.tabFilters' },
+  { id: 'ai',       icon: Sparkles,          labelKey: 'editor.tabAi' },
 ];
 
 export default function PhotoEditor() {
@@ -402,6 +405,7 @@ export default function PhotoEditor() {
   );
   const [activeSlot, setActiveSlot] = useState(null);
   const [showSlotPicker, setShowSlotPicker] = useState(false);
+  const [aiPreviewTemplate, setAiPreviewTemplate] = useState(null);
   const outletId = state.deviceConfig?.outlet?.id ?? null;
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
@@ -972,6 +976,7 @@ export default function PhotoEditor() {
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
+            {activePanel === 'ai'       && <AiTransformPanel onTransform={setAiPreviewTemplate} />}
             
             {!activePanel && (
               <div
@@ -996,6 +1001,13 @@ export default function PhotoEditor() {
           slotIndex={activeSlot}
           onPick={handlePickPhoto}
           onClose={() => { setShowSlotPicker(false); setActiveSlot(null); }}
+        />
+      )}
+
+      {aiPreviewTemplate && (
+        <AiTransformPreview
+          template={aiPreviewTemplate}
+          onDiscard={() => setAiPreviewTemplate(null)}
         />
       )}
 
