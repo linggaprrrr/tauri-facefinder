@@ -38,14 +38,17 @@ export const translations = {
   'overlay.align':      { id: 'Sejajarkan wajah Anda di sini', en: 'Align your face here' },
 
   // ── Gallery ─────────────────────────────────────────────────────────────────
-  'gallery.title':     { id: 'Foto Anda', en: 'Your Photos' },
-  'gallery.subtitle':  { id: '{count} foto ditemukan — ketuk untuk pratinjau dan pilih', en: '{count} photos found — tap to preview and select' },
-  'gallery.rescan':    { id: 'Pindai Ulang', en: 'Rescan' },
-  'gallery.all':       { id: 'Semua', en: 'All' },
-  'gallery.selected':  { id: '{count} foto dipilih', en: '{count} photo(s) selected' },
-  'gallery.continue':  { id: 'Lanjut', en: 'Continue' },
-  'gallery.emptyTitle':{ id: 'Foto tidak ditemukan', en: 'No photos found' },
-  'gallery.emptyDesc': { id: 'Kami tidak menemukan foto yang cocok dengan wajah Anda. Silakan pindai ulang wajah Anda.', en: "We couldn't find any photos matching your face. Please scan your face again." },
+  'gallery.title':       { id: 'Foto Anda', en: 'Your Photos' },
+  'gallery.subtitle':    { id: '{count} foto ditemukan', en: '{count} photos found' },
+  'gallery.tapHint':     { id: 'Ketuk foto untuk pratinjau', en: 'Tap a photo to preview' },
+  'gallery.rescan':      { id: 'Pindai Ulang', en: 'Rescan' },
+  'gallery.all':         { id: 'Semua', en: 'All' },
+  'gallery.selected':    { id: '{count} foto dipilih', en: '{count} photo(s) selected' },
+  'gallery.continue':    { id: 'Edit Foto', en: 'Edit Photos' },
+  'gallery.footerEmpty': { id: 'Ketuk foto untuk memilih', en: 'Tap a photo to select' },
+  'gallery.removeAria':  { id: 'Hapus dari pilihan', en: 'Remove from selection' },
+  'gallery.emptyTitle':  { id: 'Foto tidak ditemukan', en: 'No photos found' },
+  'gallery.emptyDesc':   { id: 'Kami tidak menemukan foto yang cocok dengan wajah Anda. Silakan pindai ulang wajah Anda.', en: "We couldn't find any photos matching your face. Please scan your face again." },
 
   // ── Photo preview ───────────────────────────────────────────────────────────
   'preview.selected': { id: 'Dipilih', en: 'Selected' },
@@ -146,6 +149,7 @@ export const translations = {
 
   // ── Editor ──────────────────────────────────────────────────────────────────
   'editor.title':          { id: 'Edit Foto', en: 'Edit Photos' },
+  'editor.subtitle':       { id: 'Pilih alat lalu ketuk foto untuk mengedit', en: 'Choose a tool then tap the photo to edit' },
   'editor.gallery':        { id: 'Galeri', en: 'Gallery' },
   'editor.done':           { id: 'Selesai', en: 'Done' },
   'editor.next':           { id: 'Lanjut', en: 'Next' },
@@ -156,7 +160,11 @@ export const translations = {
   'editor.goBack':         { id: 'Kembali', en: 'Go back' },
   'editor.selectedPhotos': { id: 'FOTO TERPILIH', en: 'SELECTED PHOTOS' },
   'editor.savedTag':       { id: 'Tersimpan', en: 'Saved' },
-  'editor.selectTool':     { id: 'Pilih alat di bawah untuk mulai mengedit', en: 'Select a tool below to start editing' },
+  'editor.editingNow':     { id: 'Sedang diedit', en: 'Editing now' },
+  'editor.selectTool':     { id: 'Pilih alat di samping untuk mulai mengedit', en: 'Select a tool on the left to start editing' },
+  'editor.hintSelectEl':   { id: 'Ketuk elemen di canvas untuk mengedit', en: 'Tap an element on canvas to edit' },
+  'editor.autoSave':       { id: 'Tersimpan otomatis saat pindah foto', en: 'Auto-saved when switching photos' },
+  'editor.progressLabel':  { id: 'Foto {current} dari {total}', en: 'Photo {current} of {total}' },
   'editor.zoomIn':         { id: 'Perbesar', en: 'Zoom In' },
   'editor.zoomOut':        { id: 'Perkecil', en: 'Zoom Out' },
   'editor.changePhoto':    { id: 'Ganti Foto', en: 'Change Photo' },
@@ -165,6 +173,7 @@ export const translations = {
   'editor.tabText':        { id: 'Teks', en: 'Text' },
   'editor.tabFilters':     { id: 'Filter', en: 'Filters' },
   'editor.tabAi':          { id: 'AI', en: 'AI' },
+  'editor.tabHint':        { id: 'Ketuk untuk menambahkan', en: 'Tap to add' },
 
   // ── AI Transform (Nano Banana) ───────────────────────────────────────────────
   'ai.title':           { id: 'AI Transform', en: 'AI Transform' },
