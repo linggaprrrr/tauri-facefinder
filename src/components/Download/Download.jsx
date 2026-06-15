@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
 
@@ -27,6 +29,7 @@ function downloadDataUrl(dataUrl, filename) {
 
 export default function Download() {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
   const navigate = useNavigate();
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
@@ -57,10 +60,10 @@ export default function Download() {
       <div className="flex flex-col items-center gap-5 shrink-0">
         <div className="text-center">
           <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            Pembayaran Berhasil!
+            {t('download.success')}
           </h1>
           <p className="mt-1 text-base" style={{ color: 'var(--color-neutral-500)' }}>
-            Scan QR di bawah untuk mengunduh foto Anda
+            {t('download.scanInstr')}
           </p>
         </div>
 
@@ -88,12 +91,12 @@ export default function Download() {
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
             style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
           >
-            <span>⏱</span> Berlaku 24 jam
+            <Clock size={16} /> {t('download.valid24')}
           </div>
         </div>
 
         <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-400)' }}>
-          Arahkan kamera HP ke QR code untuk mengunduh foto langsung.
+          {t('download.cameraInstr')}
         </p>
 
         {/* Locally-edited photos download */}
@@ -107,7 +110,7 @@ export default function Download() {
             }}
           >
             <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-500)' }}>
-              FOTO HASIL EDITAN
+              {t('download.editedPhotos')}
             </p>
             <div className="flex flex-col gap-2">
               {editedPhotos.map((p, i) => (
@@ -119,14 +122,14 @@ export default function Download() {
                     style={{ width: 56, height: 40 }}
                   />
                   <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--color-neutral-700)' }}>
-                    Foto {i + 1}
+                    {t('common.photoN', { n: i + 1 })}
                   </span>
                   <button
                     onClick={() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`)}
-                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
                     style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
                   >
-                    ⬇ Save
+                    <DownloadIcon size={14} /> {t('download.save')}
                   </button>
                 </div>
               ))}
@@ -137,16 +140,16 @@ export default function Download() {
                   setTimeout(() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`), i * 300);
                 });
               }}
-              className="w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
+              className="w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
               style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
-              ⬇ Download Semua ({editedPhotos.length} foto)
+              <DownloadIcon size={16} /> {t('download.downloadAll', { count: editedPhotos.length })}
             </button>
           </div>
         )}
 
         <Button size="xl" onClick={handleRestart} className="w-full">
-          Transaksi Baru
+          {t('download.newTransaction')}
         </Button>
       </div>
 
@@ -178,7 +181,7 @@ export default function Download() {
             </div>
           </div>
           <div className="flex justify-between text-sm opacity-80">
-            <span>Kode: <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
+            <span>{t('download.code')} <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
             <span>{formatDate(order.created_at ?? order.paid_at)}</span>
           </div>
         </div>
@@ -186,12 +189,12 @@ export default function Download() {
         {/* Items */}
         <div className="px-6 py-4">
           <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-400)' }}>
-            Item yang dibeli
+            {t('download.itemsBought')}
           </p>
 
           <div className="flex flex-col gap-2">
             {photos.length > 0 ? photos.map((photo, i) => {
-              const name = photo.filename ?? photo.name ?? `Foto ${i + 1}`;
+              const name = photo.filename ?? photo.name ?? t('common.photoN', { n: i + 1 });
               const price = photo.price ?? (finalPrice / photos.length);
               return (
                 <div
@@ -220,7 +223,7 @@ export default function Download() {
                 </div>
               );
             }) : (
-              <p className="text-sm" style={{ color: 'var(--color-neutral-400)' }}>Tidak ada data item.</p>
+              <p className="text-sm" style={{ color: 'var(--color-neutral-400)' }}>{t('download.noItems')}</p>
             )}
           </div>
 
@@ -228,13 +231,13 @@ export default function Download() {
           <div className="mt-4 flex flex-col gap-1.5">
             {discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-500)' }}>Diskon</span>
+                <span style={{ color: 'var(--color-neutral-500)' }}>{t('download.discount')}</span>
                 <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
               </div>
             )}
             {order.promo_code_used && (
               <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-500)' }}>Kode promo</span>
+                <span style={{ color: 'var(--color-neutral-500)' }}>{t('download.promoCode')}</span>
                 <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
               </div>
             )}
@@ -242,7 +245,7 @@ export default function Download() {
               className="flex justify-between items-center pt-3 mt-1"
               style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
             >
-              <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>Total</span>
+              <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
               <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
                 {formatRp(finalPrice)}
               </span>
@@ -252,20 +255,21 @@ export default function Download() {
           {/* Payment method badge */}
           <div className="mt-4 flex items-center gap-2">
             <span
-              className="px-3 py-1 rounded-full text-xs font-semibold"
+              className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5"
               style={{
                 background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
                 color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
               }}
             >
-              {isCash ? '💵 Cash' : '📱 QRIS'}
+              {isCash ? <Banknote size={14} /> : <Smartphone size={14} />}
+              {isCash ? t('download.cash') : t('download.qris')}
             </span>
             {order.paid && (
               <span
-                className="px-3 py-1 rounded-full text-xs font-semibold"
+                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
                 style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
               >
-                ✓ Lunas
+                <Check size={14} strokeWidth={3} /> {t('download.paid')}
               </span>
             )}
           </div>
@@ -276,7 +280,7 @@ export default function Download() {
           className="px-6 py-4 text-center text-xs"
           style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-400)', borderTop: '1px solid var(--color-neutral-100)' }}
         >
-          Terima kasih telah menggunakan Ownize Face Finder!
+          {t('download.thanks')}
         </div>
       </div>
     </div>

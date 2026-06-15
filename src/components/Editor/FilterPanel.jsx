@@ -1,14 +1,17 @@
 import Konva from 'konva';
+import { RotateCcw } from 'lucide-react';
+import { useLang } from '../../i18n/LanguageContext';
 
 const FILTER_PRESETS = [
-  { id: 'none',      label: 'Normal',   filters: [] },
-  { id: 'grayscale', label: 'B&W',      filters: [Konva.Filters.Grayscale] },
-  { id: 'sepia',     label: 'Sepia',    filters: [Konva.Filters.Sepia] },
-  { id: 'invert',    label: 'Invert',   filters: [Konva.Filters.Invert] },
-  { id: 'blur',      label: 'Soft Blur',filters: [Konva.Filters.Blur] },
+  { id: 'none',      labelKey: 'filter.normal', filters: [] },
+  { id: 'grayscale', labelKey: 'filter.bw',     filters: [Konva.Filters.Grayscale] },
+  { id: 'sepia',     labelKey: 'filter.sepia',  filters: [Konva.Filters.Sepia] },
+  { id: 'invert',    labelKey: 'filter.invert', filters: [Konva.Filters.Invert] },
+  { id: 'blur',      labelKey: 'filter.blur',   filters: [Konva.Filters.Blur] },
 ];
 
 export default function FilterPanel({ filters, onChange }) {
+  const { t } = useLang();
   const panelStyle = {
     background: '#fff',
     boxShadow: 'var(--shadow-md)',
@@ -27,7 +30,7 @@ export default function FilterPanel({ filters, onChange }) {
 
   return (
     <div className="rounded-2xl p-4 flex flex-col gap-4" style={panelStyle}>
-      <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>Filters</h3>
+      <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>{t('filter.title')}</h3>
 
       {/* Preset grid */}
       <div className="grid grid-cols-2 gap-2">
@@ -41,7 +44,7 @@ export default function FilterPanel({ filters, onChange }) {
             }}
             onClick={() => applyPreset(p)}
           >
-            {p.label}
+            {t(p.labelKey)}
           </button>
         ))}
       </div>
@@ -49,7 +52,7 @@ export default function FilterPanel({ filters, onChange }) {
       {/* Brightness */}
       <div>
         <label className="block mb-1" style={labelStyle}>
-          Brightness: {filters.brightness > 0 ? '+' : ''}{filters.brightness.toFixed(2)}
+          {t('filter.brightness')}: {filters.brightness > 0 ? '+' : ''}{filters.brightness.toFixed(2)}
         </label>
         <input
           type="range" min={-1} max={1} step={0.05}
@@ -70,7 +73,7 @@ export default function FilterPanel({ filters, onChange }) {
       {/* Contrast */}
       <div>
         <label className="block mb-1" style={labelStyle}>
-          Contrast: {filters.contrast > 0 ? '+' : ''}{filters.contrast.toFixed(0)}
+          {t('filter.contrast')}: {filters.contrast > 0 ? '+' : ''}{filters.contrast.toFixed(0)}
         </label>
         <input
           type="range" min={-100} max={100} step={5}
@@ -89,11 +92,11 @@ export default function FilterPanel({ filters, onChange }) {
       </div>
 
       <button
-        className="py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
+        className="py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
         style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
         onClick={() => onChange({ list: [], brightness: 0, contrast: 0 })}
       >
-        ↺ Reset Filters
+        <RotateCcw size={16} /> {t('filter.reset')}
       </button>
     </div>
   );

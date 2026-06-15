@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { X, Check } from 'lucide-react';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 
 const DEVICE_KEY = import.meta.env.VITE_DEVICE_KEY ?? '';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
 export default function SettingsModal({ onClose, forced = false }) {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
 
   // Skip auth on first-run forced setup; require it when admin manually opens settings
   const [step, setStep] = useState(forced ? 'config' : 'auth');
@@ -36,7 +39,7 @@ export default function SettingsModal({ onClose, forced = false }) {
       setStep('config');
       fetchUnits();
     } else {
-      setAuthError('Kode perangkat salah.');
+      setAuthError(t('settings.wrongCode'));
     }
   }
 
@@ -48,7 +51,7 @@ export default function SettingsModal({ onClose, forced = false }) {
       setUnits(data);
       if (selectedUnit) fetchOutlets(selectedUnit.id);
     } catch {
-      setError('Gagal memuat daftar unit.');
+      setError(t('settings.errUnits'));
     } finally {
       setLoadingUnits(false);
     }
@@ -62,7 +65,7 @@ export default function SettingsModal({ onClose, forced = false }) {
       const data = await getOutletsByUnit(unitId);
       setOutlets(data);
     } catch {
-      setError('Gagal memuat daftar outlet.');
+      setError(t('settings.errOutlets'));
     } finally {
       setLoadingOutlets(false);
     }
@@ -108,15 +111,15 @@ export default function SettingsModal({ onClose, forced = false }) {
           style={{ background: 'var(--color-primary)', color: '#fff' }}
         >
           <span className="font-bold text-xl">
-            {forced ? 'Konfigurasi Awal Perangkat' : 'Pengaturan Perangkat'}
+            {forced ? t('settings.firstSetup') : t('settings.title')}
           </span>
           {!forced && (
             <button
               onClick={onClose}
-              className="text-white opacity-70 hover:opacity-100 text-2xl leading-none"
-              aria-label="Tutup"
+              className="text-white opacity-70 hover:opacity-100 leading-none"
+              aria-label={t('common.close')}
             >
-              ×
+              <X size={24} />
             </button>
           )}
         </div>
@@ -126,7 +129,7 @@ export default function SettingsModal({ onClose, forced = false }) {
             className="px-6 pt-4 text-sm"
             style={{ color: 'var(--color-neutral-600)' }}
           >
-            Pilih unit dan outlet untuk memulai menggunakan aplikasi.
+            {t('settings.firstHint')}
           </div>
         )}
 
@@ -135,11 +138,11 @@ export default function SettingsModal({ onClose, forced = false }) {
           {step === 'auth' && (
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
               <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
-                Masukkan kode perangkat untuk membuka pengaturan.
+                {t('settings.authHint')}
               </p>
               <input
                 type="password"
-                placeholder="Kode perangkat"
+                placeholder={t('settings.codePlaceholder')}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setAuthError(''); }}
                 autoFocus
@@ -157,7 +160,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                 type="submit"
                 className="btn-primary w-full py-3 rounded-lg font-semibold text-base"
               >
-                Buka Pengaturan
+                {t('settings.openSettings')}
               </button>
             </form>
           )}
@@ -174,10 +177,10 @@ export default function SettingsModal({ onClose, forced = false }) {
               {/* Unit selector */}
               <div className="flex flex-col gap-1.5">
                 <label className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
-                  Unit
+                  {t('settings.unit')}
                 </label>
                 {loadingUnits ? (
-                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>Memuat unit…</div>
+                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>{t('settings.loadingUnits')}</div>
                 ) : (
                   <select
                     value={selectedUnit?.id ?? ''}
@@ -188,7 +191,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                       '--tw-ring-color': 'var(--color-primary)',
                     }}
                   >
-                    <option value="">— Pilih Unit —</option>
+                    <option value="">{t('settings.selectUnit')}</option>
                     {units.map((u) => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -202,10 +205,10 @@ export default function SettingsModal({ onClose, forced = false }) {
               {/* Outlet selector */}
               <div className="flex flex-col gap-1.5">
                 <label className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
-                  Outlet
+                  {t('settings.outlet')}
                 </label>
                 {loadingOutlets ? (
-                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>Memuat outlet…</div>
+                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>{t('settings.loadingOutlets')}</div>
                 ) : (
                   <select
                     value={selectedOutlet?.id ?? ''}
@@ -218,7 +221,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                     }}
                   >
                     <option value="">
-                      {!selectedUnit ? '— Pilih unit dahulu —' : outlets.length === 0 ? '— Tidak ada outlet —' : '— Pilih Outlet —'}
+                      {!selectedUnit ? t('settings.selectUnitFirst') : outlets.length === 0 ? t('settings.noOutlet') : t('settings.selectOutlet')}
                     </option>
                     {outlets.map((o) => (
                       <option key={o.id} value={o.id}>{o.name}</option>
@@ -230,11 +233,11 @@ export default function SettingsModal({ onClose, forced = false }) {
               {/* Help number */}
               <div className="flex flex-col gap-1.5">
                 <label className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
-                  Nomor Bantuan / Pengaduan
+                  {t('settings.helpNumber')}
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: 0811-2345-6789"
+                  placeholder={t('settings.helpPlaceholder')}
                   value={helpNumber}
                   onChange={(e) => setHelpNumber(e.target.value)}
                   className="border rounded-lg px-4 py-3 text-base w-full outline-none focus:ring-2"
@@ -251,16 +254,16 @@ export default function SettingsModal({ onClose, forced = false }) {
                   className="text-xs px-3 py-2 rounded-lg"
                   style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
                 >
-                  Tersimpan: <strong>{state.deviceConfig.unit.name}</strong> / <strong>{state.deviceConfig.outlet.name}</strong>
+                  {t('settings.saved')} <strong>{state.deviceConfig.unit.name}</strong> / <strong>{state.deviceConfig.outlet.name}</strong>
                 </div>
               )}
 
               <button
                 onClick={handleSave}
                 disabled={!canSave}
-                className="btn-primary w-full py-3 rounded-lg font-semibold text-base disabled:opacity-50"
+                className="btn-primary w-full py-3 rounded-lg font-semibold text-base disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                {saved ? 'Tersimpan ✓' : saving ? 'Menyimpan…' : 'Simpan Konfigurasi'}
+                {saved ? <>{t('settings.savedBtn')} <Check size={18} strokeWidth={3} /></> : saving ? t('settings.saving') : t('settings.saveBtn')}
               </button>
             </div>
           )}

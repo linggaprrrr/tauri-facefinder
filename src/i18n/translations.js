@@ -1,0 +1,222 @@
+// Translation dictionary for the Face Finder kiosk.
+// Each key maps to { id: '<Bahasa>', en: '<English>' }.
+// Use {placeholder} tokens for interpolation — see t() in LanguageContext.jsx.
+// Currency (Rp / id-ID grouping) is intentionally NOT translated.
+
+export const translations = {
+  // ── Common ────────────────────────────────────────────────────────────────
+  'common.total':     { id: 'Total',      en: 'Total' },
+  'common.retry':     { id: 'Coba Lagi',  en: 'Try Again' },
+  'common.close':     { id: 'Tutup',      en: 'Close' },
+  'common.photoN':    { id: 'Foto {n}',   en: 'Photo {n}' },
+
+  // ── Header / App ────────────────────────────────────────────────────────────
+  'app.subtitle':       { id: 'Face Finder', en: 'Face Finder' },
+  'app.about':          { id: 'Tentang Aplikasi', en: 'About App' },
+  'app.settings':       { id: 'Pengaturan', en: 'Settings' },
+  'help.title':         { id: 'Bantuan & Pengaduan', en: 'Help & Support' },
+  'help.contactPrompt': { id: 'Hubungi kami melalui WhatsApp:', en: 'Contact us via WhatsApp:' },
+  'help.button':        { id: 'Bantuan', en: 'Help' },
+
+  // ── Step indicator ──────────────────────────────────────────────────────────
+  'step.scan':     { id: 'Pindai',    en: 'Scan' },
+  'step.gallery':  { id: 'Galeri',    en: 'Gallery' },
+  'step.editor':   { id: 'Edit',      en: 'Editor' },
+  'step.cart':     { id: 'Keranjang', en: 'Cart' },
+  'step.download': { id: 'Unduh',     en: 'Download' },
+
+  // ── Face scan ───────────────────────────────────────────────────────────────
+  'scan.title':         { id: 'Temukan Foto Anda', en: 'Find Your Photos' },
+  'scan.positionPre':   { id: 'Posisikan wajah Anda di dalam oval lalu ketuk ', en: 'Position your face inside the oval and tap ' },
+  'scan.action':        { id: 'Pindai', en: 'Scan' },
+  'scan.error':         { id: 'Terjadi kesalahan. Silakan coba lagi.', en: 'Something went wrong. Please try again.' },
+  'scan.cameraError':   { id: 'Kamera belum siap. Pastikan izin kamera aktif, lalu coba lagi.', en: 'Camera not ready. Make sure camera access is allowed, then try again.' },
+  'scan.cta':           { id: 'Pindai Wajah Saya', en: 'Scan My Face' },
+  'scan.scanning':      { id: 'Memindai…', en: 'Scanning…' },
+  'scan.scanningFace':  { id: 'Memindai wajah Anda…', en: 'Scanning your face…' },
+  'scan.privacy':       { id: 'Tidak ada data yang disimpan — pindaian hanya untuk menemukan foto Anda', en: 'No data is stored — scans are used only to find your photos' },
+  'overlay.align':      { id: 'Sejajarkan wajah Anda di sini', en: 'Align your face here' },
+
+  // ── Gallery ─────────────────────────────────────────────────────────────────
+  'gallery.title':     { id: 'Foto Anda', en: 'Your Photos' },
+  'gallery.subtitle':  { id: '{count} foto ditemukan — ketuk untuk pratinjau dan pilih', en: '{count} photos found — tap to preview and select' },
+  'gallery.rescan':    { id: 'Pindai Ulang', en: 'Rescan' },
+  'gallery.all':       { id: 'Semua', en: 'All' },
+  'gallery.selected':  { id: '{count} foto dipilih', en: '{count} photo(s) selected' },
+  'gallery.continue':  { id: 'Lanjut', en: 'Continue' },
+  'gallery.emptyTitle':{ id: 'Foto tidak ditemukan', en: 'No photos found' },
+  'gallery.emptyDesc': { id: 'Kami tidak menemukan foto yang cocok dengan wajah Anda. Silakan pindai ulang wajah Anda.', en: "We couldn't find any photos matching your face. Please scan your face again." },
+
+  // ── Photo preview ───────────────────────────────────────────────────────────
+  'preview.selected': { id: 'Dipilih', en: 'Selected' },
+  'preview.select':   { id: 'Pilih', en: 'Select' },
+
+  // ── Cart ────────────────────────────────────────────────────────────────────
+  'cart.title':      { id: 'Keranjang Anda', en: 'Your Cart' },
+  'cart.editor':     { id: 'Editor', en: 'Editor' },
+  'cart.empty':      { id: 'Keranjang Anda kosong', en: 'Your cart is empty' },
+  'cart.browse':     { id: 'Lihat Foto', en: 'Browse Photos' },
+  'cart.original':   { id: 'Asli', en: 'Original' },
+  'cart.edited':     { id: 'Diedit', en: 'Edited' },
+  'cart.withEdit':   { id: 'Dengan edit', en: 'With edits' },
+  'cart.photoCount': { id: '{count} foto', en: '{count} photo(s)' },
+  'cart.payNow':     { id: 'Bayar Sekarang', en: 'Pay Now' },
+  'cart.removeAria': { id: 'Hapus foto', en: 'Remove photo' },
+
+  // ── Checkout ────────────────────────────────────────────────────────────────
+  'checkout.errNoConfig':   { id: 'Konfigurasi perangkat belum diatur. Buka Pengaturan terlebih dahulu.', en: 'Device not configured. Please open Settings first.' },
+  'checkout.errCreate':     { id: 'Gagal membuat transaksi: {msg}', en: 'Failed to create transaction: {msg}' },
+  'checkout.errTimeout':    { id: 'Waktu pembayaran habis. Transaksi dibatalkan otomatis.', en: 'Payment time expired. The transaction was cancelled automatically.' },
+  'checkout.creating':      { id: 'Membuat transaksi…', en: 'Creating transaction…' },
+  'checkout.confirmTitle':  { id: 'Konfirmasi Pembayaran', en: 'Confirm Payment' },
+  'checkout.photosSelected':{ id: '{count} foto dipilih', en: '{count} photo(s) selected' },
+  'checkout.payQris':       { id: 'Bayar dengan QRIS', en: 'Pay with QRIS' },
+  'checkout.backToCart':    { id: 'Kembali ke Keranjang', en: 'Back to Cart' },
+  'checkout.waiting':       { id: 'Menunggu pembayaran', en: 'Waiting for payment' },
+  'checkout.dueLabel':      { id: 'Batas waktu pembayaran', en: 'Payment deadline' },
+  'checkout.scanInstr':     { id: 'Buka e-wallet atau mobile banking, lalu scan QR di atas.', en: 'Open your e-wallet or mobile banking, then scan the QR above.' },
+  'checkout.backCancel':    { id: 'Kembali & Batalkan', en: 'Back & Cancel' },
+  'checkout.cancelTrx':     { id: 'Batalkan transaksi', en: 'Cancel transaction' },
+  'checkout.trxCode':       { id: 'Kode Transaksi', en: 'Transaction Code' },
+  'checkout.orderDetails':  { id: 'Rincian Pesanan', en: 'Order Details' },
+  'checkout.totalPayment':  { id: 'Total Pembayaran', en: 'Total Payment' },
+  'checkout.cancelTitle':   { id: 'Batalkan Pembayaran?', en: 'Cancel Payment?' },
+  'checkout.cancelBackMsg': { id: 'Transaksi akan dibatalkan dan Anda akan kembali ke halaman awal.', en: 'The transaction will be cancelled and you will return to the home screen.' },
+  'checkout.cancelOnlyMsg': { id: 'Transaksi ini akan dibatalkan. Anda bisa membuat tagihan baru.', en: 'This transaction will be cancelled. You can create a new bill.' },
+  'checkout.continuePay':   { id: 'Lanjut Bayar', en: 'Continue Paying' },
+  'checkout.yesCancel':     { id: 'Ya, Batalkan', en: 'Yes, Cancel' },
+  'checkout.genericError':  { id: 'Terjadi kesalahan.', en: 'Something went wrong.' },
+
+  // ── Download ────────────────────────────────────────────────────────────────
+  'download.success':        { id: 'Pembayaran Berhasil!', en: 'Payment Successful!' },
+  'download.scanInstr':      { id: 'Scan QR di bawah untuk mengunduh foto Anda', en: 'Scan the QR below to download your photos' },
+  'download.valid24':        { id: 'Berlaku 24 jam', en: 'Valid for 24 hours' },
+  'download.cameraInstr':    { id: 'Arahkan kamera HP ke QR code untuk mengunduh foto langsung.', en: 'Point your phone camera at the QR code to download photos directly.' },
+  'download.editedPhotos':   { id: 'FOTO HASIL EDITAN', en: 'EDITED PHOTOS' },
+  'download.save':           { id: 'Simpan', en: 'Save' },
+  'download.downloadAll':    { id: 'Unduh Semua ({count} foto)', en: 'Download All ({count} photos)' },
+  'download.newTransaction': { id: 'Transaksi Baru', en: 'New Transaction' },
+  'download.code':           { id: 'Kode:', en: 'Code:' },
+  'download.itemsBought':    { id: 'Item yang dibeli', en: 'Items purchased' },
+  'download.noItems':        { id: 'Tidak ada data item.', en: 'No item data.' },
+  'download.discount':       { id: 'Diskon', en: 'Discount' },
+  'download.promoCode':      { id: 'Kode promo', en: 'Promo code' },
+  'download.cash':           { id: 'Tunai', en: 'Cash' },
+  'download.qris':           { id: 'QRIS', en: 'QRIS' },
+  'download.paid':           { id: 'Lunas', en: 'Paid' },
+  'download.thanks':         { id: 'Terima kasih telah menggunakan Ownize Face Finder!', en: 'Thank you for using Ownize Face Finder!' },
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+  'settings.wrongCode':      { id: 'Kode perangkat salah.', en: 'Wrong device code.' },
+  'settings.errUnits':       { id: 'Gagal memuat daftar unit.', en: 'Failed to load units.' },
+  'settings.errOutlets':     { id: 'Gagal memuat daftar outlet.', en: 'Failed to load outlets.' },
+  'settings.firstSetup':     { id: 'Konfigurasi Awal Perangkat', en: 'Initial Device Setup' },
+  'settings.title':          { id: 'Pengaturan Perangkat', en: 'Device Settings' },
+  'settings.firstHint':      { id: 'Pilih unit dan outlet untuk memulai menggunakan aplikasi.', en: 'Select a unit and outlet to start using the app.' },
+  'settings.authHint':       { id: 'Masukkan kode perangkat untuk membuka pengaturan.', en: 'Enter the device code to open settings.' },
+  'settings.codePlaceholder':{ id: 'Kode perangkat', en: 'Device code' },
+  'settings.openSettings':   { id: 'Buka Pengaturan', en: 'Open Settings' },
+  'settings.unit':           { id: 'Unit', en: 'Unit' },
+  'settings.loadingUnits':   { id: 'Memuat unit…', en: 'Loading units…' },
+  'settings.selectUnit':     { id: '— Pilih Unit —', en: '— Select Unit —' },
+  'settings.outlet':         { id: 'Outlet', en: 'Outlet' },
+  'settings.loadingOutlets': { id: 'Memuat outlet…', en: 'Loading outlets…' },
+  'settings.selectUnitFirst':{ id: '— Pilih unit dahulu —', en: '— Select a unit first —' },
+  'settings.noOutlet':       { id: '— Tidak ada outlet —', en: '— No outlets —' },
+  'settings.selectOutlet':   { id: '— Pilih Outlet —', en: '— Select Outlet —' },
+  'settings.helpNumber':     { id: 'Nomor Bantuan / Pengaduan', en: 'Help / Support Number' },
+  'settings.helpPlaceholder':{ id: 'Contoh: 0811-2345-6789', en: 'e.g. 0811-2345-6789' },
+  'settings.saved':          { id: 'Tersimpan:', en: 'Saved:' },
+  'settings.savedBtn':       { id: 'Tersimpan', en: 'Saved' },
+  'settings.saving':         { id: 'Menyimpan…', en: 'Saving…' },
+  'settings.saveBtn':        { id: 'Simpan Konfigurasi', en: 'Save Configuration' },
+
+  // ── About ───────────────────────────────────────────────────────────────────
+  'about.title':         { id: 'Tentang Aplikasi', en: 'About App' },
+  'about.version':       { id: 'Versi', en: 'Version' },
+  'about.platform':      { id: 'Platform', en: 'Platform' },
+  'about.upToDate':      { id: 'Aplikasi sudah versi terbaru.', en: 'The app is up to date.' },
+  'about.available':     { id: 'Pembaruan tersedia: v{version}', en: 'Update available: v{version}' },
+  'about.installRestart':{ id: 'Instal & Restart', en: 'Install & Restart' },
+  'about.installing':    { id: 'Mengunduh & menginstal…', en: 'Downloading & installing…' },
+  'about.checking':      { id: 'Memeriksa…', en: 'Checking…' },
+  'about.checkUpdate':   { id: 'Periksa Pembaruan', en: 'Check for Updates' },
+  'about.errCheck':      { id: 'Gagal memeriksa pembaruan.', en: 'Failed to check for updates.' },
+  'about.errInstall':    { id: 'Gagal menginstal pembaruan.', en: 'Failed to install the update.' },
+
+  // ── Editor ──────────────────────────────────────────────────────────────────
+  'editor.title':          { id: 'Edit Foto', en: 'Edit Photos' },
+  'editor.gallery':        { id: 'Galeri', en: 'Gallery' },
+  'editor.done':           { id: 'Selesai', en: 'Done' },
+  'editor.next':           { id: 'Lanjut', en: 'Next' },
+  'editor.loadingPhoto':   { id: 'Memuat foto…', en: 'Loading photo…' },
+  'editor.loadingSlots':   { id: 'Memuat konfigurasi slot…', en: 'Loading slot configuration…' },
+  'editor.slot':           { id: 'Slot {n}', en: 'Slot {n}' },
+  'editor.noPhotos':       { id: 'Tidak ada foto dipilih.', en: 'No photos selected.' },
+  'editor.goBack':         { id: 'Kembali', en: 'Go back' },
+  'editor.selectedPhotos': { id: 'FOTO TERPILIH', en: 'SELECTED PHOTOS' },
+  'editor.savedTag':       { id: 'Tersimpan', en: 'Saved' },
+  'editor.selectTool':     { id: 'Pilih alat di bawah untuk mulai mengedit', en: 'Select a tool below to start editing' },
+  'editor.zoomIn':         { id: 'Perbesar', en: 'Zoom In' },
+  'editor.zoomOut':        { id: 'Perkecil', en: 'Zoom Out' },
+  'editor.changePhoto':    { id: 'Ganti Foto', en: 'Change Photo' },
+  'editor.tabStickers':    { id: 'Stiker', en: 'Stickers' },
+  'editor.tabFrame':       { id: 'Bingkai', en: 'Frame' },
+  'editor.tabText':        { id: 'Teks', en: 'Text' },
+  'editor.tabFilters':     { id: 'Filter', en: 'Filters' },
+
+  // ── Editor toolbar ──────────────────────────────────────────────────────────
+  'toolbar.undo':     { id: 'Urungkan', en: 'Undo' },
+  'toolbar.redo':     { id: 'Ulangi', en: 'Redo' },
+  'toolbar.forward':  { id: 'Maju', en: 'Forward' },
+  'toolbar.backward': { id: 'Mundur', en: 'Backward' },
+  'toolbar.delete':   { id: 'Hapus', en: 'Delete' },
+
+  // ── Sticker panel ───────────────────────────────────────────────────────────
+  'sticker.title':   { id: 'Stiker', en: 'Stickers' },
+  'sticker.loading': { id: 'Memuat stiker…', en: 'Loading stickers…' },
+
+  // ── Filter panel ────────────────────────────────────────────────────────────
+  'filter.title':      { id: 'Filter', en: 'Filters' },
+  'filter.normal':     { id: 'Normal', en: 'Normal' },
+  'filter.bw':         { id: 'Hitam Putih', en: 'B&W' },
+  'filter.sepia':      { id: 'Sepia', en: 'Sepia' },
+  'filter.invert':     { id: 'Invert', en: 'Invert' },
+  'filter.blur':       { id: 'Blur Halus', en: 'Soft Blur' },
+  'filter.brightness': { id: 'Kecerahan', en: 'Brightness' },
+  'filter.contrast':   { id: 'Kontras', en: 'Contrast' },
+  'filter.reset':      { id: 'Reset Filter', en: 'Reset Filters' },
+
+  // ── Frame panel ─────────────────────────────────────────────────────────────
+  'frame.title':   { id: 'Layout Multi-Foto', en: 'Multi-Photo Layout' },
+  'frame.loading': { id: 'Memuat layout…', en: 'Loading layouts…' },
+  'frame.empty':   { id: 'Belum ada layout tersedia.', en: 'No layouts available yet.' },
+
+  // ── Slot photo picker ───────────────────────────────────────────────────────
+  'picker.title': { id: 'Pilih Foto untuk Slot {n}', en: 'Choose a Photo for Slot {n}' },
+  'picker.used':  { id: 'Dipakai', en: 'In use' },
+
+  // ── Text panel ──────────────────────────────────────────────────────────────
+  'text.title':       { id: 'Tambah Teks', en: 'Add Text' },
+  'text.default':     { id: 'Teks Anda di sini', en: 'Your text here' },
+  'text.placeholder': { id: 'Ketik sesuatu…', en: 'Type something…' },
+  'text.bold':        { id: 'Tebal', en: 'Bold' },
+  'text.italic':      { id: 'Miring', en: 'Italic' },
+  'text.font':        { id: 'Font', en: 'Font' },
+  'text.size':        { id: 'Ukuran', en: 'Size' },
+  'text.color':       { id: 'Warna', en: 'Color' },
+  'text.customColor': { id: 'Warna kustom', en: 'Custom color' },
+  'text.preview':     { id: 'Pratinjau', en: 'Preview' },
+  'text.addToCanvas': { id: 'Tambahkan ke Kanvas', en: 'Add to Canvas' },
+
+  // ── Frame calibrator (admin/dev tool) ───────────────────────────────────────
+  'calib.title':        { id: 'Kalibrasi Slot — {label}', en: 'Slot Calibration — {label}' },
+  'calib.slotsDefined': { id: '{count} slot terdefinisi', en: '{count} slots defined' },
+  'calib.removeLast':   { id: 'Hapus Terakhir', en: 'Remove Last' },
+  'calib.copied':       { id: 'Tersalin!', en: 'Copied!' },
+  'calib.copyJson':     { id: 'Salin JSON', en: 'Copy JSON' },
+  'calib.saveClose':    { id: 'Simpan & Tutup', en: 'Save & Close' },
+  'calib.instruction':  { id: 'Klik dan drag pada gambar frame untuk menggambar area slot foto. Gambar dari kiri-atas ke kanan-bawah.', en: 'Click and drag on the frame image to draw photo slot areas. Draw from top-left to bottom-right.' },
+  'calib.outputJson':   { id: 'Output JSON', en: 'Output JSON' },
+  'calib.pasteTo':      { id: 'Salin lalu paste ke', en: 'Copy then paste into' },
+};

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, SearchX } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 import PhotoCard from './PhotoCard';
 import PhotoPreview from './PhotoPreview';
 import Button from '../common/Button';
 
 export default function Gallery() {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
   const navigate = useNavigate();
   const { photos, selectedPhotos } = state;
   const ratioRequests = useRef(new Set());
@@ -81,13 +84,15 @@ export default function Gallery() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            Your Photos
+            {t('gallery.title')}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-500)' }}>
-            {photos.length} photos found — tap to preview and select
+            {t('gallery.subtitle', { count: photos.length })}
           </p>
         </div>
-        <Button variant="ghost" onClick={() => navigate('/')}>← Rescan</Button>
+        <Button variant="ghost" onClick={() => navigate('/')}>
+          <ArrowLeft size={18} /> {t('gallery.rescan')}
+        </Button>
       </div>
 
       {/* Outlet sub-tabs */}
@@ -106,26 +111,49 @@ export default function Gallery() {
                   : '2px solid var(--color-neutral-200)',
               }}
             >
-              {name}
+              {name === 'All' ? t('gallery.all') : name}
             </button>
           ))}
         </div>
       )}
 
-      {/* Photo masonry */}
-      <div className="gallery-masonry flex-1 overflow-y-auto pb-4 no-scrollbar">
-        {visiblePhotos.map((photo) => (
-          <PhotoCard
-            key={photo.id}
-            photo={photo}
-            aspectRatio={photoRatios[photo.id]}
-            selected={selectedPhotos.some((p) => p.id === photo.id)}
-            onPreview={setPreviewPhoto}
-            onRatioChange={handleRatioChange}
-            onToggle={handleToggle}
-          />
-        ))}
-      </div>
+      {/* Empty state — prominent so customers don't miss a zero-result scan */}
+      {visiblePhotos.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="festive-card flex flex-col items-center gap-4 text-center px-10 py-12 max-w-md">
+            <div
+              className="bob flex items-center justify-center w-24 h-24 rounded-full text-white"
+              style={{ background: 'var(--gradient-accent)', boxShadow: 'var(--shadow-glow-accent)' }}
+            >
+              <SearchX size={44} strokeWidth={2.5} />
+            </div>
+            <h2 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
+              {t('gallery.emptyTitle')}
+            </h2>
+            <p className="text-base" style={{ color: 'var(--color-neutral-500)' }}>
+              {t('gallery.emptyDesc')}
+            </p>
+            <Button size="lg" onClick={() => navigate('/')} className="mt-2">
+              <ArrowLeft size={20} /> {t('gallery.rescan')}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* Photo masonry */
+        <div className="gallery-masonry flex-1 overflow-y-auto pb-4 no-scrollbar">
+          {visiblePhotos.map((photo) => (
+            <PhotoCard
+              key={photo.id}
+              photo={photo}
+              aspectRatio={photoRatios[photo.id]}
+              selected={selectedPhotos.some((p) => p.id === photo.id)}
+              onPreview={setPreviewPhoto}
+              onRatioChange={handleRatioChange}
+              onToggle={handleToggle}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Sticky footer bar — only when photos are selected */}
       {selectedPhotos.length > 0 && (
@@ -139,14 +167,14 @@ export default function Gallery() {
         >
           <div>
             <p className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>
-              {selectedPhotos.length} photo{selectedPhotos.length > 1 ? 's' : ''} selected
+              {t('gallery.selected', { count: selectedPhotos.length })}
             </p>
             <p className="text-lg font-black" style={{ color: 'var(--color-primary)' }}>
               Rp {totalPrice.toLocaleString('id-ID')}
             </p>
           </div>
           <Button size="lg" onClick={() => navigate('/editor')}>
-            Continue →
+            {t('gallery.continue')} <ArrowRight size={20} />
           </Button>
         </div>
       )}

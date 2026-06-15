@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { useLang } from '../../i18n/LanguageContext';
 
 const GOOGLE_FONTS_URL =
   'https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Dancing+Script:wght@400;700' +
@@ -37,7 +39,8 @@ const PRESET_COLORS = [
 ];
 
 export default function TextPanel({ onAdd }) {
-  const [text, setText] = useState('Your text here');
+  const { t } = useLang();
+  const [text, setText] = useState(() => t('text.default'));
   const [fontSize, setFontSize] = useState(36);
   const [color, setColor] = useState('#ffffff');
   const [fontFamily, setFontFamily] = useState('Montserrat');
@@ -84,16 +87,15 @@ export default function TextPanel({ onAdd }) {
   }
 
   function alignBtn(val) {
-    const icons = { left: '⬤ ⬤\n⬤', center: ' ⬤ \n⬤ ⬤', right: ' ⬤ ⬤\n  ⬤' };
-    const labels = { left: '≡', center: '≡', right: '≡' };
+    const Icon = val === 'left' ? AlignLeft : val === 'center' ? AlignCenter : AlignRight;
     return (
       <button
         key={val}
-        style={styleBtn(align === val)}
+        style={{ ...styleBtn(align === val), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={() => setAlign(val)}
         title={val}
       >
-        {val === 'left' ? '⫷' : val === 'center' ? '≡' : '⫸'}
+        <Icon size={18} />
       </button>
     );
   }
@@ -103,14 +105,14 @@ export default function TextPanel({ onAdd }) {
       className="rounded-2xl p-4 flex flex-col gap-4"
       style={{ background: '#fff', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
     >
-      <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>Add Text</h3>
+      <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>{t('text.title')}</h3>
 
       {/* Text input */}
       <textarea
         rows={2}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type something…"
+        placeholder={t('text.placeholder')}
         style={{
           ...inputStyle, resize: 'none',
           fontFamily, fontWeight: bold ? '700' : '400',
@@ -123,11 +125,11 @@ export default function TextPanel({ onAdd }) {
 
       {/* Style + Align row */}
       <div className="flex items-center gap-2">
-        <button style={styleBtn(bold)} onClick={() => setBold((v) => !v)} title="Bold">
-          <span style={{ fontFamily: 'Arial', fontWeight: 900 }}>B</span>
+        <button style={{ ...styleBtn(bold), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setBold((v) => !v)} title={t('text.bold')}>
+          <Bold size={18} />
         </button>
-        <button style={styleBtn(italic)} onClick={() => setItalic((v) => !v)} title="Italic">
-          <span style={{ fontFamily: 'Georgia', fontStyle: 'italic' }}>I</span>
+        <button style={{ ...styleBtn(italic), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setItalic((v) => !v)} title={t('text.italic')}>
+          <Italic size={18} />
         </button>
         <div className="flex-1" />
         {['left', 'center', 'right'].map((val) => alignBtn(val))}
@@ -135,7 +137,7 @@ export default function TextPanel({ onAdd }) {
 
       {/* Font family picker */}
       <div>
-        <label className="block mb-2" style={labelStyle}>Font</label>
+        <label className="block mb-2" style={labelStyle}>{t('text.font')}</label>
         <div
           className="flex flex-col gap-1 overflow-y-auto no-scrollbar rounded-xl"
           style={{ maxHeight: 200, border: '1.5px solid var(--color-neutral-200)', padding: '4px' }}
@@ -163,7 +165,7 @@ export default function TextPanel({ onAdd }) {
 
       {/* Font size */}
       <div>
-        <label className="block mb-1" style={labelStyle}>Size: {fontSize}px</label>
+        <label className="block mb-1" style={labelStyle}>{t('text.size')}: {fontSize}px</label>
         <input
           type="range" min={14} max={120} value={fontSize}
           onChange={(e) => setFontSize(Number(e.target.value))}
@@ -173,7 +175,7 @@ export default function TextPanel({ onAdd }) {
 
       {/* Color */}
       <div>
-        <label className="block mb-2" style={labelStyle}>Color</label>
+        <label className="block mb-2" style={labelStyle}>{t('text.color')}</label>
         <div className="flex gap-2 flex-wrap">
           {PRESET_COLORS.map((c) => (
             <button
@@ -193,7 +195,7 @@ export default function TextPanel({ onAdd }) {
             onChange={(e) => setColor(e.target.value)}
             className="w-7 h-7 rounded-full cursor-pointer"
             style={{ border: '2px solid var(--color-neutral-200)' }}
-            title="Custom color"
+            title={t('text.customColor')}
           />
         </div>
       </div>
@@ -216,7 +218,7 @@ export default function TextPanel({ onAdd }) {
             wordBreak: 'break-word',
           }}
         >
-          {text || 'Preview'}
+          {text || t('text.preview')}
         </span>
       </div>
 
@@ -227,7 +229,7 @@ export default function TextPanel({ onAdd }) {
           if (text.trim()) onAdd({ text, fontSize, color, fontFamily, fontStyle, align });
         }}
       >
-        + Add to Canvas
+        + {t('text.addToCanvas')}
       </button>
     </div>
   );

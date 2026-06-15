@@ -1,7 +1,10 @@
 import { useEffect, useCallback } from 'react';
+import { X, ChevronLeft, ChevronRight, Check, Plus } from 'lucide-react';
 import { usePhotoCache } from '../../hooks/usePhotoCache';
+import { useLang } from '../../i18n/LanguageContext';
 
 export default function PhotoPreview({ photo, photos, onClose, onNavigate, selected, onToggleSelect }) {
+  const { t } = useLang();
   const cachedUrl = usePhotoCache(photo.url ?? photo.thumbnail);
   const currentIndex = photos.findIndex((p) => p.id === photo.id);
 
@@ -45,8 +48,9 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
           className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg transition-all hover:scale-110"
           style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
           onClick={onClose}
+          aria-label={t('common.close')}
         >
-          ✕
+          <X size={20} />
         </button>
 
         {/* Label badge */}
@@ -96,7 +100,10 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
             }}
             onClick={onToggleSelect}
           >
-            {selected ? '✓ Selected' : '+ Select'}
+            <span className="inline-flex items-center gap-1.5">
+              {selected ? <Check size={16} strokeWidth={3} /> : <Plus size={16} strokeWidth={3} />}
+              {selected ? t('preview.selected') : t('preview.select')}
+            </span>
           </button>
         </div>
       </div>
@@ -107,8 +114,9 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
           className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl transition-all hover:scale-110"
           style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
+          aria-label="Previous"
         >
-          ‹
+          <ChevronLeft size={28} />
         </button>
       )}
 
@@ -118,8 +126,9 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
           className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl transition-all hover:scale-110"
           style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}
           onClick={(e) => { e.stopPropagation(); goNext(); }}
+          aria-label="Next"
         >
-          ›
+          <ChevronRight size={28} />
         </button>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 
 const FALLBACK_RATIO = 1;
 const OVERLAY_MIN_SIZE = 12;
@@ -159,8 +160,9 @@ export default function PhotoCard({
             backdropFilter: 'blur(4px)',
           }}
           onClick={(e) => { e.stopPropagation(); onToggle(photo); }}
+          aria-pressed={selected}
         >
-          ✓
+          <Check size={16} strokeWidth={3} />
         </button>
 
         {/* Bottom bar: price */}

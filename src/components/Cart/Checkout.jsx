@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import { ArrowLeft, QrCode, Smartphone, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 import { createTransaction, getTransaction, cancelTransaction } from '../../api/mockApi';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
@@ -16,6 +18,7 @@ function formatCountdown(seconds) {
 
 export default function Checkout() {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
   const navigate = useNavigate();
 
   // 'idle' | 'creating' | 'waiting' | 'error'
@@ -69,7 +72,7 @@ export default function Checkout() {
 
   async function handleQrisPay() {
     if (!deviceConfig.unit || !deviceConfig.outlet) {
-      setErrorMsg('Konfigurasi perangkat belum diatur. Buka Pengaturan terlebih dahulu.');
+      setErrorMsg(t('checkout.errNoConfig'));
       setStatus('error');
       return;
     }
@@ -86,7 +89,7 @@ export default function Checkout() {
       setStatus('waiting');
       startPolling(trx.id, dueSeconds);
     } catch (err) {
-      setErrorMsg(`Gagal membuat transaksi: ${err.message}`);
+      setErrorMsg(t('checkout.errCreate', { msg: err.message }));
       setStatus('error');
     }
   }
@@ -111,7 +114,7 @@ export default function Checkout() {
       setCountdown(remaining);
       if (remaining <= 0) {
         stopPolling();
-        setErrorMsg('Waktu pembayaran habis. Transaksi dibatalkan otomatis.');
+        setErrorMsg(t('checkout.errTimeout'));
         setStatus('error');
         if (transactionRef.current?.id) {
           cancelTransaction(transactionRef.current.id).catch(() => {});
@@ -125,7 +128,7 @@ export default function Checkout() {
   if (status === 'creating') {
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner message="Membuat transaksi…" />
+        <LoadingSpinner message={t('checkout.creating')} />
       </div>
     );
   }
@@ -144,10 +147,10 @@ export default function Checkout() {
         <div className="flex flex-col gap-5 w-full max-w-md">
           <div className="text-center">
             <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-              Konfirmasi Pembayaran
+              {t('checkout.confirmTitle')}
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-500)' }}>
-              {state.selectedPhotos.length} foto dipilih
+              {t('checkout.photosSelected', { count: state.selectedPhotos.length })}
             </p>
           </div>
 
@@ -169,7 +172,7 @@ export default function Checkout() {
                     {i + 1}
                   </div>
                   <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
-                    {photo.filename ?? `Foto ${i + 1}`}
+                    {photo.filename ?? t('common.photoN', { n: i + 1 })}
                   </span>
                 </div>
                 <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
@@ -181,7 +184,7 @@ export default function Checkout() {
               className="flex items-center justify-between px-4 py-4"
               style={{ background: 'var(--color-primary-50)' }}
             >
-              <span className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>Total</span>
+              <span className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>{t('common.total')}</span>
               <span className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
                 Rp {total.toLocaleString('id-ID')}
               </span>
@@ -189,10 +192,10 @@ export default function Checkout() {
           </div>
 
           <Button size="lg" onClick={handleQrisPay} className="w-full">
-            📱 Bayar dengan QRIS →
+            <QrCode size={20} /> {t('checkout.payQris')}
           </Button>
           <Button variant="ghost" onClick={() => navigate('/cart')} className="w-full">
-            ← Kembali ke Keranjang
+            <ArrowLeft size={18} /> {t('checkout.backToCart')}
           </Button>
         </div>
       )}
@@ -223,7 +226,7 @@ export default function Checkout() {
                 className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                 style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
               >
-                <span className="animate-pulse">●</span> Menunggu pembayaran
+                <span className="animate-pulse">●</span> {t('checkout.waiting')}
               </div>
             </div>
 
@@ -243,7 +246,7 @@ export default function Checkout() {
             {/* Countdown */}
             <div className="flex flex-col items-center gap-1 w-full">
               <p className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
-                Batas waktu pembayaran
+                {t('checkout.dueLabel')}
               </p>
               <div
                 className="text-4xl font-black font-mono tabular-nums"
@@ -268,28 +271,28 @@ export default function Checkout() {
             </div>
 
             <p className="text-xs text-center" style={{ color: 'var(--color-neutral-500)' }}>
-              Buka e-wallet atau mobile banking,<br />lalu scan QR di atas.
+              {t('checkout.scanInstr')}
             </p>
 
             {/* Action buttons */}
             <div className="flex flex-col gap-2 w-full">
               <button
                 onClick={() => setConfirmMode('back')}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
                 style={{
                   background: 'var(--color-neutral-100)',
                   color: 'var(--color-neutral-600)',
                   border: '1.5px solid var(--color-neutral-200)',
                 }}
               >
-                ← Kembali &amp; Batalkan
+                <ArrowLeft size={16} /> {t('checkout.backCancel')}
               </button>
               <button
                 onClick={() => setConfirmMode('cancel-only')}
                 className="w-full py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
                 style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}
               >
-                Batalkan transaksi
+                {t('checkout.cancelTrx')}
               </button>
             </div>
           </div>
@@ -304,13 +307,13 @@ export default function Checkout() {
             }}
           >
             <div className="px-6 py-4" style={{ background: 'var(--color-primary)', color: '#fff' }}>
-              <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Kode Transaksi</p>
+              <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">{t('checkout.trxCode')}</p>
               <p className="font-mono font-black text-lg">{transaction.trx_code}</p>
             </div>
 
             <div className="px-6 pt-4 flex flex-col gap-2">
               <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-400)' }}>
-                Rincian Pesanan
+                {t('checkout.orderDetails')}
               </p>
               {state.selectedPhotos.map((photo, i) => (
                 <div
@@ -326,7 +329,7 @@ export default function Checkout() {
                       {i + 1}
                     </div>
                     <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
-                      {photo.filename ?? `Foto ${i + 1}`}
+                      {photo.filename ?? t('common.photoN', { n: i + 1 })}
                     </span>
                   </div>
                   <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
@@ -342,17 +345,17 @@ export default function Checkout() {
             >
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary-400)' }}>
-                  Total Pembayaran
+                  {t('checkout.totalPayment')}
                 </p>
                 <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
                   Rp {total.toLocaleString('id-ID')}
                 </p>
               </div>
               <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
                 style={{ background: 'var(--color-primary)', color: '#fff' }}
               >
-                📱
+                <Smartphone size={24} />
               </div>
             </div>
           </div>
@@ -369,15 +372,17 @@ export default function Checkout() {
             className="flex flex-col gap-5 p-8 rounded-3xl w-full max-w-sm mx-4 text-center"
             style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}
           >
-            <div className="text-4xl">⚠️</div>
+            <div className="flex justify-center" style={{ color: 'var(--color-warning)' }}>
+              <AlertTriangle size={40} />
+            </div>
             <div>
               <p className="text-lg font-black" style={{ color: 'var(--color-neutral-900)' }}>
-                Batalkan Pembayaran?
+                {t('checkout.cancelTitle')}
               </p>
               <p className="text-sm mt-2" style={{ color: 'var(--color-neutral-500)' }}>
                 {confirmMode === 'back'
-                  ? 'Transaksi akan dibatalkan dan kamu akan kembali ke halaman awal.'
-                  : 'Transaksi ini akan dibatalkan. Kamu bisa membuat tagihan baru.'}
+                  ? t('checkout.cancelBackMsg')
+                  : t('checkout.cancelOnlyMsg')}
               </p>
             </div>
             <div className="flex gap-3">
@@ -390,14 +395,14 @@ export default function Checkout() {
                   border: '1.5px solid var(--color-neutral-200)',
                 }}
               >
-                Lanjut Bayar
+                {t('checkout.continuePay')}
               </button>
               <button
                 onClick={() => handleCancel(confirmMode)}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
                 style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
               >
-                Ya, Batalkan
+                {t('checkout.yesCancel')}
               </button>
             </div>
           </div>
@@ -411,14 +416,14 @@ export default function Checkout() {
             className="flex flex-col items-center gap-3 w-full px-6 py-5 rounded-2xl text-center"
             style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
           >
-            <span className="text-3xl">⚠️</span>
-            <p className="font-semibold">{errorMsg || 'Terjadi kesalahan.'}</p>
+            <AlertTriangle size={30} />
+            <p className="font-semibold">{errorMsg || t('checkout.genericError')}</p>
           </div>
           <Button onClick={() => { setStatus('idle'); setErrorMsg(''); }} className="w-full">
-            Coba Lagi
+            {t('common.retry')}
           </Button>
           <Button variant="ghost" onClick={() => navigate('/cart')} className="w-full">
-            ← Kembali ke Keranjang
+            <ArrowLeft size={18} /> {t('checkout.backToCart')}
           </Button>
         </div>
       )}

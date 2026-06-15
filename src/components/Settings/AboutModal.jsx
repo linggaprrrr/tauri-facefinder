@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { X, Check, Loader2 } from 'lucide-react';
 import { getVersion, getName } from '@tauri-apps/api/app';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import ownizeLogo from '../../assets/ownize_logo.png';
+import { useLang } from '../../i18n/LanguageContext';
 
 const STATUS = { IDLE: 'idle', CHECKING: 'checking', UP_TO_DATE: 'up_to_date', AVAILABLE: 'available', INSTALLING: 'installing', ERROR: 'error' };
 
 export default function AboutModal({ onClose }) {
+  const { t } = useLang();
   const [appVersion, setAppVersion] = useState('—');
   const [appName, setAppName] = useState('Face Finder');
   const [status, setStatus] = useState(STATUS.IDLE);
@@ -32,7 +35,7 @@ export default function AboutModal({ onClose }) {
         setStatus(STATUS.UP_TO_DATE);
       }
     } catch (e) {
-      setErrorMsg(e?.message ?? 'Gagal memeriksa pembaruan.');
+      setErrorMsg(e?.message ?? t('about.errCheck'));
       setStatus(STATUS.ERROR);
     }
   }
@@ -44,7 +47,7 @@ export default function AboutModal({ onClose }) {
       await updateInfo.update.downloadAndInstall();
       await relaunch();
     } catch (e) {
-      setErrorMsg(e?.message ?? 'Gagal menginstal pembaruan.');
+      setErrorMsg(e?.message ?? t('about.errInstall'));
       setStatus(STATUS.ERROR);
     }
   }
@@ -64,13 +67,13 @@ export default function AboutModal({ onClose }) {
           className="flex items-center justify-between px-6 py-4"
           style={{ background: 'var(--color-primary)', color: '#fff' }}
         >
-          <span className="font-bold text-xl">Tentang Aplikasi</span>
+          <span className="font-bold text-xl">{t('about.title')}</span>
           <button
             onClick={onClose}
-            className="text-white opacity-70 hover:opacity-100 text-2xl leading-none"
-            aria-label="Tutup"
+            className="text-white opacity-70 hover:opacity-100 leading-none"
+            aria-label={t('common.close')}
           >
-            ×
+            <X size={24} />
           </button>
         </div>
 
@@ -94,8 +97,8 @@ export default function AboutModal({ onClose }) {
             className="rounded-xl divide-y text-sm"
             style={{ background: 'var(--color-neutral-50)', borderColor: 'var(--color-neutral-100)' }}
           >
-            <InfoRow label="Versi" value={`v${appVersion}`} />
-            <InfoRow label="Platform" value="Desktop (Tauri)" />
+            <InfoRow label={t('about.version')} value={`v${appVersion}`} />
+            <InfoRow label={t('about.platform')} value="Desktop (Tauri)" />
           </div>
 
           {/* Update status feedback */}
@@ -104,8 +107,8 @@ export default function AboutModal({ onClose }) {
               className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium"
               style={{ background: 'var(--color-success-50, #f0fdf4)', color: '#16a34a' }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Aplikasi sudah versi terbaru.
+              <Check size={16} strokeWidth={2.5} />
+              {t('about.upToDate')}
             </div>
           )}
 
@@ -114,7 +117,7 @@ export default function AboutModal({ onClose }) {
               className="flex flex-col gap-3 px-4 py-3 rounded-xl text-sm"
               style={{ background: 'var(--color-primary-50, #eff6ff)', color: 'var(--color-primary)' }}
             >
-              <p className="font-semibold">Pembaruan tersedia: v{updateInfo.version}</p>
+              <p className="font-semibold">{t('about.available', { version: updateInfo.version })}</p>
               {updateInfo.notes && (
                 <p className="text-xs opacity-80 whitespace-pre-line">{updateInfo.notes}</p>
               )}
@@ -122,7 +125,7 @@ export default function AboutModal({ onClose }) {
                 onClick={handleInstall}
                 className="btn-primary py-2 rounded-lg font-semibold text-sm"
               >
-                Instal & Restart
+                {t('about.installRestart')}
               </button>
             </div>
           )}
@@ -132,7 +135,7 @@ export default function AboutModal({ onClose }) {
               className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
               style={{ background: 'var(--color-primary-50, #eff6ff)', color: 'var(--color-primary)' }}
             >
-              <Spinner /> Mengunduh & menginstal…
+              <Spinner /> {t('about.installing')}
             </div>
           )}
 
@@ -155,7 +158,7 @@ export default function AboutModal({ onClose }) {
               color: 'var(--color-neutral-700)',
             }}
           >
-            {checking ? <><Spinner /> Memeriksa…</> : 'Periksa Pembaruan'}
+            {checking ? <><Spinner /> {t('about.checking')}</> : t('about.checkUpdate')}
           </button>
         </div>
       </div>
@@ -173,10 +176,5 @@ function InfoRow({ label, value }) {
 }
 
 function Spinner() {
-  return (
-    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0" opacity=".25"/>
-      <path d="M21 12a9 9 0 0 0-9-9"/>
-    </svg>
-  );
+  return <Loader2 className="animate-spin" size={14} strokeWidth={2.5} />;
 }

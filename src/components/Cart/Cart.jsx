@@ -1,9 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, ShoppingCart, Check, X } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 import Button from '../common/Button';
 
 export default function Cart() {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
   const navigate = useNavigate();
   const { selectedPhotos, photoEdits } = state;
   const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
@@ -16,9 +19,11 @@ export default function Cart() {
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full py-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-          Your Cart
+          {t('cart.title')}
         </h1>
-        <Button variant="ghost" onClick={() => navigate('/editor')}>← Editor</Button>
+        <Button variant="ghost" onClick={() => navigate('/editor')}>
+          <ArrowLeft size={18} /> {t('cart.editor')}
+        </Button>
       </div>
 
       {selectedPhotos.length === 0 ? (
@@ -26,9 +31,9 @@ export default function Cart() {
           className="flex flex-col items-center justify-center gap-4 py-20 rounded-lg"
           style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-400)' }}
         >
-          <span className="text-6xl">🛒</span>
-          <p className="text-xl font-semibold">Your cart is empty</p>
-          <Button onClick={() => navigate('/gallery')}>Browse Photos</Button>
+          <ShoppingCart size={64} strokeWidth={1.5} />
+          <p className="text-xl font-semibold">{t('cart.empty')}</p>
+          <Button onClick={() => navigate('/gallery')}>{t('cart.browse')}</Button>
         </div>
       ) : (
         <>
@@ -55,7 +60,7 @@ export default function Cart() {
                         className="rounded-lg object-cover"
                         style={{ width: 80, height: 80 }}
                       />
-                      <span className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>Original</span>
+                      <span className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('cart.original')}</span>
                     </div>
 
                     {/* Edited result — only if user made edits */}
@@ -67,7 +72,7 @@ export default function Cart() {
                           className="rounded-lg object-cover"
                           style={{ width: 80, height: 80 }}
                         />
-                        <span className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Edited</span>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>{t('cart.edited')}</span>
                       </div>
                     )}
                   </div>
@@ -88,7 +93,9 @@ export default function Cart() {
                         className="text-xs px-2 py-0.5 rounded-full font-semibold"
                         style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
                       >
-                        ✓ Dengan edit
+                        <span className="inline-flex items-center gap-1">
+                          <Check size={12} strokeWidth={3} /> {t('cart.withEdit')}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -101,9 +108,9 @@ export default function Cart() {
                       color: 'var(--color-error)',
                     }}
                     onClick={() => handleRemove(photo.id)}
-                    aria-label="Remove photo"
+                    aria-label={t('cart.removeAria')}
                   >
-                    ✕
+                    <X size={18} />
                   </button>
                 </div>
               );
@@ -120,14 +127,14 @@ export default function Cart() {
           >
             <div>
               <p style={{ color: 'var(--color-neutral-600)' }}>
-                {selectedPhotos.length} photo{selectedPhotos.length > 1 ? 's' : ''}
+                {t('cart.photoCount', { count: selectedPhotos.length })}
               </p>
               <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
                 Rp {total.toLocaleString('id-ID')}
               </p>
             </div>
             <Button size="lg" onClick={() => navigate('/checkout')}>
-              Pay Now →
+              {t('cart.payNow')} <ArrowRight size={20} />
             </Button>
           </div>
         </>

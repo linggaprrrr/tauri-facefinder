@@ -1,4 +1,8 @@
+import { X } from 'lucide-react';
+import { useLang } from '../../i18n/LanguageContext';
+
 export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, onPick, onClose }) {
+  const { t } = useLang();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -13,12 +17,13 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
           className="flex items-center justify-between px-5 py-4 shrink-0"
           style={{ background: '#7c3aed', color: '#fff' }}
         >
-          <span className="font-bold text-base">Pilih Foto untuk Slot {slotIndex + 1}</span>
+          <span className="font-bold text-base">{t('picker.title', { n: slotIndex + 1 })}</span>
           <button
             onClick={onClose}
-            className="text-white opacity-70 hover:opacity-100 text-2xl leading-none"
+            className="text-white opacity-70 hover:opacity-100 leading-none"
+            aria-label={t('common.close')}
           >
-            ×
+            <X size={24} />
           </button>
         </div>
 
@@ -48,7 +53,7 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
                       className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold"
                       style={{ background: 'rgba(124,58,237,0.45)' }}
                     >
-                      Dipakai
+                      {t('picker.used')}
                     </div>
                   )}
                 </button>

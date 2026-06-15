@@ -1,3 +1,5 @@
+import { useLang } from '../../i18n/LanguageContext';
+
 function emojiToDataUri(emoji) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">
     <text y="96" font-size="96" font-family="Apple Color Emoji,Noto Color Emoji,sans-serif">${emoji}</text>
@@ -6,6 +8,7 @@ function emojiToDataUri(emoji) {
 }
 
 export default function StickerPanel({ onAdd, stickers = [], loading = false }) {
+  const { t } = useLang();
   function handleAdd(s) {
     if (s.type === 'emoji') {
       onAdd(emojiToDataUri(s.value));
@@ -20,10 +23,10 @@ export default function StickerPanel({ onAdd, stickers = [], loading = false }) 
       style={{ background: '#fff', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
     >
       <h3 className="font-bold mb-3" style={{ color: 'var(--color-neutral-700)' }}>
-        Stickers
+        {t('sticker.title')}
       </h3>
       {loading && (
-        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>Memuat sticker…</p>
+        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('sticker.loading')}</p>
       )}
       <div className="grid grid-cols-3 gap-2">
         {stickers.map((s) => (

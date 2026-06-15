@@ -2,7 +2,13 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage, Text, Transformer, Group, Rect } from 'react-konva';
 import useImage from 'use-image';
 import { useNavigate } from 'react-router-dom';
+import {
+  Smile, Image as ImageIcon, Type, SlidersHorizontal,
+  ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
+  Plus, Minus, Pencil,
+} from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { useLang } from '../../i18n/LanguageContext';
 import { useHistory } from '../../hooks/useHistory';
 import StickerPanel from './StickerPanel';
 import TextPanel from './TextPanel';
@@ -361,14 +367,15 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
 }
 
 const PANEL_TABS = [
-  { id: 'stickers', label: '😀  Stickers' },
-  { id: 'frames',   label: '🖼  Frame'  },  
-  { id: 'text',     label: '✏️  Text'     },
-  { id: 'filters',  label: '🎨  Filters'  },  
+  { id: 'stickers', icon: Smile,            labelKey: 'editor.tabStickers' },
+  { id: 'frames',   icon: ImageIcon,        labelKey: 'editor.tabFrame' },
+  { id: 'text',     icon: Type,             labelKey: 'editor.tabText' },
+  { id: 'filters',  icon: SlidersHorizontal,labelKey: 'editor.tabFilters' },
 ];
 
 export default function PhotoEditor() {
   const { state, dispatch } = useApp();
+  const { t } = useLang();
   const navigate = useNavigate();
   const stageRef = useRef(null);
 
@@ -611,8 +618,8 @@ export default function PhotoEditor() {
     return (
       <div className="flex items-center justify-center h-full">
         <p style={{ color: 'var(--color-neutral-500)' }}>
-          No photos selected.{' '}
-          <button onClick={() => navigate('/gallery')} style={{ color: 'var(--color-primary)' }}>Go back</button>
+          {t('editor.noPhotos')}{' '}
+          <button onClick={() => navigate('/gallery')} style={{ color: 'var(--color-primary)' }}>{t('editor.goBack')}</button>
         </p>
       </div>
     );
@@ -625,7 +632,7 @@ export default function PhotoEditor() {
       {/* Page header */}
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
-          Edit Photos
+          {t('editor.title')}
         </h1>
 
         {/* Prev / counter / Next */}
@@ -633,10 +640,11 @@ export default function PhotoEditor() {
           <button
             disabled={photoIndex === 0}
             onClick={() => navigateTo(photoIndex - 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-lg transition-all active:scale-95 disabled:opacity-30"
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+            aria-label="Previous"
           >
-            ‹
+            <ChevronLeft size={20} />
           </button>
           <span className="text-sm font-semibold px-2" style={{ color: 'var(--color-neutral-600)' }}>
             {photoIndex + 1} / {selectedPhotos.length}
@@ -644,17 +652,22 @@ export default function PhotoEditor() {
           <button
             disabled={isLast}
             onClick={() => navigateTo(photoIndex + 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-lg transition-all active:scale-95 disabled:opacity-30"
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+            aria-label="Next"
           >
-            ›
+            <ChevronRight size={20} />
           </button>
         </div>
 
         <div className="flex gap-2 shrink-0">
-          <Button variant="ghost" onClick={() => navigate('/gallery')}>← Gallery</Button>
+          <Button variant="ghost" onClick={() => navigate('/gallery')}>
+            <ArrowLeft size={18} /> {t('editor.gallery')}
+          </Button>
           <Button onClick={handleDone}>
-            {isLast ? 'Done ✓' : 'Next →'}
+            {isLast
+              ? <>{t('editor.done')} <Check size={18} strokeWidth={3} /></>
+              : <>{t('editor.next')} <ArrowRight size={18} /></>}
           </Button>
         </div>
       </div>
@@ -693,7 +706,7 @@ export default function PhotoEditor() {
                   style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }}
                 />
                 <span className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
-                  Loading photo…
+                  {t('editor.loadingPhoto')}
                 </span>
               </div>
             )}
@@ -787,7 +800,7 @@ export default function PhotoEditor() {
             {/* Loading overlay while JSON slot config is being fetched */}
             {isLayoutFrame && slotsLoading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                <div className="text-white text-sm font-semibold">Memuat konfigurasi slot…</div>
+                <div className="text-white text-sm font-semibold">{t('editor.loadingSlots')}</div>
               </div>
             )}
 
@@ -831,9 +844,9 @@ export default function PhotoEditor() {
                   onClick={filled ? undefined : () => openSlotPicker(i)}
                 >
                   {!filled && (
-                    <div style={{ color: '#7c3aed', fontSize: 12, textAlign: 'center', pointerEvents: 'none' }}>
-                      <div style={{ fontSize: 20, lineHeight: 1 }}>+</div>
-                      <div>Slot {i + 1}</div>
+                    <div style={{ color: '#7c3aed', fontSize: 12, textAlign: 'center', pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <Plus size={20} />
+                      <div>{t('editor.slot', { n: i + 1 })}</div>
                     </div>
                   )}
 
@@ -856,18 +869,21 @@ export default function PhotoEditor() {
                       <button
                         onClick={(e) => { e.stopPropagation(); zoomSlot(1.15); }}
                         style={zoomBtnStyle}
-                        title="Zoom In"
-                      >＋</button>
+                        title={t('editor.zoomIn')}
+                        aria-label={t('editor.zoomIn')}
+                      ><Plus size={16} /></button>
                       <button
                         onClick={(e) => { e.stopPropagation(); zoomSlot(1 / 1.15); }}
                         style={zoomBtnStyle}
-                        title="Zoom Out"
-                      >－</button>
+                        title={t('editor.zoomOut')}
+                        aria-label={t('editor.zoomOut')}
+                      ><Minus size={16} /></button>
                       <button
                         onClick={(e) => { e.stopPropagation(); openSlotPicker(i); }}
                         style={{ ...zoomBtnStyle, background: 'rgba(124,58,237,0.85)' }}
-                        title="Ganti Foto"
-                      >✎</button>
+                        title={t('editor.changePhoto')}
+                        aria-label={t('editor.changePhoto')}
+                      ><Pencil size={15} /></button>
                     </div>
                   )}
                 </div>
@@ -880,10 +896,10 @@ export default function PhotoEditor() {
             className="flex gap-2 p-1.5 rounded-xl shrink-0"
             style={{ background: 'var(--color-neutral-100)' }}
           >
-            {PANEL_TABS.map(({ id, label }) => (
+            {PANEL_TABS.map(({ id, icon: TabIcon, labelKey }) => (
               <button
                 key={id}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95"
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
                 style={{
                   background: activePanel === id ? 'var(--color-accent)' : 'transparent',
                   color: activePanel === id ? 'var(--color-neutral-900)' : 'var(--color-neutral-600)',
@@ -891,7 +907,7 @@ export default function PhotoEditor() {
                 }}
                 onClick={() => setActivePanel(activePanel === id ? null : id)}
               >
-                {label}
+                <TabIcon size={16} /> {t(labelKey)}
               </button>
             ))}
           </div>
@@ -909,7 +925,7 @@ export default function PhotoEditor() {
             }}
           >
             <p className="text-xs font-bold px-3 pt-3 pb-2" style={{ color: 'var(--color-neutral-500)' }}>
-              SELECTED PHOTOS
+              {t('editor.selectedPhotos')}
             </p>
             <div className="flex flex-col gap-1 px-2 pb-2 overflow-y-auto no-scrollbar" style={{ maxHeight: 300, paddingTop: 10 }}>
               {selectedPhotos.map((p, i) => (
@@ -933,11 +949,13 @@ export default function PhotoEditor() {
                       className="text-xs font-bold truncate"
                       style={{ color: i === photoIndex ? 'var(--color-primary)' : 'var(--color-neutral-700)' }}
                     >
-                      Photo {i + 1}
+                      {t('common.photoN', { n: i + 1 })}
                     </p>
                     {/* Saved edit indicator */}
                     {photoEdits[p.id]?.dataUrl && i !== photoIndex && (
-                      <p className="text-xs" style={{ color: 'var(--color-success)' }}>✓ Saved</p>
+                      <p className="text-xs inline-flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
+                        <Check size={12} strokeWidth={3} /> {t('editor.savedTag')}
+                      </p>
                     )}
                     {p.label && !photoEdits[p.id]?.dataUrl && (
                       <p className="text-xs truncate" style={{ color: 'var(--color-neutral-400)' }}>{p.label}</p>
@@ -964,7 +982,7 @@ export default function PhotoEditor() {
                   color: 'var(--color-primary-400)',
                 }}
               >
-                <p className="text-sm font-semibold">Select a tool below to start editing</p>
+                <p className="text-sm font-semibold">{t('editor.selectTool')}</p>
               </div>
             )}
           </div>

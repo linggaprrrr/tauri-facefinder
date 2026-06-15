@@ -1,5 +1,8 @@
+import { useLang } from '../../i18n/LanguageContext';
+
 // SVG overlay: dark mask with branded oval cutout + animated pulse ring
 export default function FaceOverlay() {
+  const { t } = useLang();
   return (
     <svg
       className="absolute inset-0 w-full h-full pointer-events-none"
@@ -74,7 +77,7 @@ export default function FaceOverlay() {
         fontFamily="system-ui, sans-serif"
         opacity="0.9"
       >
-        Align your face here
+        {t('overlay.align')}
       </text>
     </svg>
   );

@@ -1,9 +1,13 @@
+import { Undo2, Redo2, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { useLang } from '../../i18n/LanguageContext';
+
 export default function EditorToolbar({
   canUndo, canRedo, onUndo, onRedo,
   onDelete, onBringForward, onSendBackward,
   hasSelection,
 }) {
-  const base = 'px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 min-h-10';
+  const { t } = useLang();
+  const base = 'px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 min-h-10 inline-flex items-center gap-1.5';
 
   function toolBtn(enabled, danger = false) {
     if (!enabled) return `${base} cursor-not-allowed` ;
@@ -26,7 +30,7 @@ export default function EditorToolbar({
           color: canUndo ? 'var(--color-primary)' : 'var(--color-neutral-400)',
         }}
       >
-        ↩ Undo
+        <Undo2 size={16} /> {t('toolbar.undo')}
       </button>
       <button
         className={toolBtn(canRedo)}
@@ -37,7 +41,7 @@ export default function EditorToolbar({
           color: canRedo ? 'var(--color-primary)' : 'var(--color-neutral-400)',
         }}
       >
-        ↪ Redo
+        <Redo2 size={16} /> {t('toolbar.redo')}
       </button>
 
       {/* Divider */}
@@ -53,7 +57,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
-        ⬆ Forward
+        <ChevronUp size={16} /> {t('toolbar.forward')}
       </button>
       <button
         className={toolBtn(hasSelection)}
@@ -64,7 +68,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
-        ⬇ Backward
+        <ChevronDown size={16} /> {t('toolbar.backward')}
       </button>
 
       {/* Divider */}
@@ -80,7 +84,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-error)' : 'var(--color-neutral-300)',
         }}
       >
-        🗑 Delete
+        <Trash2 size={16} /> {t('toolbar.delete')}
       </button>
     </div>
   );

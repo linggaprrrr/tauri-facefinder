@@ -1,7 +1,29 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────
+   Bundled fonts (offline-safe — no network).
+   Both are variable fonts; one file covers the
+   full weight axis. Latin subset only.
+───────────────────────────────────────────── */
+@font-face {
+  font-family: 'Fredoka';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('./assets/fonts/fredoka-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('./assets/fonts/nunito-latin.woff2') format('woff2');
+}
+
+/* ─────────────────────────────────────────────
    FACE FINDER — Design Token System
+   Theme: "Festive Park" — vibrant, photo-first,
+   theme-park energy on the Ownize blue+orange brand.
    Tailwind v4 @theme registers every token as
    a utility class automatically.
    e.g. bg-primary, text-accent, border-neutral-200
@@ -100,6 +122,22 @@
   --shadow-md:  0 4px 12px rgba(1,125,197,0.12), 0 2px 4px rgba(0,0,0,0.08);
   --shadow-lg:  0 10px 28px rgba(1,125,197,0.15), 0 4px 8px rgba(0,0,0,0.10);
   --shadow-xl:  0 20px 48px rgba(1,125,197,0.18), 0 8px 16px rgba(0,0,0,0.12);
+
+  /* ── Festive Park: fonts ── */
+  --font-display: 'Fredoka', system-ui, sans-serif;  /* rounded, playful headings */
+  --font-sans:    'Nunito', system-ui, sans-serif;   /* friendly body */
+
+  /* ── Festive Park: gradients ── */
+  --gradient-brand:   linear-gradient(135deg, #017DC5 0%, #2A96D9 45%, #FBA519 100%);
+  --gradient-primary: linear-gradient(135deg, #2A96D9 0%, #017DC5 100%);
+  --gradient-accent:  linear-gradient(135deg, #FBBA2E 0%, #FBA519 55%, #F97316 100%);
+  --gradient-hero:    linear-gradient(160deg, #E6F4FB 0%, #FFFFFF 40%, #FEF6E6 100%);
+  --gradient-sky:     linear-gradient(180deg, #C0E1F5 0%, #E6F4FB 100%);
+
+  /* ── Festive Park: colored glow shadows ── */
+  --shadow-glow-primary: 0 12px 28px rgba(1,125,197,0.32), 0 4px 10px rgba(1,125,197,0.20);
+  --shadow-glow-accent:  0 12px 28px rgba(251,165,25,0.38), 0 4px 10px rgba(249,115,22,0.22);
+  --shadow-pop:          0 18px 40px rgba(1,125,197,0.16), 0 6px 14px rgba(251,165,25,0.14);
 }
 
 /* ─────────────────────────────────────────────
@@ -116,10 +154,16 @@ html {
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: var(--color-neutral-50);
   color: var(--color-neutral-800);
   min-height: 100svh;
+}
+
+/* Playful rounded headings carry the theme-park personality */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 #root {
@@ -135,43 +179,49 @@ body {
    Button.jsx component stays clean.
 ───────────────────────────────────────────── */
 
-/* Primary: Blue CTA — Scan, Checkout, Confirm */
+/* Primary: Blue gradient CTA — Scan, Checkout, Confirm */
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--gradient-primary);
   color: #fff;
   border: 2px solid transparent;
+  box-shadow: var(--shadow-glow-primary);
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-600);
-  box-shadow: var(--shadow-md);
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-glow-primary), 0 0 0 4px var(--color-primary-100);
+  transform: translateY(-2px);
 }
 .btn-primary:active:not(:disabled) {
-  background: var(--color-primary-700);
-  transform: scale(0.97);
+  transform: translateY(0) scale(0.97);
+  box-shadow: var(--shadow-md);
 }
 .btn-primary:disabled {
   background: var(--color-primary-200);
   color: var(--color-primary-50);
+  box-shadow: none;
 }
 
-/* Secondary: Orange — Edit, Add Sticker, secondary actions */
+/* Secondary: Orange gradient — Edit, Add Sticker, festive accents */
 .btn-secondary {
-  background: var(--color-accent);
+  background: var(--gradient-accent);
   color: var(--color-neutral-900);
   border: 2px solid transparent;
+  box-shadow: var(--shadow-glow-accent);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-accent-600);
-  color: #fff;
-  box-shadow: var(--shadow-md);
+  filter: brightness(1.05);
+  color: var(--color-neutral-900);
+  box-shadow: var(--shadow-glow-accent), 0 0 0 4px var(--color-accent-100);
+  transform: translateY(-2px);
 }
 .btn-secondary:active:not(:disabled) {
-  background: var(--color-accent-700);
-  transform: scale(0.97);
+  transform: translateY(0) scale(0.97);
+  box-shadow: var(--shadow-md);
 }
 .btn-secondary:disabled {
   background: var(--color-accent-100);
   color: var(--color-accent-400);
+  box-shadow: none;
 }
 
 /* Ghost: transparent with blue border */
@@ -208,6 +258,96 @@ body {
 button:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 3px;
+}
+
+/* ─────────────────────────────────────────────
+   Festive Park — backdrop, decoration & delight
+───────────────────────────────────────────── */
+
+/* Page backdrop: warm sky gradient + soft colored light blobs.
+   Applied to the app shell so every screen sits on a lively stage. */
+.app-bg {
+  position: relative;
+  background: var(--gradient-hero);
+  overflow: hidden;
+}
+.app-bg::before,
+.app-bg::after {
+  content: "";
+  position: absolute;
+  border-radius: var(--radius-full);
+  filter: blur(8px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+/* sky-blue light, top-left */
+.app-bg::before {
+  width: 38vw;
+  height: 38vw;
+  top: -12vw;
+  left: -10vw;
+  background: radial-gradient(circle at 30% 30%, rgba(42,150,217,0.35), transparent 70%);
+  animation: floatBlob 18s ease-in-out infinite;
+}
+/* sunset-orange light, bottom-right */
+.app-bg::after {
+  width: 42vw;
+  height: 42vw;
+  bottom: -16vw;
+  right: -12vw;
+  background: radial-gradient(circle at 70% 70%, rgba(251,165,25,0.32), transparent 70%);
+  animation: floatBlob 22s ease-in-out infinite reverse;
+}
+/* Keep main chrome above the decorative blobs — scoped to header/main so
+   fixed-positioned children (help widget, modals) keep their own positioning */
+.app-bg > header,
+.app-bg > main { position: relative; z-index: 1; }
+
+@keyframes floatBlob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(3vw, 2vw) scale(1.08); }
+}
+
+/* Festive surface card — soft, rounded, gently lifted */
+.festive-card {
+  background: #fff;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--color-primary-50);
+}
+
+/* Gradient text for hero words */
+.text-gradient-brand {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Colored glow shadow helpers */
+.shadow-glow-primary { box-shadow: var(--shadow-glow-primary); }
+.shadow-glow-accent  { box-shadow: var(--shadow-glow-accent); }
+.shadow-pop          { box-shadow: var(--shadow-pop); }
+
+/* Gentle entrance for screen content */
+.pop-in { animation: popIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Playful idle bob for hero icons / mascots */
+.bob { animation: bob 3s ease-in-out infinite; }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-bg::before, .app-bg::after,
+  .pop-in, .bob { animation: none; }
 }
 
 /* ─────────────────────────────────────────────

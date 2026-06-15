@@ -1,3 +1,5 @@
+import { useLang } from '../../i18n/LanguageContext';
+
 function LayoutFramePreview({ src }) {
   return (
     <div className="relative rounded overflow-hidden" style={{ width: 64, height: 44 }}>
@@ -14,6 +16,7 @@ function LayoutFramePreview({ src }) {
 }
 
 export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], layoutLoading = false }) {
+  const { t } = useLang();
   const activeId = typeof activeFrame === 'object' ? activeFrame?.id : activeFrame;
 
   return (
@@ -22,13 +25,13 @@ export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], l
       style={{ background: '#fff', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
     >
       <h3 className="font-bold mb-3" style={{ color: 'var(--color-neutral-700)' }}>
-        Layout Multi-Foto
+        {t('frame.title')}
       </h3>
       {layoutLoading && (
-        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>Memuat layout…</p>
+        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('frame.loading')}</p>
       )}
       {!layoutLoading && layoutFrames.length === 0 && (
-        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>Belum ada layout tersedia.</p>
+        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('frame.empty')}</p>
       )}
       <div className="grid grid-cols-2 gap-2">
         {layoutFrames.map((f) => (

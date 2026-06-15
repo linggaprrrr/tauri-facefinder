@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { Target, Check, X } from 'lucide-react';
+import { useLang } from '../../i18n/LanguageContext';
 
 // FrameCalibrator — developer tool for measuring slot positions on a layout frame PNG.
 //
@@ -23,6 +25,7 @@ function round4(n) { return Math.round(n * 10000) / 10000; }
 const COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#0ea5e9'];
 
 export default function FrameCalibrator({ frame, existingSlots = [], onClose, onSave }) {
+  const { t } = useLang();
   const containerRef = useRef(null);
   const [slots, setSlots] = useState(existingSlots.map((s, i) => ({ ...s, id: i })));
   const [drawing, setDrawing] = useState(null); // { start: {x,y} }
@@ -120,11 +123,11 @@ export default function FrameCalibrator({ frame, existingSlots = [], onClose, on
         className="flex items-center gap-3 px-5 py-3 shrink-0 flex-wrap"
         style={{ background: '#1e1b4b', borderBottom: '1px solid #312e81' }}
       >
-        <span className="font-bold text-white text-sm">
-          🎯 Kalibrasi Slot — {frame.label}
+        <span className="font-bold text-white text-sm inline-flex items-center gap-1.5">
+          <Target size={16} /> {t('calib.title', { label: frame.label })}
         </span>
         <span className="text-xs px-2 py-1 rounded" style={{ background: '#312e81', color: '#a5b4fc' }}>
-          {slots.length} slot terdefinisi
+          {t('calib.slotsDefined', { count: slots.length })}
         </span>
         <div className="flex-1" />
         <button
@@ -133,14 +136,14 @@ export default function FrameCalibrator({ frame, existingSlots = [], onClose, on
           className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-30"
           style={{ background: '#7f1d1d', color: '#fca5a5' }}
         >
-          Hapus Terakhir
+          {t('calib.removeLast')}
         </button>
         <button
           onClick={handleCopy}
-          className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+          className="text-xs px-3 py-1.5 rounded-lg font-semibold inline-flex items-center gap-1"
           style={{ background: '#14532d', color: '#86efac' }}
         >
-          {copied ? '✓ Tersalin!' : 'Salin JSON'}
+          {copied ? <><Check size={13} strokeWidth={3} /> {t('calib.copied')}</> : t('calib.copyJson')}
         </button>
         <button
           onClick={handleSave}
@@ -148,19 +151,20 @@ export default function FrameCalibrator({ frame, existingSlots = [], onClose, on
           className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-30"
           style={{ background: '#6366f1', color: '#fff' }}
         >
-          Simpan & Tutup
+          {t('calib.saveClose')}
         </button>
         <button
           onClick={onClose}
-          className="text-white opacity-60 hover:opacity-100 text-xl leading-none ml-1"
+          className="text-white opacity-60 hover:opacity-100 leading-none ml-1"
+          aria-label={t('common.close')}
         >
-          ×
+          <X size={20} />
         </button>
       </div>
 
       {/* Instruction */}
       <div className="text-center py-2 text-xs" style={{ color: '#a5b4fc' }}>
-        Klik dan drag pada gambar frame untuk menggambar area slot foto. Gambar dari kiri-atas ke kanan-bawah.
+        {t('calib.instruction')}
       </div>
 
       {/* Main canvas area */}
@@ -235,7 +239,7 @@ export default function FrameCalibrator({ frame, existingSlots = [], onClose, on
           className="ml-4 shrink-0 flex flex-col gap-2"
           style={{ width: 280 }}
         >
-          <p className="text-xs font-bold" style={{ color: '#a5b4fc' }}>Output JSON</p>
+          <p className="text-xs font-bold" style={{ color: '#a5b4fc' }}>{t('calib.outputJson')}</p>
           <pre
             className="rounded-xl p-3 text-xs overflow-auto"
             style={{
@@ -250,7 +254,7 @@ export default function FrameCalibrator({ frame, existingSlots = [], onClose, on
             {buildJson()}
           </pre>
           <p className="text-xs" style={{ color: '#64748b' }}>
-            Salin lalu paste ke{' '}
+            {t('calib.pasteTo')}{' '}
             <code style={{ color: '#94a3b8' }}>public/frames/{frame.id}.json</code>
           </p>
         </div>

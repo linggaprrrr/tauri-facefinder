@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Settings, Info } from 'lucide-react';
 import ownizeLogo from './assets/ownize_logo.png';
 import { AppProvider } from './store/AppContext';
+import { LanguageProvider, useLang } from './i18n/LanguageContext';
+import LanguageSwitcher from './components/common/LanguageSwitcher';
 import StepIndicator from './components/common/StepIndicator';
 import FaceScan from './components/FaceScan/FaceScan';
 import Gallery from './components/Gallery/Gallery';
@@ -27,6 +30,7 @@ function Layout() {
   const step = ROUTE_STEP[location.pathname] ?? 0;
   const isHome = location.pathname === '/';
   const { state } = useApp();
+  const { t } = useLang();
   const isConfigured = !!(state.deviceConfig.unit && state.deviceConfig.outlet);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -42,14 +46,16 @@ function Layout() {
   const forced = !isConfigured;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-neutral-50)' }}>
-      {/* Header — white with bottom border, brand mark left, stepper center */}
+    <div className="app-bg min-h-screen flex flex-col">
+      {/* Header — frosted festive bar, brand mark left, stepper center */}
       <header
-        className="flex items-center justify-between px-8 py-3 shrink-0"
+        className="flex items-center justify-between px-8 py-3 shrink-0 sticky top-0 z-30"
         style={{
-          background: '#fff',
-          borderBottom: '2px solid var(--color-primary-50)',
-          boxShadow: '0 2px 8px rgba(1,125,197,0.08)',
+          background: 'rgba(255,255,255,0.82)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '2px solid var(--color-primary-100)',
+          boxShadow: '0 4px 20px rgba(1,125,197,0.10)',
         }}
       >
         {/* Brand mark */}
@@ -60,14 +66,11 @@ function Layout() {
             <img src={ownizeLogo} alt="Ownize" className="w-full h-full object-contain" />
           </div>
           <div>
-            <span
-              className="font-black text-3xl leading-tight block"
-              style={{ color: 'var(--color-primary)' }}
-            >
+            <span className="font-black text-3xl leading-tight block text-gradient-brand">
               Ownize
             </span>
             <span className="text-lg" style={{ color: 'var(--color-neutral-500)' }}>
-              Face Finder
+              {t('app.subtitle')}
             </span>
           </div>
         </div>
@@ -75,33 +78,28 @@ function Layout() {
         {/* Step indicator — centered */}
         <StepIndicator current={step} />
 
-        {/* Settings + About buttons — only on home page */}
+        {/* Language switcher (always visible) + Settings/About (home only) */}
         <div className="min-w-36 flex items-center justify-end gap-2">
+          <LanguageSwitcher />
           {isHome && (
             <>
               <button
                 onClick={() => setShowAbout(true)}
-                title="Tentang Aplikasi"
+                title={t('app.about')}
+                aria-label={t('app.about')}
                 className="flex items-center justify-center w-10 h-10 rounded-xl transition-colors"
                 style={{ color: 'var(--color-neutral-500)', background: 'var(--color-neutral-100)' }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="16" x2="12" y2="12"/>
-                  <line x1="12" y1="8" x2="12.01" y2="8"/>
-                </svg>
+                <Info size={18} />
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                title="Pengaturan"
+                title={t('app.settings')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ color: 'var(--color-neutral-500)', background: 'var(--color-neutral-100)' }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                Pengaturan
+                <Settings size={18} />
+                {t('app.settings')}
               </button>
             </>
           )}
@@ -116,9 +114,9 @@ function Layout() {
       )}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
 
-      {/* Floating help button — bottom right, all pages */}
+      {/* Floating help button — bottom left, all pages */}
       {helpNumber && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-3">
           {showHelp && (
             <div
               className="rounded-2xl shadow-xl overflow-hidden"
@@ -132,13 +130,13 @@ function Layout() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-white font-semibold text-sm leading-tight">Bantuan & Pengaduan</p>
+                  <p className="text-white font-semibold text-sm leading-tight">{t('help.title')}</p>
                   <p className="text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.8)' }}>WhatsApp</p>
                 </div>
               </div>
               {/* Number */}
               <div className="px-4 py-3 flex flex-col gap-2" style={{ background: '#fff' }}>
-                <p className="text-xs" style={{ color: '#6b7280' }}>Hubungi kami melalui WhatsApp:</p>
+                <p className="text-xs" style={{ color: '#6b7280' }}>{t('help.contactPrompt')}</p>
                 <a
                   href='#'                  
                   rel="noreferrer"
@@ -165,13 +163,13 @@ function Layout() {
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
             </svg>
-            Bantuan
+            {t('help.button')}
           </button>
         </div>
       )}
 
       {/* Page content */}
-      <main className="flex-1 p-6 overflow-auto no-scrollbar">
+      <main key={location.pathname} className="flex-1 p-6 overflow-auto no-scrollbar pop-in">
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />
@@ -189,7 +187,9 @@ function Layout() {
 export default function App() {
   return (
     <AppProvider>
-      <Layout />
+      <LanguageProvider>
+        <Layout />
+      </LanguageProvider>
     </AppProvider>
   );
 }
