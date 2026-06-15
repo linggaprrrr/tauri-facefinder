@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, SearchX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, SearchX, X } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import PhotoCard from './PhotoCard';
@@ -19,6 +19,15 @@ export default function Gallery() {
     return ['All', ...Array.from(new Set(names))];
   }, [photos]);
 
+  // Count photos per outlet for chip badges
+  const outletCounts = useMemo(() => {
+    const counts = { All: photos.length };
+    photos.forEach((p) => {
+      if (p.outlet_name) counts[p.outlet_name] = (counts[p.outlet_name] || 0) + 1;
+    });
+    return counts;
+  }, [photos]);
+
   const [activeOutlet, setActiveOutlet] = useState('All');
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [photoRatios, setPhotoRatios] = useState({});
@@ -30,37 +39,17 @@ export default function Gallery() {
 
   useEffect(() => {
     let cancelled = false;
-
     visiblePhotos.forEach((photo) => {
-      if (photoRatios[photo.id] || ratioRequests.current.has(photo.id) || !photo.thumbnail) {
-        return;
-      }
-
-      ratioRequests.current.add(photo.id);
-
+      if (photoRatios[photo.id] || !photo.thumbnail) return;
       const img = new Image();
       img.decoding = 'async';
       img.onload = () => {
-        ratioRequests.current.delete(photo.id);
         if (cancelled || !img.naturalWidth || !img.naturalHeight) return;
-
-        setPhotoRatios((current) => {
-          if (current[photo.id]) return current;
-          return {
-            ...current,
-            [photo.id]: img.naturalWidth / img.naturalHeight,
-          };
-        });
-      };
-      img.onerror = () => {
-        ratioRequests.current.delete(photo.id);
+        setPhotoRatios((cur) => cur[photo.id] ? cur : { ...cur, [photo.id]: img.naturalWidth / img.naturalHeight });
       };
       img.src = photo.thumbnail;
     });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [visiblePhotos, photoRatios]);
 
   function handleToggle(photo) {
@@ -69,17 +58,19 @@ export default function Gallery() {
 
   function handleRatioChange(photoId, ratio) {
     if (!ratio) return;
-
-    setPhotoRatios((current) => {
-      if (current[photoId] === ratio) return current;
-      return { ...current, [photoId]: ratio };
-    });
+    setPhotoRatios((cur) => cur[photoId] === ratio ? cur : { ...cur, [photoId]: ratio });
   }
 
   const totalPrice = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  
+
+  // Max 4 thumbnails shown in footer strip
+  const STRIP_MAX = 4;
+  const stripPhotos = selectedPhotos.slice(0, STRIP_MAX);
+  const extraCount  = selectedPhotos.length - STRIP_MAX;
+
   return (
-    <div className="flex flex-col h-full gap-5 max-w-8xl mx-auto w-full">
+    <div className="flex flex-col h-full gap-4 max-w-8xl mx-auto w-full">
+
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -88,6 +79,11 @@ export default function Gallery() {
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-500)' }}>
             {t('gallery.subtitle', { count: photos.length })}
+            {photos.length > 0 && (
+              <span style={{ color: 'var(--color-neutral-400)' }}>
+                {' '}— {t('gallery.tapHint')}
+              </span>
+            )}
           </p>
         </div>
         <Button variant="ghost" onClick={() => navigate('/')}>
@@ -95,29 +91,43 @@ export default function Gallery() {
         </Button>
       </div>
 
-      {/* Outlet sub-tabs */}
+      {/* Outlet filter chips with photo count */}
       {outlets.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {outlets.map((name) => (
-            <button
-              key={name}
-              onClick={() => setActiveOutlet(name)}
-              className="shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
-              style={{
-                background: activeOutlet === name ? 'var(--color-primary)' : 'var(--color-neutral-100)',
-                color: activeOutlet === name ? '#fff' : 'var(--color-neutral-700)',
-                border: activeOutlet === name
-                  ? '2px solid var(--color-primary)'
-                  : '2px solid var(--color-neutral-200)',
-              }}
-            >
-              {name === 'All' ? t('gallery.all') : name}
-            </button>
-          ))}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 shrink-0">
+          {outlets.map((name) => {
+            const isActive = activeOutlet === name;
+            const count = outletCounts[name] ?? 0;
+            const label = name === 'All' ? t('gallery.all') : name;
+            return (
+              <button
+                key={name}
+                onClick={() => setActiveOutlet(name)}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all"
+                style={{
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-neutral-100)',
+                  color:      isActive ? '#fff'                  : 'var(--color-neutral-700)',
+                  border:     isActive ? '2px solid var(--color-primary)' : '2px solid var(--color-neutral-200)',
+                  boxShadow:  isActive ? '0 2px 10px rgba(1,125,197,0.25)' : 'none',
+                }}
+              >
+                {label}
+                <span
+                  className="inline-flex items-center justify-center rounded-full text-xs font-bold"
+                  style={{
+                    minWidth: 18, height: 18, padding: '0 4px',
+                    background: isActive ? 'rgba(255,255,255,0.22)' : 'var(--color-neutral-200)',
+                    color:      isActive ? '#fff'                    : 'var(--color-neutral-500)',
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* Empty state — prominent so customers don't miss a zero-result scan */}
+      {/* Empty state */}
       {visiblePhotos.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="festive-card flex flex-col items-center gap-4 text-center px-10 py-12 max-w-md">
@@ -139,45 +149,105 @@ export default function Gallery() {
           </div>
         </div>
       ) : (
-        /* Photo masonry */
+        /* Masonry grid — restored original layout */
         <div className="gallery-masonry flex-1 overflow-y-auto pb-4 no-scrollbar">
-          {visiblePhotos.map((photo) => (
-            <PhotoCard
-              key={photo.id}
-              photo={photo}
-              aspectRatio={photoRatios[photo.id]}
-              selected={selectedPhotos.some((p) => p.id === photo.id)}
-              onPreview={setPreviewPhoto}
-              onRatioChange={handleRatioChange}
-              onToggle={handleToggle}
-            />
-          ))}
+          {visiblePhotos.map((photo) => {
+            const orderIdx = selectedPhotos.findIndex((p) => p.id === photo.id);
+            const isSelected = orderIdx !== -1;
+            return (
+              <PhotoCard
+                key={photo.id}
+                photo={photo}
+                aspectRatio={photoRatios[photo.id]}
+                selected={isSelected}
+                selectionOrder={isSelected ? orderIdx + 1 : null}
+                onPreview={setPreviewPhoto}
+                onRatioChange={handleRatioChange}
+                onToggle={handleToggle}
+              />
+            );
+          })}
         </div>
       )}
 
-      {/* Sticky footer bar — only when photos are selected */}
-      {selectedPhotos.length > 0 && (
-        <div
-          className="sticky bottom-0 p-4 flex items-center justify-between rounded-lg"
-          style={{
-            background: '#fff',
-            border: '2px solid var(--color-primary-100)',
-            boxShadow: 'var(--shadow-lg)',
-          }}
-        >
-          <div>
-            <p className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>
-              {t('gallery.selected', { count: selectedPhotos.length })}
-            </p>
-            <p className="text-lg font-black" style={{ color: 'var(--color-primary)' }}>
-              Rp {totalPrice.toLocaleString('id-ID')}
-            </p>
+      {/* Sticky footer — always visible */}
+      <div
+        className="shrink-0 flex items-center gap-3 rounded-xl px-4 py-3"
+        style={{
+          background: '#fff',
+          border: '1.5px solid var(--color-primary-100)',
+          boxShadow: 'var(--shadow-lg)',
+          minHeight: 68,
+        }}
+      >
+        {selectedPhotos.length === 0 ? (
+          /* Hint state — no selection yet */
+          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
+          <p className="flex-1 text-sm font-medium" style={{ paddingLeft: 148, color: 'var(--color-neutral-400)' }}>
+            {t('gallery.footerEmpty')}
+          </p>
+        ) : (
+          /* Thumbnail strip */
+          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
+          <div className="flex items-center gap-2 flex-1 min-w-0" style={{ paddingLeft: 120 }}>
+            {stripPhotos.map((p) => (
+              <div key={p.id} className="relative shrink-0 group">
+                <img
+                  src={p.thumbnail}
+                  alt=""
+                  className="rounded-lg object-cover"
+                  style={{
+                    width: 44, height: 33,
+                    border: '2px solid var(--color-primary)',
+                  }}
+                />
+                {/* × deselect button */}
+                <button
+                  onClick={() => handleToggle(p)}
+                  aria-label={t('gallery.removeAria')}
+                  className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full transition-all"
+                  style={{
+                    width: 16, height: 16,
+                    background: 'var(--color-danger, #ef4444)',
+                    color: '#fff',
+                    border: '1.5px solid #fff',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={8} strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+            {extraCount > 0 && (
+              <span className="text-sm font-semibold shrink-0" style={{ color: 'var(--color-neutral-400)' }}>
+                +{extraCount}
+              </span>
+            )}
           </div>
-          <Button size="lg" onClick={() => navigate('/editor')}>
+        )}
+
+        {/* Price + CTA */}
+        <div className="flex items-center gap-3 shrink-0">
+          {selectedPhotos.length > 0 && (
+            <div className="text-right">
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+                {t('gallery.selected', { count: selectedPhotos.length })}
+              </p>
+              <p className="text-lg font-black" style={{ color: 'var(--color-primary)' }}>
+                Rp {totalPrice.toLocaleString('id-ID')}
+              </p>
+            </div>
+          )}
+          <Button
+            size="lg"
+            onClick={() => navigate('/editor')}
+            disabled={selectedPhotos.length === 0}
+          >
             {t('gallery.continue')} <ArrowRight size={20} />
           </Button>
         </div>
-      )}
+      </div>
 
       {/* Preview modal */}
       {previewPhoto && (

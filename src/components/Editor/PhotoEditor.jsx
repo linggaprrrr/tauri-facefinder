@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
-  Plus, Minus, Pencil,
+  Plus, Minus, Pencil, MousePointer,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
@@ -197,8 +197,6 @@ function FrameOverlay({ src, canvasW, canvasH }) {
   );
 }
 
-// DOM-based watermark — lives outside the Konva canvas so stage.toDataURL()
-// can never capture it. Repositions randomly every 1.2 s and pulses opacity.
 function WatermarkOverlay({ canvasW, canvasH }) {
   const [pos, setPos] = useState({ x: 60, y: 60 });
   const [opacity, setOpacity] = useState(0.35);
@@ -250,7 +248,6 @@ function WatermarkOverlay({ canvasW, canvasH }) {
   );
 }
 
-// Clamp photo offset so it always covers the slot (no gray gaps).
 function clampOffset(x, y, imgW, imgH, slotW, slotH) {
   return {
     x: Math.min(0, Math.max(x, slotW - imgW)),
@@ -258,7 +255,6 @@ function clampOffset(x, y, imgW, imgH, slotW, slotH) {
   };
 }
 
-// Zoom towards the slot center and return the new {scale, offsetX, offsetY}.
 function zoomToCenter(oldScale, newScale, oldX, oldY, slotW, slotH, imgNatW, imgNatH) {
   const cx = slotW / 2;
   const cy = slotH / 2;
@@ -284,12 +280,10 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
 
   const derived = useMemo(() => {
     if (!image) return null;
-    // minScale = smallest scale that still covers the slot (cover-fit)
     const minScale = Math.max(slotPx.w / image.naturalWidth, slotPx.h / image.naturalHeight);
     const scale = slotData.scale ?? minScale;
     const w = image.naturalWidth * scale;
     const h = image.naturalHeight * scale;
-    // Use stored offset if available, otherwise center the photo
     const rawX = slotData.offsetX ?? (slotPx.w - w) / 2;
     const rawY = slotData.offsetY ?? (slotPx.h - h) / 2;
     const { x, y } = clampOffset(rawX, rawY, w, h, slotPx.w, slotPx.h);
@@ -320,12 +314,9 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
     >
       <KonvaImage
         image={image}
-        x={derived.x}
-        y={derived.y}
-        width={derived.w}
-        height={derived.h}
+        x={derived.x} y={derived.y}
+        width={derived.w} height={derived.h}
         draggable
-        // Constrain drag so photo always covers the slot
         dragBoundFunc={(pos) => {
           const groupX = slotPx.x;
           const groupY = slotPx.y;
@@ -340,14 +331,12 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
           const groupY = slotPx.y;
           onUpdate({ offsetX: e.target.x() - groupX, offsetY: e.target.y() - groupY });
         }}
-        // Mouse wheel zoom — zooms towards slot center
         onWheel={(e) => {
           e.evt.preventDefault();
           const direction = e.evt.deltaY < 0 ? 1 : -1;
           const newScale = derived.scale * (1 + direction * 0.08);
           onUpdate(applyZoom(newScale));
         }}
-        // Pinch-to-zoom for touch screens
         onTouchStart={(e) => {
           if (e.evt.touches.length === 2) {
             lastPinchDist.current = getTouchDist(e.evt.touches);
@@ -368,7 +357,8 @@ function SlotPhotoLayer({ slot, slotData, photo, canvasW, canvasH, onUpdate }) {
   );
 }
 
-const PANEL_TABS = [
+// ── Sidebar tool definitions ───────────────────────────────────────────────
+const SIDEBAR_TOOLS = [
   { id: 'stickers', icon: Smile,             labelKey: 'editor.tabStickers' },
   { id: 'frames',   icon: ImageIcon,         labelKey: 'editor.tabFrame' },
   { id: 'text',     icon: Type,              labelKey: 'editor.tabText' },
@@ -387,10 +377,8 @@ export default function PhotoEditor() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const currentPhoto = selectedPhotos[photoIndex];
 
-  // Initialize savedEditsRef from AppContext so back-navigation restores edits
   const savedEditsRef = useRef({ ...state.photoEdits });
 
-  // Lazy-init each piece of state from persisted edits for the first photo
   const initEdit = state.photoEdits[currentPhoto?.id] ?? {};
   const { state: elements, push: pushHistory, undo, redo, reset: resetHistory, canUndo, canRedo } = useHistory(initEdit.elements ?? []);
   const [selectedId, setSelectedId] = useState(null);
@@ -410,12 +398,10 @@ export default function PhotoEditor() {
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
 
-
   const frameSlots = isLayoutFrame ? (frame.slots ?? []) : [];
   const frameAspectRatio = isLayoutFrame ? (frame.aspectRatio ?? frame.aspect_ratio ?? null) : null;
   const slotsLoading = false;
 
-  // Reset slots when switching to a different layout frame
   const prevLayoutFrameId = useRef(null);
   useEffect(() => {
     if (!isLayoutFrame) { prevLayoutFrameId.current = null; return; }
@@ -424,14 +410,13 @@ export default function PhotoEditor() {
       setLayoutSlots([]);
     }
   }, [isLayoutFrame, frame]);
+
   const [isLoading, setIsLoading] = useState(false);
   const handleImageLoad = useCallback(() => setIsLoading(false), []);
 
-  // Use proxyUrl (~800px degraded version) for editor display — never render the full-res original on screen.
   const photoUrl = currentPhoto?.proxyUrl ?? currentPhoto?.url;
   const orientationCache = useRef({});
 
-  // Eagerly load dimensions for all selected photos using proxy (not full-res)
   useEffect(() => {
     selectedPhotos.forEach((photo) => {
       const src = photo.proxyUrl ?? photo.url;
@@ -444,7 +429,6 @@ export default function PhotoEditor() {
     });
   }, [selectedPhotos]);
 
-  // Sync canvas dimensions + loading state when current photo changes
   useEffect(() => {
     if (!photoUrl) return;
     const cached = orientationCache.current[currentPhoto.id];
@@ -461,10 +445,9 @@ export default function PhotoEditor() {
     img.src = photoUrl;
   }, [photoUrl, currentPhoto?.id]);
 
-
   const layoutCanvasSize = useMemo(() => {
     if (!isLayoutFrame) return canvas;
-    const ratio = frameAspectRatio;   // from JSON via hook
+    const ratio = frameAspectRatio;
     let w = MAX_CANVAS_W;
     let h = Math.round(w / ratio);
     if (h > MAX_CANVAS_H) { h = MAX_CANVAS_H; w = Math.round(h * ratio); }
@@ -473,9 +456,7 @@ export default function PhotoEditor() {
 
   const activeCanvas = isLayoutFrame ? layoutCanvasSize : canvas;
 
-  // Export the current stage and persist edits to AppContext
   function exportAndSave() {
-    // Determine whether user has actually made any edits
     const hasEdits =
       isLayoutFrame ||
       elements.length > 0 ||
@@ -534,37 +515,21 @@ export default function PhotoEditor() {
 
   function navigateTo(newIndex) {
     if (newIndex < 0 || newIndex >= selectedPhotos.length) return;
-
     exportAndSave();
-
     const saved = savedEditsRef.current[selectedPhotos[newIndex].id];
     resetHistory(saved?.elements ?? []);
     setFilters(saved?.filters ?? DEFAULT_FILTERS);
     setFrame(saved?.frame ?? 'none');
     setSelectedId(null);
     setActivePanel('stickers');
-
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(cached);
-
     setPhotoIndex(newIndex);
   }
 
   function handleDone() {
     exportAndSave();
     navigate('/cart');
-  }
-
-  function downloadCurrentPhoto() {
-    const dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.92 });
-    if (!dataUrl) return;
-    const edit = { elements, filters, frame, dataUrl };
-    savedEditsRef.current[currentPhoto.id] = edit;
-    dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `edited_photo_${photoIndex + 1}.jpg`;
-    a.click();
   }
 
   function handleStageClick(e) {
@@ -618,6 +583,11 @@ export default function PhotoEditor() {
     }
   }
 
+  // Toggle sidebar tool — clicking active tool collapses panel
+  function handleSidebarTool(id) {
+    setActivePanel((prev) => (prev === id ? null : id));
+  }
+
   if (!currentPhoto) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -630,37 +600,47 @@ export default function PhotoEditor() {
   }
 
   const isLast = photoIndex === selectedPhotos.length - 1;
+  const activeTool = SIDEBAR_TOOLS.find((s) => s.id === activePanel);
 
   return (
     <div className="flex flex-col h-full gap-3 max-w-6xl mx-auto w-full">
-      {/* Page header */}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
-          {t('editor.title')}
-        </h1>
 
-        {/* Prev / counter / Next */}
-        <div className="flex items-center gap-2">
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between gap-4 shrink-0">
+        <div>
+          <h1 className="text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
+            {t('editor.title')}
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-400)' }}>
+            {t('editor.subtitle')}
+          </p>
+        </div>
+
+        {/* Photo counter nav */}
+        <div
+          className="flex items-center gap-2 rounded-xl px-3 py-2 shrink-0"
+          style={{ background: 'var(--color-neutral-100)', border: '1.5px solid var(--color-neutral-200)' }}
+        >
           <button
             disabled={photoIndex === 0}
             onClick={() => navigateTo(photoIndex - 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
-            style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Previous"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
-          <span className="text-sm font-semibold px-2" style={{ color: 'var(--color-neutral-600)' }}>
+          <span className="text-sm font-bold px-1" style={{ color: 'var(--color-neutral-700)', minWidth: 40, textAlign: 'center' }}>
             {photoIndex + 1} / {selectedPhotos.length}
           </span>
           <button
             disabled={isLast}
             onClick={() => navigateTo(photoIndex + 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
-            style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Next"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         </div>
 
@@ -676,9 +656,87 @@ export default function PhotoEditor() {
         </div>
       </div>
 
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* Left: canvas + toolbar */}
-        <div className="flex flex-col gap-3 flex-1 min-w-0">
+      {/* ── Main 3-column body ── */}
+      <div
+        className="flex-1 min-h-0"
+        style={{ display: 'grid', gridTemplateColumns: '64px 1fr 248px', gap: 12 }}
+      >
+        {/* ── Left sidebar: tool icons ── */}
+        <div
+          className="flex flex-col items-center gap-1 py-3 rounded-xl shrink-0"
+          style={{
+            background: '#fff',
+            border: '1.5px solid var(--color-neutral-200)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          {SIDEBAR_TOOLS.map(({ id, icon: Icon, labelKey }) => {
+            const isActive = activePanel === id;
+            return (
+              <button
+                key={id}
+                onClick={() => handleSidebarTool(id)}
+                aria-label={t(labelKey)}
+                aria-pressed={isActive}
+                className="relative flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
+                style={{
+                  width: 52, height: 52,
+                  background: isActive ? 'var(--color-accent-light, #fff7ed)' : 'transparent',
+                  color: isActive ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {/* Active left-edge indicator */}
+                {isActive && (
+                  <span
+                    className="absolute"
+                    style={{
+                      left: -7, top: '50%', transform: 'translateY(-50%)',
+                      width: 3, height: 22,
+                      background: 'var(--color-accent)',
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+                <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+                  {t(labelKey)}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Divider */}
+          <div
+            className="my-1 w-6 shrink-0"
+            style={{ height: 1, background: 'var(--color-neutral-200)' }}
+          />
+
+          {/* No-tool / deselect mode */}
+          <button
+            onClick={() => setActivePanel(null)}
+            aria-label="Pilih elemen di canvas"
+            className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
+            style={{
+              width: 52, height: 52,
+              background: !activePanel ? 'var(--color-primary-50)' : 'transparent',
+              color: !activePanel ? 'var(--color-primary)' : 'var(--color-neutral-400)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <MousePointer size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
+            <span style={{ fontSize: 9, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+              {t('editor.toolSelect')}
+            </span>
+          </button>
+        </div>
+
+        {/* ── Center: toolbar + canvas + filmstrip ── */}
+        <div className="flex flex-col gap-3 min-w-0">
+
+          {/* Toolbar */}
           <EditorToolbar
             canUndo={canUndo} canRedo={canRedo}
             onUndo={undo} onRedo={redo}
@@ -687,6 +745,19 @@ export default function PhotoEditor() {
             hasSelection={!!selectedId}
           />
 
+          {/* Contextual hint when nothing is selected */}
+          {!selectedId && (
+            <p
+              className="text-xs font-medium text-center py-1 rounded-lg"
+              style={{
+                color: 'var(--color-neutral-400)',
+                background: 'var(--color-neutral-50)',
+                border: '1px dashed var(--color-neutral-200)',
+              }}
+            >
+              💡 {t('editor.hintSelectEl')}
+            </p>
+          )}
 
           {/* Canvas */}
           <div
@@ -698,6 +769,7 @@ export default function PhotoEditor() {
               border: '2px solid var(--color-neutral-200)',
               alignSelf: 'center',
               transition: 'width 0.2s ease, height 0.2s ease',
+              borderRadius: 8,
             }}
           >
             {isLoading && !isLayoutFrame && (
@@ -724,7 +796,6 @@ export default function PhotoEditor() {
               onContextMenu={(e) => e.evt.preventDefault()}
             >
               <Layer>
-                {/* ── Normal single-photo mode ── */}
                 {!isLayoutFrame && photoUrl && (
                   <BackgroundImage
                     src={photoUrl}
@@ -735,7 +806,6 @@ export default function PhotoEditor() {
                   />
                 )}
 
-                {/* ── Layout frame mode: slot photos (uses frameSlots from JSON hook) ── */}
                 {isLayoutFrame && frameSlots.map((slot, i) => {
                   const slotData = layoutSlots[i];
                   if (!slotData?.photoId) {
@@ -775,7 +845,6 @@ export default function PhotoEditor() {
                   />
                 ))}
 
-                {/* Layout frame PNG overlay (sits above slot photos) */}
                 {isLayoutFrame && (
                   <FrameOverlay src={frame.src} canvasW={activeCanvas.width} canvasH={activeCanvas.height} />
                 )}
@@ -784,13 +853,9 @@ export default function PhotoEditor() {
 
             <WatermarkOverlay canvasW={activeCanvas.width} canvasH={activeCanvas.height} />
 
-            {/* Moiré pattern — degrades phone camera captures of the screen */}
             <div
               style={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                zIndex: 5,
+                position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5,
                 background: `repeating-linear-gradient(
                   45deg,
                   rgba(0,0,0,0.045) 0px,
@@ -801,14 +866,12 @@ export default function PhotoEditor() {
               }}
             />
 
-            {/* Loading overlay while JSON slot config is being fetched */}
             {isLayoutFrame && slotsLoading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.3)' }}>
                 <div className="text-white text-sm font-semibold">{t('editor.loadingSlots')}</div>
               </div>
             )}
 
-            {/* DOM tap targets + zoom buttons for slots in layout mode */}
             {isLayoutFrame && !slotsLoading && frameSlots.map((slot, i) => {
               const px = toSlotPx(slot, activeCanvas.width, activeCanvas.height);
               const slotData = layoutSlots[i];
@@ -854,7 +917,6 @@ export default function PhotoEditor() {
                     </div>
                   )}
 
-                  {/* Zoom controls — visible on hover for filled slots */}
                   {filled && (
                     <div
                       className="slot-controls"
@@ -870,24 +932,9 @@ export default function PhotoEditor() {
                       onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
                       onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                     >
-                      <button
-                        onClick={(e) => { e.stopPropagation(); zoomSlot(1.15); }}
-                        style={zoomBtnStyle}
-                        title={t('editor.zoomIn')}
-                        aria-label={t('editor.zoomIn')}
-                      ><Plus size={16} /></button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); zoomSlot(1 / 1.15); }}
-                        style={zoomBtnStyle}
-                        title={t('editor.zoomOut')}
-                        aria-label={t('editor.zoomOut')}
-                      ><Minus size={16} /></button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openSlotPicker(i); }}
-                        style={{ ...zoomBtnStyle, background: 'rgba(124,58,237,0.85)' }}
-                        title={t('editor.changePhoto')}
-                        aria-label={t('editor.changePhoto')}
-                      ><Pencil size={15} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); zoomSlot(1.15); }} style={zoomBtnStyle} title={t('editor.zoomIn')} aria-label={t('editor.zoomIn')}><Plus size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); zoomSlot(1 / 1.15); }} style={zoomBtnStyle} title={t('editor.zoomOut')} aria-label={t('editor.zoomOut')}><Minus size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); openSlotPicker(i); }} style={{ ...zoomBtnStyle, background: 'rgba(124,58,237,0.85)' }} title={t('editor.changePhoto')} aria-label={t('editor.changePhoto')}><Pencil size={15} /></button>
                     </div>
                   )}
                 </div>
@@ -895,92 +942,118 @@ export default function PhotoEditor() {
             })}
           </div>
 
-          {/* Panel tab switcher */}
+          {/* ── Filmstrip: horizontal photo queue below canvas ── */}
           <div
-            className="flex gap-2 p-1.5 rounded-xl shrink-0"
-            style={{ background: 'var(--color-neutral-100)' }}
+            className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 shrink-0 rounded-xl"
+            style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
           >
-            {PANEL_TABS.map(({ id, icon: TabIcon, labelKey }) => (
-              <button
-                key={id}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
-                style={{
-                  background: activePanel === id ? 'var(--color-accent)' : 'transparent',
-                  color: activePanel === id ? 'var(--color-neutral-900)' : 'var(--color-neutral-600)',
-                  boxShadow: activePanel === id ? 'var(--shadow-sm)' : 'none',
-                }}
-                onClick={() => setActivePanel(activePanel === id ? null : id)}
-              >
-                <TabIcon size={16} /> {t(labelKey)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: photo queue + active panel */}
-        <div className="w-64 shrink-0 flex flex-col gap-3 min-h-0">
-          {/* Photo queue */}
-          <div
-            className="rounded-2xl overflow-hidden shrink-0"
-            style={{
-              border: '1.5px solid var(--color-neutral-200)',
-              background: '#fff',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
-            <p className="text-xs font-bold px-3 pt-3 pb-2" style={{ color: 'var(--color-neutral-500)' }}>
-              {t('editor.selectedPhotos')}
-            </p>
-            <div className="flex flex-col gap-1 px-2 pb-2 overflow-y-auto no-scrollbar" style={{ maxHeight: 300, paddingTop: 10 }}>
-              {selectedPhotos.map((p, i) => (
+            {selectedPhotos.map((p, i) => {
+              const isActive = i === photoIndex;
+              const isSaved = !!photoEdits[p.id]?.dataUrl && !isActive;
+              return (
                 <button
                   key={p.id}
                   onClick={() => navigateTo(i)}
-                  className="flex items-center gap-2 w-full rounded-xl p-1.5 text-left transition-all"
+                  className="flex flex-col items-center gap-1 shrink-0 transition-all active:scale-95"
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+                  aria-label={t('common.photoN', { n: i + 1 })}
+                  aria-current={isActive ? 'true' : undefined}
+                >
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{
+                      width: 52, height: 39,
+                      border: isActive
+                        ? '2.5px solid var(--color-primary)'
+                        : isSaved
+                          ? '2px solid var(--color-success, #22c55e)'
+                          : '2px solid var(--color-neutral-200)',
+                      boxShadow: isActive ? '0 0 0 1px var(--color-primary)' : 'none',
+                      transition: 'border-color 0.15s',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={p.thumbnail}
+                      alt=""
+                      className="block w-full h-full object-cover"
+                    />
+                  </div>
+                  <span
+                    className="text-xs font-bold"
+                    style={{
+                      color: isActive
+                        ? 'var(--color-primary)'
+                        : isSaved
+                          ? 'var(--color-success, #22c55e)'
+                          : 'var(--color-neutral-400)',
+                    }}
+                  >
+                    {isActive
+                      ? t('editor.editingNow')
+                      : isSaved
+                        ? `✓ ${t('editor.savedTag')}`
+                        : t('common.photoN', { n: i + 1 })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Right: active panel content ── */}
+        <div
+          className="flex flex-col min-h-0 rounded-xl overflow-hidden shrink-0"
+          style={{
+            background: '#fff',
+            border: '1.5px solid var(--color-neutral-200)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          {/* Panel header */}
+          <div
+            className="flex items-center gap-3 px-4 py-3 shrink-0"
+            style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+          >
+            {activeTool ? (
+              <>
+                <span
+                  className="flex items-center justify-center rounded-lg shrink-0"
                   style={{
-                    background: i === photoIndex ? 'var(--color-primary-50)' : 'transparent',
-                    outline: i === photoIndex ? '2px solid var(--color-primary)' : '2px solid transparent',
+                    width: 34, height: 34,
+                    background: 'var(--color-accent-light, #fff7ed)',
+                    color: 'var(--color-neutral-800)',
                   }}
                 >
-                  <img
-                    src={p.thumbnail}
-                    alt=""
-                    className="rounded-lg object-cover shrink-0"
-                    style={{ width: 48, height: 36 }}
-                  />
-                  <div className="min-w-0">
-                    <p
-                      className="text-xs font-bold truncate"
-                      style={{ color: i === photoIndex ? 'var(--color-primary)' : 'var(--color-neutral-700)' }}
-                    >
-                      {t('common.photoN', { n: i + 1 })}
-                    </p>
-                    {/* Saved edit indicator */}
-                    {photoEdits[p.id]?.dataUrl && i !== photoIndex && (
-                      <p className="text-xs inline-flex items-center gap-1" style={{ color: 'var(--color-success)' }}>
-                        <Check size={12} strokeWidth={3} /> {t('editor.savedTag')}
-                      </p>
-                    )}
-                    {p.label && !photoEdits[p.id]?.dataUrl && (
-                      <p className="text-xs truncate" style={{ color: 'var(--color-neutral-400)' }}>{p.label}</p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
+                  <activeTool.icon size={18} strokeWidth={2} />
+                </span>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-neutral-900)' }}>
+                    {t(activeTool.labelKey)}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>
+                    {t('editor.tabHint', { default: 'Ketuk untuk menambahkan' })}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
+                {t('editor.selectTool')}
+              </p>
+            )}
           </div>
 
-          {/* Tool panel content */}
-          <div className="flex-1 overflow-y-auto no-scrollbar">
+          {/* Panel content */}
+          <div className="flex-1 overflow-y-auto no-scrollbar p-3">
             {activePanel === 'frames'   && <FramePanel activeFrame={frame} onSelect={setFrame} layoutFrames={layoutFrames} layoutLoading={layoutFramesLoading} />}
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
             {activePanel === 'ai'       && <AiTransformPanel onTransform={setAiPreviewTemplate} />}
-            
+
             {!activePanel && (
               <div
-                className="rounded-2xl p-6 flex flex-col items-center justify-center h-32 text-center"
+                className="rounded-xl p-5 flex flex-col items-center justify-center h-32 text-center"
                 style={{
                   background: 'var(--color-primary-50)',
                   border: '1.5px dashed var(--color-primary-200)',
@@ -992,6 +1065,45 @@ export default function PhotoEditor() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Progress footer ── */}
+      <div
+        className="shrink-0 flex items-center justify-between px-4 py-2.5 rounded-xl"
+        style={{
+          background: '#fff',
+          border: '1.5px solid var(--color-neutral-200)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        {/* Progress dots */}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 items-center">
+            {selectedPhotos.map((_, i) => (
+              <span
+                key={i}
+                className="transition-all rounded-full"
+                style={{
+                  height: 8,
+                  width: i === photoIndex ? 20 : 8,
+                  background: i === photoIndex
+                    ? 'var(--color-primary)'
+                    : photoEdits[selectedPhotos[i]?.id]?.dataUrl
+                      ? 'var(--color-success, #22c55e)'
+                      : 'var(--color-neutral-200)',
+                  borderRadius: 4,
+                }}
+              />
+            ))}
+          </div>
+          <span className="text-xs font-medium ml-1" style={{ color: 'var(--color-neutral-400)' }}>
+            {t('editor.progressLabel', { current: photoIndex + 1, total: selectedPhotos.length })}
+          </span>
+        </div>
+
+        <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('editor.autoSave')}
+        </span>
       </div>
 
       {showSlotPicker && (
@@ -1010,8 +1122,6 @@ export default function PhotoEditor() {
           onDiscard={() => setAiPreviewTemplate(null)}
         />
       )}
-
-
     </div>
   );
 }
