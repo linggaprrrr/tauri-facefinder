@@ -189,7 +189,7 @@ export default function Gallery() {
         ) : (
           /* Thumbnail strip */
           /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
-          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden" style={{ paddingLeft: 148 }}>
+          <div className="flex items-center gap-2 flex-1 min-w-0" style={{ paddingLeft: 120 }}>
             {stripPhotos.map((p) => (
               <div key={p.id} className="relative shrink-0 group">
                 <img
