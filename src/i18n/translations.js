@@ -173,6 +173,7 @@ export const translations = {
   'editor.tabText':        { id: 'Teks', en: 'Text' },
   'editor.tabFilters':     { id: 'Filter', en: 'Filters' },
   'editor.tabAi':          { id: 'AI', en: 'AI' },
+  'editor.toolSelect':     { id: 'Pilih', en: 'Select' },
   'editor.tabHint':        { id: 'Ketuk untuk menambahkan', en: 'Tap to add' },
 
   // ── AI Transform (Nano Banana) ───────────────────────────────────────────────

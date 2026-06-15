@@ -659,7 +659,7 @@ export default function PhotoEditor() {
       {/* ── Main 3-column body ── */}
       <div
         className="flex-1 min-h-0"
-        style={{ display: 'grid', gridTemplateColumns: '48px 1fr 248px', gap: 12 }}
+        style={{ display: 'grid', gridTemplateColumns: '64px 1fr 248px', gap: 12 }}
       >
         {/* ── Left sidebar: tool icons ── */}
         <div
@@ -676,12 +676,11 @@ export default function PhotoEditor() {
               <button
                 key={id}
                 onClick={() => handleSidebarTool(id)}
-                title={t(labelKey)}
                 aria-label={t(labelKey)}
                 aria-pressed={isActive}
-                className="relative flex items-center justify-center rounded-xl transition-all active:scale-90"
+                className="relative flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
                 style={{
-                  width: 36, height: 36,
+                  width: 52, height: 52,
                   background: isActive ? 'var(--color-accent-light, #fff7ed)' : 'transparent',
                   color: isActive ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
                   border: 'none',
@@ -693,14 +692,17 @@ export default function PhotoEditor() {
                   <span
                     className="absolute"
                     style={{
-                      left: -12, top: '50%', transform: 'translateY(-50%)',
+                      left: -7, top: '50%', transform: 'translateY(-50%)',
                       width: 3, height: 22,
                       background: 'var(--color-accent)',
                       borderRadius: 2,
                     }}
                   />
                 )}
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+                <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+                  {t(labelKey)}
+                </span>
               </button>
             );
           })}
@@ -714,11 +716,10 @@ export default function PhotoEditor() {
           {/* No-tool / deselect mode */}
           <button
             onClick={() => setActivePanel(null)}
-            title="Pilih elemen"
             aria-label="Pilih elemen di canvas"
-            className="flex items-center justify-center rounded-xl transition-all active:scale-90"
+            className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
             style={{
-              width: 36, height: 36,
+              width: 52, height: 52,
               background: !activePanel ? 'var(--color-primary-50)' : 'transparent',
               color: !activePanel ? 'var(--color-primary)' : 'var(--color-neutral-400)',
               border: 'none',
@@ -726,6 +727,9 @@ export default function PhotoEditor() {
             }}
           >
             <MousePointer size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
+            <span style={{ fontSize: 9, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+              {t('editor.toolSelect')}
+            </span>
           </button>
         </div>
 
