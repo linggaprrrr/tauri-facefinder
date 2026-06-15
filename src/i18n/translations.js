@@ -211,6 +211,7 @@ export const translations = {
   'frame.title':   { id: 'Layout Multi-Foto', en: 'Multi-Photo Layout' },
   'frame.loading': { id: 'Memuat layout…', en: 'Loading layouts…' },
   'frame.empty':   { id: 'Belum ada layout tersedia.', en: 'No layouts available yet.' },
+  'frame.none':    { id: 'Hapus Frame', en: 'Remove Frame' },
 
   // ── Slot photo picker ───────────────────────────────────────────────────────
   'picker.title': { id: 'Pilih Foto untuk Slot {n}', en: 'Choose a Photo for Slot {n}' },

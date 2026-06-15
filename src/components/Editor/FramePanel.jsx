@@ -34,6 +34,29 @@ export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], l
         <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('frame.empty')}</p>
       )}
       <div className="grid grid-cols-2 gap-2">
+        {/* None option — always first */}
+        <button
+          onClick={() => onSelect('none')}
+          className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all active:scale-95"
+          style={{
+            background: activeId === 'none' ? '#f3e8ff' : 'var(--color-neutral-50)',
+            outline: activeId === 'none' ? '2px solid #7c3aed' : '2px solid transparent',
+          }}
+        >
+          <div
+            className="rounded overflow-hidden flex items-center justify-center"
+            style={{ width: 64, height: 44, background: 'var(--color-neutral-200)', fontSize: 20 }}
+          >
+            🚫
+          </div>
+          <span
+            className="text-xs font-semibold text-center leading-tight"
+            style={{ color: activeId === 'none' ? '#7c3aed' : 'var(--color-neutral-600)' }}
+          >
+            {t('frame.none')}
+          </span>
+        </button>
+
         {layoutFrames.map((f) => (
           <button
             key={f.id}
