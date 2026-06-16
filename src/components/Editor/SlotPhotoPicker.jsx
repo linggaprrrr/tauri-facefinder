@@ -10,8 +10,8 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-        style={{ background: '#fff', width: 420, maxHeight: '80vh' }}
+        className="rounded-2xl overflow-hidden shadow-2xl flex flex-col mx-4"
+        style={{ background: '#fff', width: 'min(420px, calc(100vw - 32px))', maxHeight: '80vh' }}
       >
         <div
           className="flex items-center justify-between px-5 py-4 shrink-0"

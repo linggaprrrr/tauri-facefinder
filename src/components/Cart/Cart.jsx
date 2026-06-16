@@ -16,9 +16,9 @@ export default function Cart() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-2xl mx-auto w-full py-4 sm:py-6">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl sm:text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
           {t('cart.title')}
         </h1>
         <Button variant="ghost" onClick={() => navigate('/editor')}>

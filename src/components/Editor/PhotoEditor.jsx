@@ -19,9 +19,11 @@ import EditorToolbar from './EditorToolbar';
 import Button from '../common/Button';
 import { useStickers } from '../../hooks/useStickers';
 import { useLayoutFrames } from '../../hooks/useLayoutFrames';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import AiTransformPanel from './AiTransformPanel';
 import AiTransformPreview from './AiTransformPreview';
 
+// Desktop ceilings. On mobile these are overridden by the viewport (see component).
 const MAX_CANVAS_W = 780;
 const MAX_CANVAS_H = 520;
 const DEFAULT_FILTERS = { list: [], brightness: 0, contrast: 0 };
@@ -51,13 +53,13 @@ function toSlotPx(slot, canvasW, canvasH) {
   };
 }
 
-function fitDimensions(natW, natH) {
-  if (!natW || !natH) return { width: MAX_CANVAS_W, height: Math.round(MAX_CANVAS_W * 0.667) };
+function fitDimensions(natW, natH, maxW = MAX_CANVAS_W, maxH = MAX_CANVAS_H) {
+  if (!natW || !natH) return { width: maxW, height: Math.round(maxW * 0.667) };
   const ratio = natW / natH;
-  let w = MAX_CANVAS_W;
+  let w = maxW;
   let h = Math.round(w / ratio);
-  if (h > MAX_CANVAS_H) {
-    h = MAX_CANVAS_H;
+  if (h > maxH) {
+    h = maxH;
     w = Math.round(h * ratio);
   }
   return { width: w, height: h };
@@ -371,6 +373,20 @@ export default function PhotoEditor() {
   const { t } = useLang();
   const navigate = useNavigate();
   const stageRef = useRef(null);
+  const isMobile = useIsMobile();
+
+  // Canvas must fit the phone viewport (the desktop 780×520 overflows badly).
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    h: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const maxCanvasW = isMobile ? Math.max(200, viewport.w - 24) : MAX_CANVAS_W;
+  const maxCanvasH = isMobile ? Math.max(220, Math.round(viewport.h * 0.42)) : MAX_CANVAS_H;
 
   const selectedPhotos = state.selectedPhotos;
   const photoEdits = state.photoEdits;
@@ -423,7 +439,8 @@ export default function PhotoEditor() {
       if (!src || orientationCache.current[photo.id]) return;
       const img = new Image();
       img.onload = () => {
-        orientationCache.current[photo.id] = fitDimensions(img.naturalWidth, img.naturalHeight);
+        // Cache natural size, not fitted dims, so canvas can re-fit on resize.
+        orientationCache.current[photo.id] = { natW: img.naturalWidth, natH: img.naturalHeight };
       };
       img.src = src;
     });
@@ -432,27 +449,29 @@ export default function PhotoEditor() {
   useEffect(() => {
     if (!photoUrl) return;
     const cached = orientationCache.current[currentPhoto.id];
-    if (cached) { setCanvas(cached); return; }
+    if (cached) {
+      setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
+      return;
+    }
     const img = new Image();
     img.onload = () => {
-      const dims = fitDimensions(img.naturalWidth, img.naturalHeight);
-      orientationCache.current[currentPhoto.id] = dims;
-      setCanvas(dims);
+      orientationCache.current[currentPhoto.id] = { natW: img.naturalWidth, natH: img.naturalHeight };
+      setCanvas(fitDimensions(img.naturalWidth, img.naturalHeight, maxCanvasW, maxCanvasH));
       setIsLoading(false);
     };
     img.onerror = () => setIsLoading(false);
     setIsLoading(true);
     img.src = photoUrl;
-  }, [photoUrl, currentPhoto?.id]);
+  }, [photoUrl, currentPhoto?.id, maxCanvasW, maxCanvasH]);
 
   const layoutCanvasSize = useMemo(() => {
     if (!isLayoutFrame) return canvas;
     const ratio = frameAspectRatio;
-    let w = MAX_CANVAS_W;
+    let w = maxCanvasW;
     let h = Math.round(w / ratio);
-    if (h > MAX_CANVAS_H) { h = MAX_CANVAS_H; w = Math.round(h * ratio); }
+    if (h > maxCanvasH) { h = maxCanvasH; w = Math.round(h * ratio); }
     return { width: w, height: h };
-  }, [isLayoutFrame, frameAspectRatio, canvas]);
+  }, [isLayoutFrame, frameAspectRatio, canvas, maxCanvasW, maxCanvasH]);
 
   const activeCanvas = isLayoutFrame ? layoutCanvasSize : canvas;
 
@@ -523,7 +542,7 @@ export default function PhotoEditor() {
     setSelectedId(null);
     setActivePanel('stickers');
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
-    if (cached) setCanvas(cached);
+    if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
     setPhotoIndex(newIndex);
   }
 
@@ -606,25 +625,25 @@ export default function PhotoEditor() {
     <div className="flex flex-col h-full gap-3 max-w-6xl mx-auto w-full">
 
       {/* ── Page header ── */}
-      <div className="flex items-center justify-between gap-4 shrink-0">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 shrink-0 flex-wrap">
         <div>
-          <h1 className="text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
+          <h1 className="text-xl sm:text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
             {t('editor.title')}
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-400)' }}>
+          <p className="hidden sm:block text-sm mt-0.5" style={{ color: 'var(--color-neutral-400)' }}>
             {t('editor.subtitle')}
           </p>
         </div>
 
         {/* Photo counter nav */}
         <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2 shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 shrink-0"
           style={{ background: 'var(--color-neutral-100)', border: '1.5px solid var(--color-neutral-200)' }}
         >
           <button
             disabled={photoIndex === 0}
             onClick={() => navigateTo(photoIndex - 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Previous"
           >
@@ -636,7 +655,7 @@ export default function PhotoEditor() {
           <button
             disabled={isLast}
             onClick={() => navigateTo(photoIndex + 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Next"
           >
@@ -656,14 +675,19 @@ export default function PhotoEditor() {
         </div>
       </div>
 
-      {/* ── Main 3-column body ── */}
+      {/* ── Main body: 3-column on desktop, stacked on mobile ── */}
       <div
-        className="flex-1 min-h-0"
-        style={{ display: 'grid', gridTemplateColumns: '64px 1fr 248px', gap: 12 }}
+        className="flex-1 min-h-0 no-scrollbar"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '64px 1fr 248px',
+          gap: 12,
+          overflowY: isMobile ? 'auto' : 'visible',
+        }}
       >
-        {/* ── Left sidebar: tool icons ── */}
+        {/* ── Tool icons: vertical sidebar on desktop, horizontal bar on mobile ── */}
         <div
-          className="flex flex-col items-center gap-1 py-3 rounded-xl shrink-0"
+          className="flex flex-row sm:flex-col items-center gap-1 px-2 sm:px-0 py-2 sm:py-3 rounded-xl shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar"
           style={{
             background: '#fff',
             border: '1.5px solid var(--color-neutral-200)',
@@ -707,9 +731,9 @@ export default function PhotoEditor() {
             );
           })}
 
-          {/* Divider */}
+          {/* Divider (horizontal sidebar hides it on mobile) */}
           <div
-            className="my-1 w-6 shrink-0"
+            className="hidden sm:block my-1 w-6 shrink-0"
             style={{ height: 1, background: 'var(--color-neutral-200)' }}
           />
 
@@ -1001,9 +1025,9 @@ export default function PhotoEditor() {
           </div>
         </div>
 
-        {/* ── Right: active panel content ── */}
+        {/* ── Right: active panel content (full-width below canvas on mobile) ── */}
         <div
-          className="flex flex-col min-h-0 rounded-xl overflow-hidden shrink-0"
+          className="flex flex-col min-h-0 sm:min-h-0 min-h-[280px] rounded-xl overflow-hidden shrink-0"
           style={{
             background: '#fff',
             border: '1.5px solid var(--color-neutral-200)',
