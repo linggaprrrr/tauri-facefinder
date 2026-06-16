@@ -16,6 +16,7 @@ import SettingsModal from './components/Settings/SettingsModal';
 import AboutModal from './components/Settings/AboutModal';
 import { useApp } from './store/AppContext';
 import { useOutletFromURL } from './hooks/useOutletFromURL';
+import { useIsMobile } from './hooks/useIsMobile';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -40,6 +41,10 @@ function Layout() {
   const [showAbout, setShowAbout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const helpNumber = state.deviceConfig.helpNumber;
+  const isMobile = useIsMobile();
+  // On mobile the bottom action bars (gallery/cart/checkout) would collide with
+  // the fixed help FAB, so only surface it on the home screen there.
+  const showHelpFab = !!helpNumber && (!isMobile || isHome);
 
   // Force settings open on first run when config is missing
   useEffect(() => {
@@ -119,8 +124,8 @@ function Layout() {
       )}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
 
-      {/* Floating help button — bottom left, all pages */}
-      {helpNumber && (
+      {/* Floating help button — bottom left (all pages on desktop; home only on mobile) */}
+      {showHelpFab && (
         <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-3">
           {showHelp && (
             <div

@@ -181,15 +181,15 @@ export default function Gallery() {
         }}
       >
         {selectedPhotos.length === 0 ? (
-          /* Hint state — no selection yet */
-          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
-          <p className="flex-1 text-sm font-medium" style={{ paddingLeft: 148, color: 'var(--color-neutral-400)' }}>
+          /* Hint state — no selection yet.
+             pl reserve clears the fixed WhatsApp button on desktop; none on mobile
+             where the help FAB sits below the footer flow. */
+          <p className="flex-1 text-sm font-medium pl-0 sm:pl-[148px]" style={{ color: 'var(--color-neutral-400)' }}>
             {t('gallery.footerEmpty')}
           </p>
         ) : (
           /* Thumbnail strip */
-          /* paddingLeft clears the fixed WhatsApp button (~135px wide at left:24px) */
-          <div className="flex items-center gap-2 flex-1 min-w-0" style={{ paddingLeft: 120 }}>
+          <div className="flex items-center gap-2 flex-1 min-w-0 pl-0 sm:pl-[120px]">
             {stripPhotos.map((p) => (
               <div key={p.id} className="relative shrink-0 group">
                 <img
