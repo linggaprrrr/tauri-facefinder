@@ -35,7 +35,9 @@ export default function FaceScan() {
       navigate('/gallery');
     } catch (err) {
       console.error('scanFace failed:', err);
-      setErrorKey('scan.error');
+      // A dead link / timeout reads as "reconnecting", not "scan failed".
+      const offlineKind = err?.kind === 'network' || err?.kind === 'timeout';
+      setErrorKey(offlineKind ? 'scan.offline' : 'scan.error');
       setStatus('error');
     }
   }, [capture, dispatch, navigate]);
@@ -94,7 +96,10 @@ export default function FaceScan() {
         </p>
       )}
 
-      {/* Primary CTA */}
+      {/* Primary CTA. We DON'T hard-disable on a missed heartbeat (that would
+          falsely block the kiosk's main action on a transient blip); instead the
+          attempt surfaces a clear 'reconnecting' message on a real network error,
+          and the offline banner already signals connectivity. */}
       <Button
         size="lg"
         onClick={handleCapture}

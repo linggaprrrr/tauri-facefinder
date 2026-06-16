@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
+import { clearPendingOrder } from '../../utils/pendingOrder';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
 
@@ -40,6 +41,7 @@ export default function Download() {
   }
 
   function handleRestart() {
+    clearPendingOrder(); // order delivered — no longer needs recovery
     dispatch({ type: 'RESET' });
     navigate('/');
   }
