@@ -107,14 +107,20 @@ export async function getOutletsByUnit(unitId) {
   return json.outlets ?? [];
 }
 
-// Create kiosk transaction — returns full transaction object from backend
-export async function createTransaction({ outletId, photos }) {
+// Create kiosk transaction — returns full transaction object from backend.
+// photoEdits is the store's { [photoId]: { dataUrl, ... } } map; when a photo
+// has an edited render we send it so the backend persists what the customer
+// actually made (delivered later via the pickup link), not just the original.
+export async function createTransaction({ outletId, photos, photoEdits = {} }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
     body: JSON.stringify({
       device_id: outletId,
-      photos: photos.map((p) => ({ photo_id: p.photo_id })),
+      photos: photos.map((p) => ({
+        photo_id: p.photo_id,
+        edited_image: photoEdits[p.id]?.dataUrl ?? null,
+      })),
     }),
   });
 

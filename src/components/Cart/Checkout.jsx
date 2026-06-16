@@ -83,6 +83,7 @@ export default function Checkout() {
       const trx = await createTransaction({
         outletId: deviceConfig.outlet.id,
         photos: state.selectedPhotos,
+        photoEdits: state.photoEdits,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment
