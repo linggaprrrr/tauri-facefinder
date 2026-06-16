@@ -1,4 +1,4 @@
-// Translation dictionary for the Face Finder kiosk.
+// Translation dictionary for the AI Studio kiosk.
 // Each key maps to { id: '<Bahasa>', en: '<English>' }.
 // Use {placeholder} tokens for interpolation — see t() in LanguageContext.jsx.
 // Currency (Rp / id-ID grouping) is intentionally NOT translated.
@@ -11,7 +11,7 @@ export const translations = {
   'common.photoN':    { id: 'Foto {n}',   en: 'Photo {n}' },
 
   // ── Header / App ────────────────────────────────────────────────────────────
-  'app.subtitle':       { id: 'Face Finder', en: 'Face Finder' },
+  'app.subtitle':       { id: 'AI Studio', en: 'AI Studio' },
   'app.about':          { id: 'Tentang Aplikasi', en: 'About App' },
   'app.settings':       { id: 'Pengaturan', en: 'Settings' },
   'help.title':         { id: 'Bantuan & Pengaduan', en: 'Help & Support' },
@@ -107,7 +107,7 @@ export const translations = {
   'download.cash':           { id: 'Tunai', en: 'Cash' },
   'download.qris':           { id: 'QRIS', en: 'QRIS' },
   'download.paid':           { id: 'Lunas', en: 'Paid' },
-  'download.thanks':         { id: 'Terima kasih telah menggunakan Ownize Face Finder!', en: 'Thank you for using Ownize Face Finder!' },
+  'download.thanks':         { id: 'Terima kasih telah menggunakan Ownize AI Studio!', en: 'Thank you for using Ownize AI Studio!' },
 
   // ── Settings ────────────────────────────────────────────────────────────────
   'settings.wrongCode':      { id: 'Kode perangkat salah.', en: 'Wrong device code.' },

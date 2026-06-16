@@ -11,7 +11,7 @@ const STATUS = { IDLE: 'idle', CHECKING: 'checking', UP_TO_DATE: 'up_to_date', A
 export default function AboutModal({ onClose }) {
   const { t } = useLang();
   const [appVersion, setAppVersion] = useState('—');
-  const [appName, setAppName] = useState('Face Finder');
+  const [appName, setAppName] = useState('AI Studio');
   const [status, setStatus] = useState(STATUS.IDLE);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
