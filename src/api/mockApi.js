@@ -119,20 +119,32 @@ export async function cancelTransaction(transactionId) {
   return res.json();
 }
 
-export async function getStickers(outletId) {
+export async function getStickers(outletId, etag = null) {
   const url = outletId
     ? `${API_BASE}/stickers/?outlet_id=${outletId}`
     : `${API_BASE}/stickers/`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: etag ? { 'If-None-Match': etag } : {},
+  });
+  if (res.status === 304) return { unchanged: true };
   if (!res.ok) throw new Error(`API error ${res.status}`);
-  return (await res.json()).data ?? [];
+  return {
+    data: (await res.json()).data ?? [],
+    etag: res.headers.get('etag'),
+  };
 }
 
-export async function getLayoutFrames(outletId) {
+export async function getLayoutFrames(outletId, etag = null) {
   const url = outletId
     ? `${API_BASE}/templates/?outlet_id=${outletId}`
     : `${API_BASE}/templates/`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: etag ? { 'If-None-Match': etag } : {},
+  });
+  if (res.status === 304) return { unchanged: true };
   if (!res.ok) throw new Error(`API error ${res.status}`);
-  return (await res.json()).data ?? [];
+  return {
+    data: (await res.json()).data ?? [],
+    etag: res.headers.get('etag'),
+  };
 }
