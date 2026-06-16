@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { templateImages } from './AiTransformPanel';
 
 export default function AiTransformPreview({ template, onDiscard }) {
   const { t } = useLang();
+  const isMobile = useIsMobile();
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef(null);
   const isDragging = useRef(false);
@@ -43,7 +45,7 @@ export default function AiTransformPreview({ template, onDiscard }) {
       onClick={onDiscard}
     >
       <div
-        className="rounded-3xl overflow-hidden flex w-full mx-3"
+        className="rounded-3xl overflow-hidden flex flex-col sm:flex-row w-full mx-3"
         style={{
           background: '#fff',
           maxWidth: 'min(840px, calc(100vw - 24px))',
@@ -52,12 +54,13 @@ export default function AiTransformPreview({ template, onDiscard }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Left: before/after slider ── */}
+        {/* ── Before/after slider — side on desktop, top on mobile ── */}
         <div
           ref={containerRef}
           style={{
             position: 'relative',
-            width: '56%',
+            width: isMobile ? '100%' : '56%',
+            height: isMobile ? '42vh' : undefined,
             flexShrink: 0,
             display: 'flex',
             overflow: 'hidden',
@@ -183,8 +186,8 @@ export default function AiTransformPreview({ template, onDiscard }) {
           </div>
         </div>
 
-        {/* ── Right: template info ── */}
-        <div className="flex flex-col flex-1 p-6 gap-4 overflow-y-auto">
+        {/* ── Template info — right on desktop, below on mobile ── */}
+        <div className="flex flex-col flex-1 min-h-0 p-6 gap-4 overflow-y-auto">
           {/* Close */}
           <div className="flex justify-end">
             <button
