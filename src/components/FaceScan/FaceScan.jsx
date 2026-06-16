@@ -41,28 +41,29 @@ export default function FaceScan() {
   }, [capture, dispatch, navigate]);
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto py-10">
+    <div className="flex flex-col items-center gap-5 sm:gap-8 w-full max-w-2xl mx-auto py-4 sm:py-10">
       {/* Page heading */}
       <div className="text-center">
-        <h1 className="text-5xl font-black text-gradient-brand pb-1">
+        <h1 className="text-3xl sm:text-5xl font-black text-gradient-brand pb-1">
           {t('scan.title')}
         </h1>
-        <p className="mt-2 text-lg" style={{ color: 'var(--color-neutral-600)' }}>
+        <p className="mt-2 text-base sm:text-lg" style={{ color: 'var(--color-neutral-600)' }}>
           {t('scan.positionPre')}<strong>{t('scan.action')}</strong>
         </p>
       </div>
 
-      {/* Camera / loading area */}
+      {/* Camera / loading area — responsive: fills width on phones, capped at
+          640px on desktop, with a 4:3 box so it never overflows the viewport. */}
       {status === 'scanning' ? (
         <div
-          className="w-[640px] h-[480px] flex items-center justify-center rounded-3xl"
+          className="w-full max-w-[640px] aspect-[4/3] flex items-center justify-center rounded-3xl"
           style={{ background: 'var(--color-primary-50)' }}
         >
           <LoadingSpinner message={t('scan.scanningFace')} />
         </div>
       ) : (
         <div
-          className="relative rounded-3xl overflow-hidden"
+          className="relative rounded-3xl overflow-hidden w-full max-w-[640px] aspect-[4/3]"
           style={{
             boxShadow: 'var(--shadow-pop)',
             border: '4px solid #fff',
@@ -74,7 +75,7 @@ export default function FaceScan() {
             audio={false}
             screenshotFormat="image/jpeg"
             videoConstraints={VIDEO_CONSTRAINTS}
-            className="block"
+            className="block w-full h-full object-cover"
           />
           <FaceOverlay />
         </div>
@@ -98,7 +99,7 @@ export default function FaceScan() {
         size="lg"
         onClick={handleCapture}
         disabled={status === 'scanning'}
-        className="w-72"
+        className="w-full max-w-72"
       >
         {status === 'scanning' ? t('scan.scanning') : t('scan.cta')}
       </Button>

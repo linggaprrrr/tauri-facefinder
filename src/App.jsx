@@ -15,6 +15,7 @@ import Editor from './components/Editor/PhotoEditor';
 import SettingsModal from './components/Settings/SettingsModal';
 import AboutModal from './components/Settings/AboutModal';
 import { useApp } from './store/AppContext';
+import { useOutletFromURL } from './hooks/useOutletFromURL';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -31,6 +32,8 @@ function Layout() {
   const isHome = location.pathname === '/';
   const { state } = useApp();
   const { t } = useLang();
+  // Mobile customers arrive via QR with ?outlet_id=... — auto-configure from URL.
+  useOutletFromURL();
   const isConfigured = !!(state.deviceConfig.unit && state.deviceConfig.outlet);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -49,7 +52,7 @@ function Layout() {
     <div className="app-bg min-h-screen flex flex-col">
       {/* Header — frosted festive bar, brand mark left, stepper center */}
       <header
-        className="flex items-center justify-between px-8 py-3 shrink-0 sticky top-0 z-30"
+        className="flex items-center justify-between px-3 sm:px-8 py-2 sm:py-3 shrink-0 sticky top-0 z-30"
         style={{
           background: 'rgba(255,255,255,0.82)',
           backdropFilter: 'blur(12px)',
@@ -59,27 +62,29 @@ function Layout() {
         }}
       >
         {/* Brand mark */}
-        <div className="flex items-center min-w-36">
+        <div className="flex items-center min-w-0 sm:min-w-36">
           <div
-            className="w-20 h-20 flex items-center justify-center text-xl font-black text-white"
+            className="w-12 h-12 sm:w-20 sm:h-20 flex items-center justify-center text-xl font-black text-white shrink-0"
           >
             <img src={ownizeLogo} alt="Ownize" className="w-full h-full object-contain" />
           </div>
-          <div>
-            <span className="font-black text-3xl leading-tight block text-gradient-brand">
+          <div className="min-w-0">
+            <span className="font-black text-xl sm:text-3xl leading-tight block text-gradient-brand">
               Ownize
             </span>
-            <span className="text-lg" style={{ color: 'var(--color-neutral-500)' }}>
+            <span className="hidden sm:block text-lg" style={{ color: 'var(--color-neutral-500)' }}>
               {t('app.subtitle')}
             </span>
           </div>
         </div>
 
-        {/* Step indicator — centered */}
-        <StepIndicator current={step} />
+        {/* Step indicator — centered (hidden on phones to save header width) */}
+        <div className="hidden sm:flex">
+          <StepIndicator current={step} />
+        </div>
 
         {/* Language switcher (always visible) + Settings/About (home only) */}
-        <div className="min-w-36 flex items-center justify-end gap-2">
+        <div className="min-w-0 sm:min-w-36 flex items-center justify-end gap-2">
           <LanguageSwitcher />
           {isHome && (
             <>
@@ -95,11 +100,11 @@ function Layout() {
               <button
                 onClick={() => setShowSettings(true)}
                 title={t('app.settings')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ color: 'var(--color-neutral-500)', background: 'var(--color-neutral-100)' }}
               >
                 <Settings size={18} />
-                {t('app.settings')}
+                <span className="hidden sm:inline">{t('app.settings')}</span>
               </button>
             </>
           )}
@@ -169,7 +174,7 @@ function Layout() {
       )}
 
       {/* Page content */}
-      <main key={location.pathname} className="flex-1 p-6 overflow-auto no-scrollbar pop-in">
+      <main key={location.pathname} className="flex-1 p-3 sm:p-6 overflow-auto no-scrollbar pop-in">
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />
