@@ -13,7 +13,7 @@ export default function Editor() {
           draggable
         />
         <Text
-          text="Hello Face Finder"
+          text="Hello Ownize AI Studio"
           x={100}
           y={100}
           fontSize={24}

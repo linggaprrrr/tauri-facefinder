@@ -174,7 +174,7 @@ export default function Download() {
           <div className="flex items-center gap-3 mb-3">
             <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
             <div>
-              <p className="font-black text-xl leading-tight">Ownize Face Finder</p>
+              <p className="font-black text-xl leading-tight">Ownize AI Studio</p>
               {unitName && (
                 <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
               )}

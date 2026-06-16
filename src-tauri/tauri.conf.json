@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "face-finder-desktop",
+        "title": "Ownize AI Studio",
         "width": 1920,
         "height": 1080,
         "resizable": true,
