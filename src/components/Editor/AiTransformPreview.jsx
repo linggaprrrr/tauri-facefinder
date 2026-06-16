@@ -43,10 +43,10 @@ export default function AiTransformPreview({ template, onDiscard }) {
       onClick={onDiscard}
     >
       <div
-        className="rounded-3xl overflow-hidden flex w-full"
+        className="rounded-3xl overflow-hidden flex w-full mx-3"
         style={{
           background: '#fff',
-          maxWidth: 840,
+          maxWidth: 'min(840px, calc(100vw - 24px))',
           maxHeight: '90vh',
           boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
         }}

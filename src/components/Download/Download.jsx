@@ -54,10 +54,10 @@ export default function Download() {
   const outletName = deviceConfig?.outlet?.name ?? '';
 
   return (
-    <div className="flex gap-8 items-start justify-center w-full max-w-4xl mx-auto py-8">
+    <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
 
       {/* ── Left: QR download ── */}
-      <div className="flex flex-col items-center gap-5 shrink-0">
+      <div className="flex flex-col items-center gap-5 shrink-0 w-full sm:w-auto">
         <div className="text-center">
           <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
             {t('download.success')}
@@ -155,7 +155,7 @@ export default function Download() {
 
       {/* ── Right: Receipt ── */}
       <div
-        className="flex-1 rounded-3xl overflow-hidden"
+        className="w-full sm:flex-1 rounded-3xl overflow-hidden"
         style={{
           background: '#fff',
           boxShadow: 'var(--shadow-xl)',

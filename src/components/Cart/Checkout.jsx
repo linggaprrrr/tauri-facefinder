@@ -202,16 +202,15 @@ export default function Checkout() {
 
       {/* ── QRIS Payment Screen ── */}
       {status === 'waiting' && transaction && (
-        <div className="flex gap-6 w-full items-start">
+        <div className="flex flex-col sm:flex-row gap-6 w-full items-stretch sm:items-start">
 
           {/* Left: QR Code card */}
           <div
-            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0"
+            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto sm:min-w-[300px]"
             style={{
               background: '#fff',
               boxShadow: 'var(--shadow-xl)',
               border: '2px solid var(--color-primary-100)',
-              minWidth: 300,
             }}
           >
             {/* QRIS badge */}
