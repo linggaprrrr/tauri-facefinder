@@ -27,6 +27,18 @@ export async function printImage(printerName, dataUrl, copies = 1) {
   });
 }
 
+// Fetch an image by URL (e.g. an original photo from storage) and print it.
+// Storage serves CORS-enabled images (the editor already canvas-exports them),
+// so a plain fetch works.
+export async function printFromUrl(printerName, url, copies = 1) {
+  if (!isTauri()) throw new Error('Printing is only available in the kiosk app');
+  if (!printerName) throw new Error('No printer selected');
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Could not load image (${resp.status})`);
+  const buf = new Uint8Array(await resp.arrayBuffer());
+  await invoke('print_image', { printer: printerName, bytes: Array.from(buf), copies });
+}
+
 // A throwaway image so staff can validate silent printing without a real photo.
 export function makeTestImageDataUrl() {
   const c = document.createElement('canvas');

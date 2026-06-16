@@ -160,6 +160,24 @@ export const translations = {
   'settings.testPrintSent':  { id: 'Terkirim ke printer ✓', en: 'Sent to printer ✓' },
   'settings.testPrintFail':  { id: 'Gagal mencetak', en: 'Print failed' },
 
+  // ── Printing flow (paid) ─────────────────────────────────────────────────────
+  'print.printBtn':      { id: 'Cetak Foto', en: 'Print Photos' },
+  'print.title':         { id: 'Cetak Foto', en: 'Print Photos' },
+  'print.notAvailable':  { id: 'Pencetakan tidak tersedia di outlet ini.', en: "Printing isn't available at this outlet." },
+  'print.selectHint':    { id: 'Pilih versi dan jumlah salinan tiap foto.', en: 'Choose the version and number of copies per photo.' },
+  'print.perPrint':      { id: 'Per cetak', en: 'Per print' },
+  'print.original':      { id: 'Asli', en: 'Original' },
+  'print.edited':        { id: 'Editan', en: 'Edited' },
+  'print.totalCopies':   { id: '{n} cetak', en: '{n} prints' },
+  'print.payAndPrint':   { id: 'Bayar & Cetak', en: 'Pay & Print' },
+  'print.creating':      { id: 'Menyiapkan pembayaran…', en: 'Preparing payment…' },
+  'print.payTitle':      { id: 'Scan untuk membayar cetak', en: 'Scan to pay for prints' },
+  'print.printing':      { id: 'Mencetak…', en: 'Printing…' },
+  'print.doneTitle':     { id: 'Selesai Dicetak 🎉', en: 'Printing Complete 🎉' },
+  'print.doneDesc':      { id: 'Silakan ambil foto Anda di printer.', en: 'Please collect your photos from the printer.' },
+  'print.printErr':      { id: 'Sebagian cetak gagal. Anda sudah membayar — coba cetak ulang.', en: "Some prints failed. You've already paid — try reprinting." },
+  'print.retry':         { id: 'Cetak Ulang', en: 'Reprint' },
+
   // ── About ───────────────────────────────────────────────────────────────────
   'about.title':         { id: 'Tentang Aplikasi', en: 'About App' },
   'about.version':       { id: 'Versi', en: 'Version' },
