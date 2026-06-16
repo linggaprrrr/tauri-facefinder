@@ -637,13 +637,13 @@ export default function PhotoEditor() {
 
         {/* Photo counter nav */}
         <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2 shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 shrink-0"
           style={{ background: 'var(--color-neutral-100)', border: '1.5px solid var(--color-neutral-200)' }}
         >
           <button
             disabled={photoIndex === 0}
             onClick={() => navigateTo(photoIndex - 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Previous"
           >
@@ -655,7 +655,7 @@ export default function PhotoEditor() {
           <button
             disabled={isLast}
             onClick={() => navigateTo(photoIndex + 1)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
             style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
             aria-label="Next"
           >
