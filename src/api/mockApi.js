@@ -1,6 +1,21 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001';
 const KIOSK_API_KEY = import.meta.env.VITE_KIOSK_API_KEY ?? '';
 
+// Lightweight liveness probe for the connectivity layer. Returns a boolean and
+// never throws — a network failure / timeout simply reads as "not reachable".
+export async function checkHealth(timeoutMs = 5000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}/health`, { signal: controller.signal, cache: 'no-store' });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function base64ToBlob(base64) {
   const [meta, data] = base64.split(',');
   const mime = meta.match(/:(.*?);/)[1];

@@ -17,6 +17,7 @@ export const translations = {
   'help.title':         { id: 'Bantuan & Pengaduan', en: 'Help & Support' },
   'help.contactPrompt': { id: 'Hubungi kami melalui WhatsApp:', en: 'Contact us via WhatsApp:' },
   'help.button':        { id: 'Bantuan', en: 'Help' },
+  'offline.banner':     { id: 'Koneksi terputus — menyambungkan kembali…', en: 'Connection lost — reconnecting…' },
 
   // ── Step indicator ──────────────────────────────────────────────────────────
   'step.scan':     { id: 'Pindai',    en: 'Scan' },
