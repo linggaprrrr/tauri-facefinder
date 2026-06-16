@@ -7,7 +7,8 @@ export default function EditorToolbar({
   hasSelection,
 }) {
   const { t } = useLang();
-  const base = 'px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 min-h-10 inline-flex items-center gap-1.5';
+  // Compact on mobile (xs), full kiosk size on desktop (sm:+).
+  const base = 'px-2 sm:px-4 py-1 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 min-h-7 sm:min-h-10 inline-flex items-center gap-1 sm:gap-1.5';
 
   function toolBtn(enabled, danger = false) {
     if (!enabled) return `${base} cursor-not-allowed` ;
@@ -30,7 +31,7 @@ export default function EditorToolbar({
           color: canUndo ? 'var(--color-primary)' : 'var(--color-neutral-400)',
         }}
       >
-        <Undo2 size={16} /> {t('toolbar.undo')}
+        <Undo2 size={14} /> {t('toolbar.undo')}
       </button>
       <button
         className={toolBtn(canRedo)}
@@ -41,7 +42,7 @@ export default function EditorToolbar({
           color: canRedo ? 'var(--color-primary)' : 'var(--color-neutral-400)',
         }}
       >
-        <Redo2 size={16} /> {t('toolbar.redo')}
+        <Redo2 size={14} /> {t('toolbar.redo')}
       </button>
 
       {/* Divider */}
@@ -57,7 +58,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
-        <ChevronUp size={16} /> {t('toolbar.forward')}
+        <ChevronUp size={14} /> {t('toolbar.forward')}
       </button>
       <button
         className={toolBtn(hasSelection)}
@@ -68,7 +69,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
-        <ChevronDown size={16} /> {t('toolbar.backward')}
+        <ChevronDown size={14} /> {t('toolbar.backward')}
       </button>
 
       {/* Divider */}
@@ -84,7 +85,7 @@ export default function EditorToolbar({
           color: hasSelection ? 'var(--color-error)' : 'var(--color-neutral-300)',
         }}
       >
-        <Trash2 size={16} /> {t('toolbar.delete')}
+        <Trash2 size={14} /> {t('toolbar.delete')}
       </button>
     </div>
   );

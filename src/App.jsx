@@ -17,6 +17,7 @@ import AboutModal from './components/Settings/AboutModal';
 import { useApp } from './store/AppContext';
 import { useOutletFromURL } from './hooks/useOutletFromURL';
 import { useIsMobile } from './hooks/useIsMobile';
+import ScrollHint from './components/common/ScrollHint';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -190,6 +191,10 @@ function Layout() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      {/* Mobile-only scroll-down hint — window-based, covers every screen
+          (the page grows past the viewport and the window scrolls). */}
+      <ScrollHint bottom={24} />
     </div>
   );
 }
