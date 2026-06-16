@@ -16,7 +16,6 @@ export function useIsMobile(maxWidth = MOBILE_MAX_WIDTH) {
     const mql = window.matchMedia(query);
     const onChange = (e) => setIsMobile(e.matches);
     mql.addEventListener('change', onChange);
-    setIsMobile(mql.matches);
     return () => mql.removeEventListener('change', onChange);
   }, [query]);
 
