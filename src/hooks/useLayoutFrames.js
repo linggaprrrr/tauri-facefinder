@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getLayoutFrames } from '../api/mockApi';
+import { readCache, writeCache } from '../utils/assetCache';
 
-const cache = {};
+const memCache = {};
 
 function normalize(frame) {
   return {
@@ -19,25 +20,28 @@ function normalize(frame) {
 
 export function useLayoutFrames(outletId) {
   const cacheKey = outletId ?? '__global__';
-  const [layoutFrames, setLayoutFrames] = useState(cache[cacheKey] ?? []);
-  const [loading, setLoading] = useState(!cache[cacheKey]);
+  const lsKey = `frames_${cacheKey}`;
+  // localStorage survives reloads; memCache avoids re-reads within a session.
+  // Cached data is already normalized, so it can be used as-is.
+  const persisted = memCache[cacheKey] ?? readCache(lsKey); // { data, etag } | array | null
+  const persistedData = Array.isArray(persisted) ? persisted : persisted?.data;
+
+  const [layoutFrames, setLayoutFrames] = useState(persistedData ?? []);
+  const [loading, setLoading] = useState(!persistedData);
 
   useEffect(() => {
-    if (cache[cacheKey]) {
-      setLayoutFrames(cache[cacheKey]);
-      return;
-    }
     let cancelled = false;
-    setLoading(true);
-    getLayoutFrames(outletId)
-      .then((data) => {
-        if (cancelled) return;
-        const result = data.map(normalize);
-        cache[cacheKey] = result;
-        setLayoutFrames(result);
+    // `loading` already initializes to true when no cached data exists.
+    getLayoutFrames(outletId, persisted?.etag ?? null)
+      .then((result) => {
+        if (cancelled || result.unchanged) return; // 304 — cached copy still valid
+        const resolved = result.data.map(normalize);
+        memCache[cacheKey] = { data: resolved, etag: result.etag };
+        writeCache(lsKey, { data: resolved, etag: result.etag });
+        setLayoutFrames(resolved);
       })
       .catch(() => {
-        if (!cancelled) setLayoutFrames([]);
+        if (!cancelled && !persistedData) setLayoutFrames([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

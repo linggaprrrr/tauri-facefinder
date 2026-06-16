@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getStickers } from '../api/mockApi';
+import { readCache, writeCache } from '../utils/assetCache';
 
 const FALLBACK = [
   { id: 's1',  type: 'emoji', value: '😂', label: 'LOL' },
@@ -16,29 +17,31 @@ const FALLBACK = [
   { id: 's12', type: 'emoji', value: '☀️', label: 'Sun' },
 ];
 
-const cache = {};
+const memCache = {};
 
 export function useStickers(outletId) {
   const cacheKey = outletId ?? '__global__';
-  const [stickers, setStickers] = useState(cache[cacheKey] ?? FALLBACK);
-  const [loading, setLoading] = useState(!cache[cacheKey]);
+  const lsKey = `stickers_${cacheKey}`;
+  // localStorage survives reloads; memCache avoids re-reads within a session.
+  const persisted = memCache[cacheKey] ?? readCache(lsKey); // { data, etag } | array | null
+  const persistedData = Array.isArray(persisted) ? persisted : persisted?.data;
+
+  const [stickers, setStickers] = useState(persistedData ?? FALLBACK);
+  const [loading, setLoading] = useState(!persistedData);
 
   useEffect(() => {
-    if (cache[cacheKey]) {
-      setStickers(cache[cacheKey]);
-      return;
-    }
     let cancelled = false;
-    setLoading(true);
-    getStickers(outletId)
-      .then((data) => {
-        if (cancelled) return;
-        const result = data.length > 0 ? data : FALLBACK;
-        cache[cacheKey] = result;
-        setStickers(result);
+    // `loading` already initializes to true when no cached data exists.
+    getStickers(outletId, persisted?.etag ?? null)
+      .then((result) => {
+        if (cancelled || result.unchanged) return; // 304 — cached copy still valid
+        const resolved = result.data.length > 0 ? result.data : FALLBACK;
+        memCache[cacheKey] = { data: resolved, etag: result.etag };
+        writeCache(lsKey, { data: resolved, etag: result.etag });
+        setStickers(resolved);
       })
       .catch(() => {
-        if (!cancelled) setStickers(FALLBACK);
+        if (!cancelled && !persistedData) setStickers(FALLBACK);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
