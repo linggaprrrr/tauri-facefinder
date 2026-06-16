@@ -150,6 +150,15 @@ export const translations = {
   'settings.savedBtn':       { id: 'Tersimpan', en: 'Saved' },
   'settings.saving':         { id: 'Menyimpan…', en: 'Saving…' },
   'settings.saveBtn':        { id: 'Simpan Konfigurasi', en: 'Save Configuration' },
+  'settings.printSection':   { id: 'Pencetakan', en: 'Printing' },
+  'settings.printEnable':    { id: 'Aktifkan cetak foto', en: 'Enable photo printing' },
+  'settings.printer':        { id: 'Printer', en: 'Printer' },
+  'settings.selectPrinter':  { id: '— Pilih Printer —', en: '— Select Printer —' },
+  'settings.noPrinters':     { id: 'Tidak ada printer terdeteksi', en: 'No printers detected' },
+  'settings.refreshPrinters':{ id: 'Muat ulang', en: 'Refresh' },
+  'settings.testPrint':      { id: 'Tes Cetak', en: 'Test Print' },
+  'settings.testPrintSent':  { id: 'Terkirim ke printer ✓', en: 'Sent to printer ✓' },
+  'settings.testPrintFail':  { id: 'Gagal mencetak', en: 'Print failed' },
 
   // ── About ───────────────────────────────────────────────────────────────────
   'about.title':         { id: 'Tentang Aplikasi', en: 'About App' },

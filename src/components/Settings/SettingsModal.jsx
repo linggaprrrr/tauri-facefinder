@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Check, Printer, RefreshCw } from 'lucide-react';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
+import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
 
 const DEVICE_KEY = import.meta.env.VITE_DEVICE_KEY ?? '';
 
@@ -21,6 +22,14 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [selectedUnit, setSelectedUnit] = useState(state.deviceConfig.unit);
   const [selectedOutlet, setSelectedOutlet] = useState(state.deviceConfig.outlet);
   const [helpNumber, setHelpNumber] = useState(state.deviceConfig.helpNumber ?? '');
+
+  // Printing (kiosk/.exe only — native silent print)
+  const [printEnabled, setPrintEnabled] = useState(!!state.deviceConfig.printEnabled);
+  const [printerName, setPrinterName] = useState(state.deviceConfig.printerName ?? '');
+  const [printers, setPrinters] = useState([]);
+  const [printersLoading, setPrintersLoading] = useState(false);
+  const [testMsg, setTestMsg] = useState(null); // null | 'sent' | 'fail'
+  const [testing, setTesting] = useState(false);
 
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(false);
@@ -83,10 +92,38 @@ export default function SettingsModal({ onClose, forced = false }) {
     setSelectedOutlet(outlet);
   }
 
+  // Load printers when the config step is open in the kiosk app.
+  useEffect(() => {
+    if (step !== 'config' || !isTauri()) return;
+    let cancelled = false;
+    const run = async () => {
+      setPrintersLoading(true);
+      const list = await listPrinters();
+      if (cancelled) return;
+      setPrinters(list);
+      setPrintersLoading(false);
+    };
+    const id = setTimeout(run, 0); // defer out of effect body (sync setState)
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [step]);
+
+  async function handleTestPrint() {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      await printImage(printerName, makeTestImageDataUrl(), 1);
+      setTestMsg('sent');
+    } catch {
+      setTestMsg('fail');
+    } finally {
+      setTesting(false);
+    }
+  }
+
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -247,6 +284,83 @@ export default function SettingsModal({ onClose, forced = false }) {
                   }}
                 />
               </div>
+
+              {/* ── Printing (kiosk app only) ── */}
+              {isTauri() && (
+                <div className="flex flex-col gap-2 pt-1" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
+                  <div className="flex items-center justify-between pt-3">
+                    <label className="font-semibold text-sm flex items-center gap-1.5" style={{ color: 'var(--color-neutral-700)' }}>
+                      <Printer size={16} /> {t('settings.printSection')}
+                    </label>
+                    {/* toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setPrintEnabled((v) => !v)}
+                      role="switch"
+                      aria-checked={printEnabled}
+                      className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+                      style={{ background: printEnabled ? 'var(--color-primary)' : 'var(--color-neutral-300)' }}
+                    >
+                      <span
+                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                        style={{ left: printEnabled ? 22 : 2 }}
+                      />
+                    </button>
+                  </div>
+
+                  {printEnabled && (
+                    <>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 flex flex-col gap-1.5">
+                          <label className="text-xs font-medium" style={{ color: 'var(--color-neutral-500)' }}>
+                            {t('settings.printer')}
+                          </label>
+                          <select
+                            value={printerName}
+                            onChange={(e) => { setPrinterName(e.target.value); setTestMsg(null); }}
+                            className="border rounded-lg px-3 py-2.5 text-sm w-full outline-none focus:ring-2"
+                            style={{ borderColor: 'var(--color-neutral-300)', '--tw-ring-color': 'var(--color-primary)' }}
+                          >
+                            <option value="">
+                              {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
+                            </option>
+                            {printers.map((p) => (
+                              <option key={p.name} value={p.name}>
+                                {p.name}{p.is_default ? ' (default)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setPrintersLoading(true); listPrinters().then(setPrinters).finally(() => setPrintersLoading(false)); }}
+                          title={t('settings.refreshPrinters')}
+                          aria-label={t('settings.refreshPrinters')}
+                          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
+                        >
+                          <RefreshCw size={16} className={printersLoading ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleTestPrint}
+                        disabled={!printerName || testing}
+                        className="text-sm font-semibold py-2 rounded-lg disabled:opacity-50"
+                        style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                      >
+                        {testing ? '…' : t('settings.testPrint')}
+                      </button>
+                      {testMsg && (
+                        <p className="text-xs text-center" style={{ color: testMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
+                          {t(testMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Current saved info (only when editing, not forced) */}
               {!forced && state.deviceConfig.unit && state.deviceConfig.outlet && (
