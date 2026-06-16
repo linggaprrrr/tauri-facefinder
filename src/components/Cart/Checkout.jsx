@@ -5,6 +5,7 @@ import { ArrowLeft, QrCode, Smartphone, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { createTransaction, getTransaction, cancelTransaction } from '../../api/mockApi';
+import { savePendingOrder, updatePendingOrder, clearPendingOrder } from '../../utils/pendingOrder';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
@@ -46,14 +47,12 @@ export default function Checkout() {
     if (countdownRef.current) clearInterval(countdownRef.current);
   }
 
-  // Auto-cancel on unmount if still waiting (e.g. user navigates via browser back)
+  // On unmount, just stop polling — do NOT auto-cancel. Cancelling a 'waiting'
+  // transaction races the payment: the customer may have paid moments earlier,
+  // before the DOKU webhook lands. Abandoned transactions expire on DOKU's side,
+  // and a persisted pendingOrder lets us recover a paid one on next launch.
   useEffect(() => {
-    return () => {
-      stopPolling();
-      if (statusRef.current === 'waiting' && transactionRef.current?.id) {
-        cancelTransaction(transactionRef.current.id).catch(() => {});
-      }
-    };
+    return () => { stopPolling(); };
   }, []);
 
   const handleCancel = useCallback(async (mode) => {
@@ -64,6 +63,8 @@ export default function Checkout() {
     setTransaction(null);
     setCountdown(300);
     setErrorMsg('');
+    // Explicit user cancel → drop the recovery record too.
+    clearPendingOrder();
     if (trxId) {
       try { await cancelTransaction(trxId); } catch { /* silent */ }
     }
@@ -84,6 +85,16 @@ export default function Checkout() {
         photos: state.selectedPhotos,
       });
       setTransaction(trx);
+      // Persist immediately — before payment — so even a crash mid-payment
+      // leaves a recoverable trx_code (pickup is retrievable from any device).
+      savePendingOrder({
+        id: trx.id,
+        trxCode: trx.trx_code,
+        total,
+        photos: state.selectedPhotos.map((p) => ({
+          id: p.id, photo_id: p.photo_id, filename: p.filename, price: p.price, thumbnail: p.thumbnail,
+        })),
+      });
       const dueSeconds = (trx.payment_due_minutes ?? 5) * 60;
       setCountdown(dueSeconds);
       setStatus('waiting');
@@ -101,6 +112,7 @@ export default function Checkout() {
         const trx = await getTransaction(transactionId);
         if (trx.paid) {
           stopPolling();
+          updatePendingOrder({ paid: true });
           dispatch({ type: 'SET_ORDER', payload: trx });
           navigate('/download');
         }

@@ -17,6 +17,23 @@ export const translations = {
   'help.title':         { id: 'Bantuan & Pengaduan', en: 'Help & Support' },
   'help.contactPrompt': { id: 'Hubungi kami melalui WhatsApp:', en: 'Contact us via WhatsApp:' },
   'help.button':        { id: 'Bantuan', en: 'Help' },
+  'offline.banner':     { id: 'Koneksi terputus — menyambungkan kembali…', en: 'Connection lost — reconnecting…' },
+  'scan.offline':       { id: 'Koneksi terputus. Mohon tunggu sebentar lalu coba lagi.', en: 'Connection lost. Please wait a moment and try again.' },
+
+  // ── Order recovery (paid-but-stranded) ──────────────────────────────────────
+  'recovery.title':       { id: 'Pesanan Sebelumnya', en: 'Previous Order' },
+  'recovery.checking':    { id: 'Memeriksa status pesanan…', en: 'Checking your order…' },
+  'recovery.paidTitle':   { id: 'Pembayaran Berhasil 🎉', en: 'Payment Successful 🎉' },
+  'recovery.paidDesc':    { id: 'Pindai QR ini untuk mengunduh foto Anda.', en: 'Scan this QR to download your photos.' },
+  'recovery.pendingTitle':{ id: 'Menunggu Pembayaran', en: 'Awaiting Payment' },
+  'recovery.pendingDesc': { id: 'Kami belum menerima pembayaran untuk pesanan ini.', en: "We haven't received payment for this order yet." },
+  'recovery.goneTitle':   { id: 'Pesanan Tidak Aktif', en: 'Order No Longer Active' },
+  'recovery.goneDesc':    { id: 'Pesanan ini sudah kedaluwarsa atau dibatalkan.', en: 'This order has expired or was cancelled.' },
+  'recovery.errorDesc':   { id: 'Tidak dapat memeriksa status. Periksa koneksi.', en: "Couldn't check status. Check the connection." },
+  'recovery.code':        { id: 'Kode', en: 'Code' },
+  'recovery.recheck':     { id: 'Periksa Lagi', en: 'Check Again' },
+  'recovery.done':        { id: 'Selesai', en: 'Done' },
+  'recovery.dismiss':     { id: 'Nanti', en: 'Later' },
 
   // ── Step indicator ──────────────────────────────────────────────────────────
   'step.scan':     { id: 'Pindai',    en: 'Scan' },

@@ -15,9 +15,14 @@ import Editor from './components/Editor/PhotoEditor';
 import SettingsModal from './components/Settings/SettingsModal';
 import AboutModal from './components/Settings/AboutModal';
 import { useApp } from './store/AppContext';
+import { ConnectivityProvider } from './store/ConnectivityContext';
 import { useOutletFromURL } from './hooks/useOutletFromURL';
 import { useIsMobile } from './hooks/useIsMobile';
 import ScrollHint from './components/common/ScrollHint';
+import OfflineBanner from './components/common/OfflineBanner';
+import OrderRecovery from './components/common/OrderRecovery';
+import ErrorBoundary from './components/common/ErrorBoundary';
+import { readPendingOrder } from './utils/pendingOrder';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -47,6 +52,10 @@ function Layout() {
   // the fixed help FAB, so only surface it on the home screen there.
   const showHelpFab = !!helpNumber && (!isMobile || isHome);
 
+  // Recovery for a paid-but-stranded order: if a recent pendingOrder survives
+  // from a prior session (kiosk crash/reboot), offer to retrieve it on home.
+  const [pendingOrder, setPendingOrder] = useState(() => readPendingOrder());
+
   // Force settings open on first run when config is missing
   useEffect(() => {
     if (!isConfigured) setShowSettings(true);
@@ -56,6 +65,9 @@ function Layout() {
 
   return (
     <div className="app-bg min-h-screen flex flex-col">
+      {/* Connectivity banner — sits above the header when the server is unreachable */}
+      <OfflineBanner />
+
       {/* Header — frosted festive bar, brand mark left, stepper center */}
       <header
         className="flex items-center justify-between px-3 sm:px-8 py-2 sm:py-3 shrink-0 sticky top-0 z-30"
@@ -195,16 +207,25 @@ function Layout() {
       {/* Mobile-only scroll-down hint — window-based, covers every screen
           (the page grows past the viewport and the window scrolls). */}
       <ScrollHint bottom={24} />
+
+      {/* Paid-but-stranded recovery — only on home, for an order from a prior session */}
+      {isHome && pendingOrder && (
+        <OrderRecovery order={pendingOrder} onClose={() => setPendingOrder(null)} />
+      )}
     </div>
   );
 }
 
 export default function App() {
   return (
-    <AppProvider>
-      <LanguageProvider>
-        <Layout />
-      </LanguageProvider>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <LanguageProvider>
+          <ConnectivityProvider>
+            <Layout />
+          </ConnectivityProvider>
+        </LanguageProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,6 +1,32 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001';
 const KIOSK_API_KEY = import.meta.env.VITE_KIOSK_API_KEY ?? '';
 
+// Typed API error so callers can tell a dead link ('network'/'timeout') apart
+// from a server fault ('server') or a real business result (e.g. no matches).
+export class ApiError extends Error {
+  constructor(kind, message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.kind = kind; // 'network' | 'timeout' | 'server'
+    this.status = status;
+  }
+}
+
+// Lightweight liveness probe for the connectivity layer. Returns a boolean and
+// never throws — a network failure / timeout simply reads as "not reachable".
+export async function checkHealth(timeoutMs = 5000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}/health`, { signal: controller.signal, cache: 'no-store' });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function base64ToBlob(base64) {
   const [meta, data] = base64.split(',');
   const mime = meta.match(/:(.*?);/)[1];
@@ -17,7 +43,7 @@ function similarityLabel(score) {
 }
 
 // Call the real face-search API, returns matched photos
-export async function scanFace(base64Image) {
+export async function scanFace(base64Image, timeoutMs = 20000) {
   const blob = base64ToBlob(base64Image);
   const form = new FormData();
   form.append('file', blob, 'face.jpg');
@@ -25,12 +51,24 @@ export async function scanFace(base64Image) {
   form.append('top_k', '50');
   form.append('collection_name', 'face_embeddings');
 
-  const res = await fetch(`${API_BASE}/faces/search-by-face`, {
-    method: 'POST',
-    body: form,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/faces/search-by-face`, {
+      method: 'POST',
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    // fetch only rejects on network failure / abort — distinguish them so the
+    // UI can say "connection lost, retry" instead of "scan failed".
+    throw new ApiError(e.name === 'AbortError' ? 'timeout' : 'network', 'Network request failed');
+  } finally {
+    clearTimeout(timer);
+  }
 
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) throw new ApiError('server', `API error ${res.status}`, res.status);
   const json = await res.json();
 
   const photos = (json.data ?? []).map((item) => ({
