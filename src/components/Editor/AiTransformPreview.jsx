@@ -173,24 +173,10 @@ export default function AiTransformPreview({ template, currentPhoto, outletId, o
             </button>
           </div>
 
-          {/* Name + tag */}
-          <div className="flex flex-col gap-2">
-            <h2 className="font-black text-2xl leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
-              {template.label}
-            </h2>
-            {template.tag && (
-              <span
-                className="text-sm font-bold px-3 py-1 rounded-full self-start"
-                style={
-                  template.tag_color
-                    ? { background: template.tag_color.bg, color: template.tag_color.color }
-                    : { background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }
-                }
-              >
-                {template.tag}
-              </span>
-            )}
-          </div>
+          {/* Name */}
+          <h2 className="font-black text-2xl leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
+            {template.label}
+          </h2>
 
           {/* Loading state */}
           {status === 'loading' && (

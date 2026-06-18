@@ -21,13 +21,9 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
             {t('ai.title')}
           </h3>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-3 animate-pulse"
-              style={{ background: 'var(--color-neutral-100)', height: 80 }}
-            />
+        <div className="flex flex-col gap-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl animate-pulse" style={{ background: 'var(--color-neutral-100)', height: 56 }} />
           ))}
         </div>
       </div>
@@ -51,7 +47,7 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
   }
 
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-4" style={panelStyle}>
+    <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
       {/* Header */}
       <div className="flex items-center gap-2">
         <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
@@ -60,59 +56,52 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
         </h3>
       </div>
 
-      <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
-        {t('ai.subtitle')}
-      </p>
-
-      {/* Template grid */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Template list — before/after thumbnails + label */}
+      <div className="flex flex-col gap-1.5">
         {templates.map((tpl) => {
           const isActive = selected === tpl.id;
           return (
             <button
               key={tpl.id}
               onClick={() => setSelected(isActive ? null : tpl.id)}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all active:scale-95"
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all active:scale-95"
               style={{
                 background: isActive ? 'var(--color-primary-50)' : 'var(--color-neutral-50)',
                 border: `2px solid ${isActive ? 'var(--color-primary)' : 'var(--color-neutral-200)'}`,
                 cursor: 'pointer',
+                textAlign: 'left',
               }}
             >
-              {tpl.emoji && (
-                <span style={{ fontSize: 26, lineHeight: 1 }}>{tpl.emoji}</span>
-              )}
-              {!tpl.emoji && tpl.after_url && (
-                <img
-                  src={tpl.after_url}
-                  alt={tpl.label}
-                  style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 6 }}
-                />
-              )}
+              {/* Before thumbnail */}
+              <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#000' }}>
+                {tpl.before_url
+                  ? <img src={tpl.before_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ width: '100%', height: '100%', background: 'var(--color-neutral-200)' }} />}
+              </div>
+
+              {/* Arrow */}
+              <span style={{ fontSize: 10, color: 'var(--color-neutral-400)', flexShrink: 0 }}>→</span>
+
+              {/* After thumbnail */}
+              <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#000' }}>
+                {tpl.after_url
+                  ? <img src={tpl.after_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ width: '100%', height: '100%', background: 'var(--color-neutral-200)' }} />}
+              </div>
+
+              {/* Label */}
               <span
-                className="text-xs font-semibold text-center leading-tight"
+                className="text-xs font-semibold leading-tight flex-1 truncate"
                 style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-700)' }}
               >
                 {tpl.label}
               </span>
-              {tpl.tag && (
-                <span
-                  className="text-xs font-bold px-1.5 py-0.5 rounded-full"
-                  style={
-                    tpl.tag_color
-                      ? { background: tpl.tag_color.bg, color: tpl.tag_color.color }
-                      : { background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }
-                  }
-                >
-                  {tpl.tag}
-                </span>
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* Preview button */}
+      {/* Apply button */}
       <button
         disabled={!selected}
         onClick={() => {
