@@ -219,3 +219,45 @@ export async function getLayoutFrames(outletId, etag = null) {
     etag: res.headers.get('etag'),
   };
 }
+
+export async function getAiTemplates(outletId, etag = null) {
+  const url = outletId
+    ? `${API_BASE}/ai-templates/?outlet_id=${outletId}`
+    : `${API_BASE}/ai-templates/`;
+  const res = await fetch(url, {
+    headers: etag ? { 'If-None-Match': etag } : {},
+  });
+  if (res.status === 304) return { unchanged: true };
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return {
+    data: (await res.json()).data ?? [],
+    etag: res.headers.get('etag'),
+  };
+}
+
+export async function aiTransform({ outletId, photoUrl, templateId }, timeoutMs = 120000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/ai-templates/transform`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+      signal: controller.signal,
+      body: JSON.stringify({ device_id: outletId, photo_url: photoUrl, template_id: templateId }),
+    });
+  } catch (e) {
+    throw new ApiError(e.name === 'AbortError' ? 'timeout' : 'network', 'AI transform request failed');
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 429) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError('rate_limit', body.detail ?? 'Batas transform AI tercapai. Coba lagi nanti.', 429);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError('server', body.detail ?? `Server error ${res.status}`, res.status);
+  }
+  return res.json(); // { image_url }
+}

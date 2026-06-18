@@ -27,7 +27,21 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {} };
+    case 'UPDATE_PHOTO_SOURCE': {
+      // payload: { id, url } — replaces a selected photo's URL with an AI-transformed result
+      const cleaned = { ...state.photoEdits };
+      delete cleaned[action.payload.id];
+      return {
+        ...state,
+        selectedPhotos: state.selectedPhotos.map((p) =>
+          p.id === action.payload.id
+            ? { ...p, url: action.payload.url, proxyUrl: action.payload.url }
+            : p
+        ),
+        photoEdits: cleaned,
+      };
+    }
     case 'TOGGLE_PHOTO': {
       const exists = state.selectedPhotos.some((p) => p.id === action.payload.id);
       return {

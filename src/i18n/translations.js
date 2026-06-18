@@ -220,24 +220,22 @@ export const translations = {
   'editor.toolSelect':     { id: 'Pilih', en: 'Select' },
   'editor.tabHint':        { id: 'Ketuk untuk menambahkan', en: 'Tap to add' },
 
-  // ── AI Transform (Nano Banana) ───────────────────────────────────────────────
+  // ── AI Transform ─────────────────────────────────────────────────────────────
   'ai.title':           { id: 'AI Transform', en: 'AI Transform' },
   'ai.subtitle':        { id: 'Ubah fotomu menjadi karya seni dengan AI', en: 'Transform your photo into art with AI' },
-  'ai.comingSoon':      { id: 'Segera Hadir', en: 'Coming Soon' },
   'ai.previewBtn':      { id: 'Lihat Preview', en: 'Preview' },
-  'ai.previewTitle':    { id: 'Preview Transformasi', en: 'Transform Preview' },
   'ai.before':          { id: 'Sebelum', en: 'Before' },
   'ai.after':           { id: 'Sesudah', en: 'After' },
   'ai.applyBtn':        { id: 'Terapkan', en: 'Apply' },
+  'ai.applying':        { id: 'Memproses…', en: 'Applying…' },
+  'ai.retryBtn':        { id: 'Coba Lagi', en: 'Retry' },
   'ai.closeBtn':        { id: 'Tutup', en: 'Close' },
-  'ai.demoNote':        { id: 'Hasil nyata dari Nano Banana API akan tampil di sini', en: 'Real result from Nano Banana API will appear here' },
-  'ai.comingSoonNote':  { id: 'Fitur AI Transform akan segera tersedia. Integrasi dengan Nano Banana API sedang dalam pengembangan.', en: 'AI Transform feature is coming soon. Integration with Nano Banana API is under development.' },
-  'ai.tpl.3dtoy':       { id: 'Boneka 3D', en: '3D Toy' },
-  'ai.tpl.ghibsky':     { id: 'Ghibli Art', en: 'Ghibli Art' },
-  'ai.tpl.caricature':  { id: 'Karikatur', en: 'Caricature' },
-  'ai.tpl.caricature3d':{ id: 'Karikatur 3D', en: '3D Caricature' },
-  'ai.tpl.halloween':   { id: 'Halloween Poster', en: 'Halloween Poster' },
-  'ai.tpl.minecraft':   { id: 'Filter Minecraft', en: 'Minecraft Filter' },
+  'ai.noTemplates':     { id: 'Belum ada template AI tersedia', en: 'No AI templates available yet' },
+  'ai.applyNote':       { id: 'Foto akan diganti dengan hasil AI. Gratis untuk setiap foto yang dibeli.', en: 'Your photo will be replaced with the AI result. Free with every photo purchase.' },
+  'ai.transforming':    { id: 'AI sedang memproses fotomu…', en: 'AI is transforming your photo…' },
+  'ai.transformingNote':{ id: 'Ini bisa memakan waktu 10–30 detik', en: 'This may take 10–30 seconds' },
+  'ai.errorGeneric':    { id: 'Transform gagal. Silakan coba lagi.', en: 'Transform failed. Please try again.' },
+  'ai.errorRateLimit':  { id: 'Batas transform AI tercapai. Coba lagi nanti.', en: 'AI transform limit reached. Try again later.' },
 
   // ── Editor toolbar ──────────────────────────────────────────────────────────
   'toolbar.undo':     { id: 'Urungkan', en: 'Undo' },

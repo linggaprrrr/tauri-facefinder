@@ -22,6 +22,7 @@ import { useLayoutFrames } from '../../hooks/useLayoutFrames';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import AiTransformPanel from './AiTransformPanel';
 import AiTransformPreview from './AiTransformPreview';
+import { useAiTemplates } from '../../hooks/useAiTemplates';
 
 // Desktop ceilings. On mobile these are overridden by the viewport (see component).
 const MAX_CANVAS_W = 780;
@@ -413,6 +414,7 @@ export default function PhotoEditor() {
   const outletId = state.deviceConfig?.outlet?.id ?? null;
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
+  const { templates: aiTemplates, loading: aiTemplatesLoading } = useAiTemplates(outletId);
 
   const frameSlots = isLayoutFrame ? (frame.slots ?? []) : [];
   const frameAspectRatio = isLayoutFrame ? (frame.aspectRatio ?? frame.aspect_ratio ?? null) : null;
@@ -549,6 +551,14 @@ export default function PhotoEditor() {
   function handleDone() {
     exportAndSave();
     navigate('/cart');
+  }
+
+  function handleAiApply(imageUrl) {
+    if (!currentPhoto) return;
+    dispatch({ type: 'UPDATE_PHOTO_SOURCE', payload: { id: currentPhoto.id, url: imageUrl } });
+    // Reset canvas orientation cache so the new image dims are measured fresh
+    delete orientationCache.current[currentPhoto.id];
+    setAiPreviewTemplate(null);
   }
 
   function handleStageClick(e) {
@@ -1073,7 +1083,7 @@ export default function PhotoEditor() {
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
-            {activePanel === 'ai'       && <AiTransformPanel onTransform={setAiPreviewTemplate} />}
+            {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onTransform={setAiPreviewTemplate} />}
 
             {!activePanel && (
               <div
@@ -1143,6 +1153,9 @@ export default function PhotoEditor() {
       {aiPreviewTemplate && (
         <AiTransformPreview
           template={aiPreviewTemplate}
+          currentPhoto={currentPhoto}
+          outletId={outletId}
+          onApply={handleAiApply}
           onDiscard={() => setAiPreviewTemplate(null)}
         />
       )}
