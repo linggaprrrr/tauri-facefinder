@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
+import { isTauri } from '../../native/print';
+import PrintModal from '../Print/PrintModal';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
 
@@ -34,6 +37,9 @@ export default function Download() {
   const navigate = useNavigate();
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
+  const [showPrint, setShowPrint] = useState(false);
+  // Paid-print add-on: only in the kiosk app, when enabled + a printer is set.
+  const canPrint = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName && selectedPhotos.length > 0;
 
   if (!order) {
     navigate('/');
@@ -148,6 +154,12 @@ export default function Download() {
               <DownloadIcon size={16} /> {t('download.downloadAll', { count: editedPhotos.length })}
             </button>
           </div>
+        )}
+
+        {canPrint && (
+          <Button variant="secondary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
+            <Printer size={20} /> {t('print.printBtn')}
+          </Button>
         )}
 
         <Button size="xl" onClick={handleRestart} className="w-full">
@@ -285,6 +297,16 @@ export default function Download() {
           {t('download.thanks')}
         </div>
       </div>
+
+      {showPrint && (
+        <PrintModal
+          photos={selectedPhotos}
+          photoEdits={photoEdits}
+          outletId={deviceConfig?.outlet?.id}
+          printerName={deviceConfig?.printerName}
+          onClose={() => setShowPrint(false)}
+        />
+      )}
     </div>
   );
 }
