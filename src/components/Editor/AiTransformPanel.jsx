@@ -72,20 +72,10 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
                 textAlign: 'left',
               }}
             >
-              {/* Before thumbnail */}
-              <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#000' }}>
-                {tpl.before_url
-                  ? <img src={tpl.before_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <div style={{ width: '100%', height: '100%', background: 'var(--color-neutral-200)' }} />}
-              </div>
-
-              {/* Arrow */}
-              <span style={{ fontSize: 10, color: 'var(--color-neutral-400)', flexShrink: 0 }}>→</span>
-
-              {/* After thumbnail */}
-              <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#000' }}>
+              {/* Result (after) thumbnail */}
+              <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: 'var(--color-neutral-100)' }}>
                 {tpl.after_url
-                  ? <img src={tpl.after_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <img src={tpl.after_url} alt={tpl.label} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : <div style={{ width: '100%', height: '100%', background: 'var(--color-neutral-200)' }} />}
               </div>
 
