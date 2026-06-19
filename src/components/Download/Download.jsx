@@ -57,7 +57,7 @@ export default function Download() {
   // Prefer the secure, unguessable download_token; fall back to trx_code so QRs
   // still work if the backend hasn't issued a token (older transactions).
   const downloadToken = order.download_token ?? trxCode;
-  const downloadUrl = `${DOWNLOAD_BASE}/myqr/${downloadToken}`;
+  const downloadUrl = `${DOWNLOAD_BASE}/myphotos/${downloadToken}`;
   const photos = order.photos ?? selectedPhotos ?? [];
   const finalPrice = order.final_price ?? order.total ?? selectedPhotos?.reduce((s, p) => s + p.price, 0) ?? 0;
   const discount = order.discount_amount ?? 0;
