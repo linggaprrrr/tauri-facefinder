@@ -36,7 +36,7 @@ export default function OrderRecovery({ order, onClose }) {
   function dismiss() { onClose(); }
   function finish() { clearPendingOrder(); onClose(); }
 
-  const pickupUrl = `${DOWNLOAD_BASE}/myqr/${order.trxCode}`;
+  const pickupUrl = `${DOWNLOAD_BASE}/myphotos/${order.trxCode}`;
 
   return (
     <div

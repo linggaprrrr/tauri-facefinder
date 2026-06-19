@@ -20,6 +20,7 @@ const initialState = {
   deviceConfig: loadDeviceConfig(), // persisted unit + outlet selection
   photoEdits: {},           // { [photoId]: { elements, filters, frame, dataUrl } }
   layoutEdits: {},          // { [frameId]: { slots, elements, dataUrl } }
+  aiTransformUsed: false,   // 1 free AI transform per session
 };
 
 function reducer(state, action) {
@@ -27,7 +28,43 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false };
+    case 'ADD_AI_PHOTO': {
+      // payload: { url } — adds AI-transformed photo as a new cart item (does not replace original)
+      const aiPhoto = {
+        id: crypto.randomUUID(),
+        url: action.payload.url,
+        proxyUrl: action.payload.url,
+        thumbnail: action.payload.url, // filmstrip renders p.thumbnail
+        price: action.payload.price ?? 0,
+        filename: action.payload.filename ?? 'AI Photo',
+        photo_id: action.payload.photoId ?? null, // real backend Photo id → checkout resolves it
+        sourcePhotoId: action.payload.sourcePhotoId ?? null,
+        isAiGenerated: true,
+      };
+      return {
+        ...state,
+        selectedPhotos: [...state.selectedPhotos, aiPhoto],
+        aiTransformUsed: true,
+      };
+    }
+    case 'ADD_COMPOSITE_PHOTO': {
+      // payload: { url, photoId } — a frame/collage render added as a new free cart item.
+      const composite = {
+        id: crypto.randomUUID(),
+        url: action.payload.url,
+        proxyUrl: action.payload.url,
+        thumbnail: action.payload.url,
+        price: 0,                                  // free, like AI photos
+        filename: action.payload.filename ?? 'Frame',
+        photo_id: action.payload.photoId ?? null,  // real backend Photo id → checkout resolves it
+        isComposite: true,
+      };
+      return {
+        ...state,
+        selectedPhotos: [...state.selectedPhotos, composite],
+      };
+    }
     case 'TOGGLE_PHOTO': {
       const exists = state.selectedPhotos.some((p) => p.id === action.payload.id);
       return {

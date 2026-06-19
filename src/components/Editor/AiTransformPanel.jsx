@@ -1,79 +1,8 @@
 import { useState } from 'react';
-import { Sparkles, Wand2 } from 'lucide-react';
+import { Sparkles, Wand2, Loader2 } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
-const CDN = 'https://s.magicaitool.com/nanobanana/prompts';
-
-// Template slugs match the Nano Banana CDN pattern:
-//   before → {CDN}/{slug}.webp
-//   after  → {CDN}/{slug}-effect.webp
-export const AI_TEMPLATES = [
-  {
-    id:         '3d-toy',
-    slug:       '3d-toy',
-    nameKey:    'ai.tpl.3dtoy',
-    emoji:      '🧸',
-    tag:        '3D',
-    tagColor:   { bg: '#eff6ff', color: '#2563eb' },
-    prompt:     'Q-version modern style, 3D toy, original character rendering, clever and cute, minimalist art style, with a cartoon aesthetic.',
-  },
-  {
-    id:         'ghibsky-illustration',
-    slug:       'ghibsky-illustration',
-    nameKey:    'ai.tpl.ghibsky',
-    emoji:      '🌸',
-    tag:        'Anime',
-    tagColor:   { bg: '#fdf4ff', color: '#9333ea' },
-    prompt:     'GHIBSKY style, dreamy watercolor sky, soft cumulus clouds, pastel gradient, gentle natural light, whimsical atmosphere.',
-  },
-  {
-    id:         'caricature-trend',
-    slug:       'caricature-trend',
-    nameKey:    'ai.tpl.caricature',
-    emoji:      '🎭',
-    tag:        'Fun',
-    tagColor:   { bg: '#fff7ed', color: '#ea580c' },
-    prompt:     'Humorous exaggerated caricature, oversized head features, vibrant colors, comic book style, playful and fun.',
-  },
-  {
-    id:         '3d-caricature',
-    slug:       '3d-caricature',
-    nameKey:    'ai.tpl.caricature3d',
-    emoji:      '🤪',
-    tag:        '3D',
-    tagColor:   { bg: '#eff6ff', color: '#2563eb' },
-    prompt:     'A highly stylized 3D caricature of this character, with expressive facial features and playful exaggeration. Rendered in a smooth, polished style with clean materials and soft ambient lighting. Bold color background to emphasize the character\'s charm and presence.',
-  },
-  {
-    id:         'halloween-poster',
-    slug:       'halloween-poster',
-    nameKey:    'ai.tpl.halloween',
-    emoji:      '🎃',
-    tag:        'Fun',
-    tagColor:   { bg: '#fff7ed', color: '#ea580c' },
-    prompt:     'Vintage Halloween poster with witch hat, cape, jack-o-lantern, diagonal dramatic background, and horror-themed text elements.',
-  },
-  {
-    id:         'ai-minecraft-filter',
-    slug:       'ai-minecraft-filter',
-    nameKey:    'ai.tpl.minecraft',
-    emoji:      '⛏️',
-    tag:        'Game',
-    tagColor:   { bg: '#f0fdf4', color: '#16a34a' },
-    prompt:     'Transform the source photo into an isometric 3-D voxel scene in Minecraft Pixel Art style. Preserve original composition, colors, pose and key details. Build everything with small cubes under bright neutral light. Each character\'s head is one solid cube with pixel eyes & mouth (no subdivisions); the rest of the body and environment use detailed voxels. Sharp edges, subtle AO, ultra-clean, 8K.',
-  },
-];
-
-// Derive CDN URLs — id === slug for all Nano Banana templates
-export function templateImages(tpl) {
-  const slug = tpl.slug ?? tpl.id;
-  return {
-    beforeImg: `${CDN}/${slug}.webp`,
-    afterImg:  `${CDN}/${slug}-effect.webp`,
-  };
-}
-
-export default function AiTransformPanel({ onTransform }) {
+export default function AiTransformPanel({ templates, loading, onGenerate, aiTransformUsed, generating, currentIsAi }) {
   const { t } = useLang();
   const [selected, setSelected] = useState(null);
 
@@ -83,74 +12,123 @@ export default function AiTransformPanel({ onTransform }) {
     border: '1px solid var(--color-neutral-100)',
   };
 
+  if (loading) {
+    return (
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
+          <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>
+            {t('ai.title')}
+          </h3>
+        </div>
+        <div className="flex flex-col gap-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl animate-pulse" style={{ background: 'var(--color-neutral-100)', height: 56 }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!templates.length) {
+    return (
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
+          <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>
+            {t('ai.title')}
+          </h3>
+        </div>
+        <p className="text-xs text-center py-6" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('ai.noTemplates')}
+        </p>
+      </div>
+    );
+  }
+
+  const disabled = !selected || aiTransformUsed || generating || currentIsAi;
+
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-4" style={panelStyle}>
+    <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
       {/* Header */}
       <div className="flex items-center gap-2">
         <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
         <h3 className="font-bold flex-1" style={{ color: 'var(--color-neutral-700)' }}>
           {t('ai.title')}
         </h3>
-        <span
-          className="text-xs font-bold px-2 py-0.5 rounded-full"
-          style={{ background: '#fff3cd', color: '#92400e' }}
-        >
-          {t('ai.comingSoon')}
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
+          background: aiTransformUsed ? 'var(--color-neutral-100)' : 'var(--color-primary-50)',
+          color: aiTransformUsed ? 'var(--color-neutral-400)' : 'var(--color-primary)',
+        }}>
+          {aiTransformUsed ? t('ai.used') : t('ai.free')}
         </span>
       </div>
 
-      <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
-        {t('ai.subtitle')}
-      </p>
-
-      {/* Template grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {AI_TEMPLATES.map((tpl) => {
+      {/* Template list — after thumbnail + label */}
+      <div className="flex flex-col gap-1.5">
+        {templates.map((tpl) => {
           const isActive = selected === tpl.id;
           return (
             <button
               key={tpl.id}
+              disabled={aiTransformUsed || generating || currentIsAi}
               onClick={() => setSelected(isActive ? null : tpl.id)}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all active:scale-95"
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: isActive ? 'var(--color-primary-50)' : 'var(--color-neutral-50)',
                 border: `2px solid ${isActive ? 'var(--color-primary)' : 'var(--color-neutral-200)'}`,
                 cursor: 'pointer',
+                textAlign: 'left',
               }}
             >
-              <span style={{ fontSize: 26, lineHeight: 1 }}>{tpl.emoji}</span>
+              {/* Result (after) thumbnail */}
+              <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: 'var(--color-neutral-100)' }}>
+                {tpl.after_url
+                  ? <img src={tpl.after_url} alt={tpl.label} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ width: '100%', height: '100%', background: 'var(--color-neutral-200)' }} />}
+              </div>
+
+              {/* Label */}
               <span
-                className="text-xs font-semibold text-center leading-tight"
+                className="text-xs font-semibold leading-tight flex-1 truncate"
                 style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-700)' }}
               >
-                {t(tpl.nameKey)}
-              </span>
-              <span
-                className="text-xs font-bold px-1.5 py-0.5 rounded-full"
-                style={tpl.tagColor}
-              >
-                {tpl.tag}
+                {tpl.label}
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* Preview button */}
+      {/* Hint */}
+      {currentIsAi ? (
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('ai.aiPhotoHint')}
+        </p>
+      ) : !aiTransformUsed && (
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('ai.generateNote')}
+        </p>
+      )}
+
+      {/* Generate button — fires background job, panel stays usable */}
       <button
-        disabled={!selected}
+        disabled={disabled}
         onClick={() => {
-          const tpl = AI_TEMPLATES.find((t) => t.id === selected);
-          if (tpl) onTransform(tpl);
+          const tpl = templates.find((t) => t.id === selected);
+          if (tpl) onGenerate(tpl);
         }}
         className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
-          background: selected ? 'var(--color-primary)' : 'var(--color-neutral-200)',
-          color: selected ? '#fff' : 'var(--color-neutral-400)',
+          background: !disabled ? 'var(--color-primary)' : 'var(--color-neutral-200)',
+          color: !disabled ? '#fff' : 'var(--color-neutral-400)',
         }}
       >
-        <Wand2 size={16} />
-        {t('ai.previewBtn')}
+        {generating ? (
+          <><Loader2 size={16} className="animate-spin" /> {t('ai.generating')}</>
+        ) : (
+          <><Wand2 size={16} /> {t('ai.generateBtn')}</>
+        )}
       </button>
     </div>
   );
