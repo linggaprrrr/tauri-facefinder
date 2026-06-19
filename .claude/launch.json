@@ -6,6 +6,15 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],
       "port": 5199
+    },
+    {
+      "name": "photo-download",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/linggapangestu/Documents/App/photo-download && npm run dev -- --port 5180 --strictPort"
+      ],
+      "port": 5180
     }
   ]
 }
