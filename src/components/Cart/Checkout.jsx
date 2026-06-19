@@ -80,9 +80,16 @@ export default function Checkout() {
     setStatus('creating');
     setErrorMsg('');
     try {
+      // Attach each output's edited render (stickers/text/filter) so the customer
+      // receives what they actually made. Collage/AI photos already carry their
+      // render as original_path, but any decoration on top lives in photoEdits.
+      const photosWithEdits = state.selectedPhotos.map((p) => ({
+        ...p,
+        edited_image: state.photoEdits[p.id]?.dataUrl ?? null,
+      }));
       const trx = await createTransaction({
         outletId: deviceConfig.outlet.id,
-        photos: state.selectedPhotos,
+        photos: photosWithEdits,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment

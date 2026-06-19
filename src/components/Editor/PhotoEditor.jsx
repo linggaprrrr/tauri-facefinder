@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
-  Plus, Minus, Pencil, MousePointer,
+  Plus, Minus, Pencil, MousePointer, Loader2,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
@@ -21,8 +21,10 @@ import { useStickers } from '../../hooks/useStickers';
 import { useLayoutFrames } from '../../hooks/useLayoutFrames';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import AiTransformPanel from './AiTransformPanel';
-import AiTransformPreview from './AiTransformPreview';
+import AiResultModal from './AiResultModal';
+import AiJobPill from './AiJobPill';
 import { useAiTemplates } from '../../hooks/useAiTemplates';
+import { aiTransform, createCompositePhoto, ApiError } from '../../api/mockApi';
 
 // Desktop ceilings. On mobile these are overridden by the viewport (see component).
 const MAX_CANVAS_W = 780;
@@ -391,8 +393,11 @@ export default function PhotoEditor() {
 
   const selectedPhotos = state.selectedPhotos;
   const photoEdits = state.photoEdits;
+  const aiTransformUsed = state.aiTransformUsed;
   const [photoIndex, setPhotoIndex] = useState(0);
   const currentPhoto = selectedPhotos[photoIndex];
+  // Derived photos (AI result, collage) can't be re-transformed or re-framed.
+  const currentIsDerived = !!(currentPhoto?.isAiGenerated || currentPhoto?.isComposite);
 
   const savedEditsRef = useRef({ ...state.photoEdits });
 
@@ -410,7 +415,11 @@ export default function PhotoEditor() {
   );
   const [activeSlot, setActiveSlot] = useState(null);
   const [showSlotPicker, setShowSlotPicker] = useState(false);
-  const [aiPreviewTemplate, setAiPreviewTemplate] = useState(null);
+  // Non-blocking AI job: { status:'pending'|'ready'|'error', template, originalUrl, resultUrl?, errorMsg? }
+  const [aiJob, setAiJob] = useState(null);
+  const [aiResultOpen, setAiResultOpen] = useState(false);
+  const aiJobRef = useRef(0);
+  const [committingFrame, setCommittingFrame] = useState(false); // collage → new output upload
   const outletId = state.deviceConfig?.outlet?.id ?? null;
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
@@ -478,8 +487,11 @@ export default function PhotoEditor() {
   const activeCanvas = isLayoutFrame ? layoutCanvasSize : canvas;
 
   function exportAndSave() {
+    // A layout frame (collage) is NOT a per-photo edit — it's committed as its own
+    // new output via commitCollage(). Never persist it onto the current photo.
+    if (isLayoutFrame) return undefined;
+
     const hasEdits =
-      isLayoutFrame ||
       elements.length > 0 ||
       (typeof frame === 'string' ? frame !== 'none' : !!frame) ||
       filters.brightness !== 0 ||
@@ -500,19 +512,48 @@ export default function PhotoEditor() {
       console.warn('Canvas export failed (cross-origin frame?):', e);
     }
 
-    if (isLayoutFrame) {
-      dispatch({ type: 'SET_LAYOUT_EDIT', payload: { frameId: frame.id, slots: layoutSlots, elements, dataUrl } });
-      if (dataUrl && currentPhoto) {
-        const edit = { elements, filters, frame, dataUrl };
-        savedEditsRef.current[currentPhoto.id] = edit;
-        dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
-      }
-    } else {
-      const edit = { elements, filters, frame, dataUrl };
-      savedEditsRef.current[currentPhoto.id] = edit;
-      dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
-    }
+    const edit = { elements, filters, frame, dataUrl };
+    savedEditsRef.current[currentPhoto.id] = edit;
+    dispatch({ type: 'SET_PHOTO_EDIT', payload: { id: currentPhoto.id, data: edit } });
     return dataUrl;
+  }
+
+  // Commit the in-progress collage as a NEW free output. Uploads the render so the
+  // backend persists it as a Photo; originals are left untouched.
+  async function commitCollage() {
+    if (!isLayoutFrame || committingFrame) return;
+    let dataUrl;
+    try {
+      dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+    } catch (e) {
+      console.warn('Collage export failed (cross-origin?):', e);
+    }
+    if (!dataUrl) return;
+
+    setCommittingFrame(true);
+    try {
+      const result = await createCompositePhoto({
+        outletId,
+        sourcePhotoId: currentPhoto?.photo_id ?? null,
+        imageBase64: dataUrl,
+      });
+      const newIndex = selectedPhotos.length; // appended at end by ADD_COMPOSITE_PHOTO
+      dispatch({
+        type: 'ADD_COMPOSITE_PHOTO',
+        payload: { url: result.image_url, photoId: result.photo_id, filename: frame?.label ? `Frame · ${frame.label}` : 'Frame' },
+      });
+      // Reset the frame on the current photo and jump to the new collage output.
+      setFrame('none');
+      setLayoutSlots([]);
+      setSelectedId(null);
+      setActivePanel('stickers');
+      setPhotoIndex(newIndex);
+    } catch (err) {
+      console.error('Failed to commit collage:', err);
+      window.alert(t('frame.commitError'));
+    } finally {
+      setCommittingFrame(false);
+    }
   }
 
   function updateLayoutSlot(slotIdx, patch) {
@@ -553,12 +594,70 @@ export default function PhotoEditor() {
     navigate('/cart');
   }
 
-  function handleAiApply(imageUrl) {
-    if (!currentPhoto) return;
-    dispatch({ type: 'UPDATE_PHOTO_SOURCE', payload: { id: currentPhoto.id, url: imageUrl } });
-    // Reset canvas orientation cache so the new image dims are measured fresh
-    delete orientationCache.current[currentPhoto.id];
-    setAiPreviewTemplate(null);
+  // Kick off a background AI generation. Customer keeps editing while it runs.
+  async function startAiJob(template) {
+    if (aiJob?.status === 'pending' || aiTransformUsed || currentIsDerived) return;
+    // Always source the clean original photo — never the manually-edited canvas
+    // (stickers/frames) and never another AI result.
+    const originalUrl = currentPhoto?.url ?? currentPhoto?.proxyUrl;
+    const jobId = ++aiJobRef.current;
+    const sourcePhotoId = currentPhoto?.photo_id ?? null;
+    setAiResultOpen(false);
+    setAiJob({ status: 'pending', template, originalUrl });
+    try {
+      const result = await aiTransform({ outletId, photoUrl: originalUrl, templateId: template.id, sourcePhotoId });
+      if (aiJobRef.current !== jobId) return; // superseded / dismissed
+      setAiJob({ status: 'ready', template, originalUrl, resultUrl: result.image_url, resultPhotoId: result.photo_id ?? null });
+      setAiResultOpen(true);
+    } catch (err) {
+      if (aiJobRef.current !== jobId) return;
+      // Quota is never consumed here — only acceptAiResult() spends it. A failed
+      // generation always leaves the free transform available for another try.
+      let msg = t('ai.errorGeneric');
+      let canRetry = true; // transient errors (network/timeout) are worth retrying
+      if (err instanceof ApiError && err.kind === 'rate_limit') {
+        msg = t('ai.errorRateLimit');
+        canRetry = false;
+      } else if (err instanceof ApiError && err.status === 502) {
+        // Backend couldn't produce an image (Gemini refused / returned nothing).
+        // Retrying the same template+photo won't help — guide to another choice.
+        msg = t('ai.errorTemplate');
+        canRetry = false;
+      }
+      setAiJob({ status: 'error', template, originalUrl, errorMsg: msg, canRetry });
+    }
+  }
+
+  // Keep the result — only HERE is the free transform consumed.
+  function acceptAiResult() {
+    if (aiJob?.status !== 'ready') return;
+    const newIndex = selectedPhotos.length; // appended at end by ADD_AI_PHOTO
+    dispatch({
+      type: 'ADD_AI_PHOTO',
+      payload: {
+        url: aiJob.resultUrl,
+        photoId: aiJob.resultPhotoId,   // real Photo row id from the backend → checkout works
+        price: 0,                        // AI photo is free; the free transform covers it
+        filename: aiJob.template?.label ? `AI · ${aiJob.template.label}` : 'AI Photo',
+        sourcePhotoId: currentPhoto?.photo_id ?? null,
+      },
+    });
+    aiJobRef.current++;
+    setAiResultOpen(false);
+    setAiJob(null);
+    setPhotoIndex(newIndex); // jump to the new AI photo so the customer sees it
+  }
+
+  // Discard / try another / dismiss — does NOT consume the free transform.
+  function dismissAiJob() {
+    aiJobRef.current++; // invalidate any in-flight request
+    setAiResultOpen(false);
+    setAiJob(null);
+  }
+
+  function retryAiJob() {
+    const tpl = aiJob?.template;
+    if (tpl) startAiJob(tpl);
   }
 
   function handleStageClick(e) {
@@ -976,6 +1075,32 @@ export default function PhotoEditor() {
             })}
           </div>
 
+          {/* ── Collage commit bar — turns the frame into a NEW output ── */}
+          {isLayoutFrame && (() => {
+            const filled = layoutSlots.filter((s) => s?.photoId).length;
+            const ready = frameSlots.length > 0 && filled === frameSlots.length; // all slots required
+            return (
+              <div
+                className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl shrink-0"
+                style={{ background: '#fff', border: '1.5px solid var(--color-primary-200)', boxShadow: 'var(--shadow-sm)' }}
+              >
+                <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-500)' }}>
+                  {t('frame.slotsFilled', { filled, total: frameSlots.length })}
+                </span>
+                <button
+                  disabled={!ready || committingFrame}
+                  onClick={commitCollage}
+                  className="py-2.5 px-4 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: ready ? 'var(--color-primary)' : 'var(--color-neutral-200)', color: ready ? '#fff' : 'var(--color-neutral-400)' }}
+                >
+                  {committingFrame
+                    ? <><Loader2 size={16} className="animate-spin" /> {t('frame.saving')}</>
+                    : <><Check size={16} /> {t('frame.saveAsNew')}</>}
+                </button>
+              </div>
+            );
+          })()}
+
           {/* ── Filmstrip: horizontal photo queue below canvas ── */}
           <div
             className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 shrink-0 rounded-xl"
@@ -1083,7 +1208,7 @@ export default function PhotoEditor() {
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
-            {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onTransform={setAiPreviewTemplate} />}
+            {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} />}
 
             {!activePanel && (
               <div
@@ -1150,13 +1275,25 @@ export default function PhotoEditor() {
         />
       )}
 
-      {aiPreviewTemplate && (
-        <AiTransformPreview
-          template={aiPreviewTemplate}
-          currentPhoto={currentPhoto}
-          outletId={outletId}
-          onApply={handleAiApply}
-          onDiscard={() => setAiPreviewTemplate(null)}
+      {/* Result reveal — opens automatically when the background job finishes */}
+      {aiResultOpen && aiJob?.status === 'ready' && (
+        <AiResultModal
+          originalUrl={aiJob.originalUrl}
+          resultUrl={aiJob.resultUrl}
+          label={aiJob.template?.label}
+          onUse={acceptAiResult}
+          onTryAnother={dismissAiJob}
+          onClose={() => setAiResultOpen(false)}
+        />
+      )}
+
+      {/* Floating status pill — pending / error / ready-but-dismissed */}
+      {aiJob && !(aiResultOpen && aiJob.status === 'ready') && (
+        <AiJobPill
+          job={aiJob}
+          onView={() => setAiResultOpen(true)}
+          onRetry={retryAiJob}
+          onDismiss={dismissAiJob}
         />
       )}
     </div>

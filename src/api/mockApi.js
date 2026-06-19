@@ -114,7 +114,9 @@ export async function createTransaction({ outletId, photos }) {
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
     body: JSON.stringify({
       device_id: outletId,
-      photos: photos.map((p) => ({ photo_id: p.photo_id })),
+      // edited_image (base64 render) is persisted so the customer receives what
+      // they actually made — stickers/text/filter, or a framed collage on top.
+      photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
     }),
   });
 
@@ -235,7 +237,21 @@ export async function getAiTemplates(outletId, etag = null) {
   };
 }
 
-export async function aiTransform({ outletId, photoUrl, templateId }, timeoutMs = 120000) {
+// Persist a client-rendered frame/collage as a free Photo. Returns { image_url, photo_id }.
+export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase64 }) {
+  const res = await fetch(`${API_BASE}/kiosk-render/composite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({ device_id: outletId, source_photo_id: sourcePhotoId ?? null, image_base64: imageBase64 }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError('server', body.detail ?? `Server error ${res.status}`, res.status);
+  }
+  return res.json(); // { image_url, photo_id }
+}
+
+export async function aiTransform({ outletId, photoUrl, templateId, sourcePhotoId }, timeoutMs = 120000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res;
@@ -244,7 +260,7 @@ export async function aiTransform({ outletId, photoUrl, templateId }, timeoutMs 
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
       signal: controller.signal,
-      body: JSON.stringify({ device_id: outletId, photo_url: photoUrl, template_id: templateId }),
+      body: JSON.stringify({ device_id: outletId, photo_url: photoUrl, template_id: templateId, source_photo_id: sourcePhotoId ?? null }),
     });
   } catch (e) {
     throw new ApiError(e.name === 'AbortError' ? 'timeout' : 'network', 'AI transform request failed');

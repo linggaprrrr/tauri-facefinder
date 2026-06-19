@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Sparkles, Wand2 } from 'lucide-react';
+import { Sparkles, Wand2, Loader2 } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
-export default function AiTransformPanel({ templates, loading, onTransform }) {
+export default function AiTransformPanel({ templates, loading, onGenerate, aiTransformUsed, generating, currentIsAi }) {
   const { t } = useLang();
   const [selected, setSelected] = useState(null);
 
@@ -46,6 +46,8 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
     );
   }
 
+  const disabled = !selected || aiTransformUsed || generating || currentIsAi;
+
   return (
     <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
       {/* Header */}
@@ -54,17 +56,24 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
         <h3 className="font-bold flex-1" style={{ color: 'var(--color-neutral-700)' }}>
           {t('ai.title')}
         </h3>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{
+          background: aiTransformUsed ? 'var(--color-neutral-100)' : 'var(--color-primary-50)',
+          color: aiTransformUsed ? 'var(--color-neutral-400)' : 'var(--color-primary)',
+        }}>
+          {aiTransformUsed ? t('ai.used') : t('ai.free')}
+        </span>
       </div>
 
-      {/* Template list — before/after thumbnails + label */}
+      {/* Template list — after thumbnail + label */}
       <div className="flex flex-col gap-1.5">
         {templates.map((tpl) => {
           const isActive = selected === tpl.id;
           return (
             <button
               key={tpl.id}
+              disabled={aiTransformUsed || generating || currentIsAi}
               onClick={() => setSelected(isActive ? null : tpl.id)}
-              className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all active:scale-95"
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: isActive ? 'var(--color-primary-50)' : 'var(--color-neutral-50)',
                 border: `2px solid ${isActive ? 'var(--color-primary)' : 'var(--color-neutral-200)'}`,
@@ -91,21 +100,35 @@ export default function AiTransformPanel({ templates, loading, onTransform }) {
         })}
       </div>
 
-      {/* Apply button */}
+      {/* Hint */}
+      {currentIsAi ? (
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('ai.aiPhotoHint')}
+        </p>
+      ) : !aiTransformUsed && (
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          {t('ai.generateNote')}
+        </p>
+      )}
+
+      {/* Generate button — fires background job, panel stays usable */}
       <button
-        disabled={!selected}
+        disabled={disabled}
         onClick={() => {
           const tpl = templates.find((t) => t.id === selected);
-          if (tpl) onTransform(tpl);
+          if (tpl) onGenerate(tpl);
         }}
         className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
-          background: selected ? 'var(--color-primary)' : 'var(--color-neutral-200)',
-          color: selected ? '#fff' : 'var(--color-neutral-400)',
+          background: !disabled ? 'var(--color-primary)' : 'var(--color-neutral-200)',
+          color: !disabled ? '#fff' : 'var(--color-neutral-400)',
         }}
       >
-        <Wand2 size={16} />
-        {t('ai.previewBtn')}
+        {generating ? (
+          <><Loader2 size={16} className="animate-spin" /> {t('ai.generating')}</>
+        ) : (
+          <><Wand2 size={16} /> {t('ai.generateBtn')}</>
+        )}
       </button>
     </div>
   );
