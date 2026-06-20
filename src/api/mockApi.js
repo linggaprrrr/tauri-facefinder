@@ -238,11 +238,17 @@ export async function getAiTemplates(outletId, etag = null) {
 }
 
 // Persist a client-rendered frame/collage as a free Photo. Returns { image_url, photo_id }.
-export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase64 }) {
+export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase64, templateId, stickerIds }) {
   const res = await fetch(`${API_BASE}/kiosk-render/composite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
-    body: JSON.stringify({ device_id: outletId, source_photo_id: sourcePhotoId ?? null, image_base64: imageBase64 }),
+    body: JSON.stringify({
+      device_id: outletId,
+      source_photo_id: sourcePhotoId ?? null,
+      image_base64: imageBase64,
+      template_id: templateId ?? null,
+      sticker_ids: stickerIds ?? null,
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

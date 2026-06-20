@@ -263,6 +263,11 @@ export const translations = {
   'ai.aiPhotoHint':     { id: 'Foto ini sudah hasil olahan. Pilih foto asli untuk membuat transform AI.', en: 'This is already a generated photo. Pick an original photo to run an AI transform.' },
   'ai.errorTemplate':   { id: 'Gaya ini tidak bisa dipakai untuk foto ini. Kuota gratismu masih utuh — coba gaya lain atau pilih foto lain.', en: "This style can't be used for this photo. Your free transform is still available — try another style or pick a different photo." },
   'ai.pickAnotherBtn':  { id: 'Pilih Gaya Lain', en: 'Pick another style' },
+  'ai.previewTitle':    { id: 'Contoh hasil gaya ini', en: 'Example of this style' },
+  'ai.previewNote':     { id: 'Ini adalah contoh hasil — fotomu sendiri akan diubah saat kamu konfirmasi. Kuota gratis dipakai setelah kamu simpan hasilnya.', en: 'This is a sample result — your actual photo will be transformed when you confirm. Free quota is used only when you keep the result.' },
+  'ai.noSampleNote':    { id: 'Belum ada contoh gambar untuk gaya ini. AI akan mengubah fotomu menggunakan gaya yang dipilih.', en: 'No sample image for this style yet. AI will transform your photo using the selected style.' },
+  'ai.confirmGenerate': { id: 'Ya, Buat Foto AI', en: 'Yes, generate AI photo' },
+  'ai.cancelGenerate':  { id: 'Batal', en: 'Cancel' },
 
   // ── Editor toolbar ──────────────────────────────────────────────────────────
   'toolbar.undo':     { id: 'Urungkan', en: 'Undo' },

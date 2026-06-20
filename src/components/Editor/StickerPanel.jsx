@@ -11,9 +11,9 @@ export default function StickerPanel({ onAdd, stickers = [], loading = false }) 
   const { t } = useLang();
   function handleAdd(s) {
     if (s.type === 'emoji') {
-      onAdd(emojiToDataUri(s.value));
+      onAdd({ src: emojiToDataUri(s.value), stickerId: s.id });
     } else {
-      onAdd(s.url);
+      onAdd({ src: s.url, stickerId: s.id });
     }
   }
 

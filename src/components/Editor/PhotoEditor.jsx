@@ -532,10 +532,15 @@ export default function PhotoEditor() {
 
     setCommittingFrame(true);
     try {
+      const stickerIds = [...new Set(
+        elements.filter((el) => el.type === 'sticker' && el.stickerId).map((el) => el.stickerId)
+      )];
       const result = await createCompositePhoto({
         outletId,
         sourcePhotoId: currentPhoto?.photo_id ?? null,
         imageBase64: dataUrl,
+        templateId: isLayoutFrame ? frame.id : null,
+        stickerIds: stickerIds.length ? stickerIds : null,
       });
       const newIndex = selectedPhotos.length; // appended at end by ADD_COMPOSITE_PHOTO
       dispatch({
@@ -671,10 +676,11 @@ export default function PhotoEditor() {
     pushHistory(updated);
   }, [elements, pushHistory]);
 
-  function addSticker(src) {
+  function addSticker({ src, stickerId }) {
     pushHistory([...elements, {
       id: `sticker-${Date.now()}`,
       type: 'sticker',
+      stickerId: stickerId ?? null,
       attrs: { src, x: 100, y: 100, width: 120, height: 120, rotation: 0 },
     }]);
   }
