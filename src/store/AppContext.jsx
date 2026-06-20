@@ -21,6 +21,7 @@ const initialState = {
   photoEdits: {},           // { [photoId]: { elements, filters, frame, dataUrl } }
   layoutEdits: {},          // { [frameId]: { slots, elements, dataUrl } }
   aiTransformUsed: false,   // 1 free AI transform per session
+  aiJob: null,              // in-flight or ready AI job — survives navigation
 };
 
 function reducer(state, action) {
@@ -28,7 +29,9 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null };
+    case 'SET_AI_JOB':
+      return { ...state, aiJob: action.payload };
     case 'ADD_AI_PHOTO': {
       // payload: { url } — adds AI-transformed photo as a new cart item (does not replace original)
       const aiPhoto = {
