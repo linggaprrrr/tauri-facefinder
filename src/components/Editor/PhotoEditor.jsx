@@ -371,6 +371,10 @@ const SIDEBAR_TOOLS = [
   { id: 'ai',       icon: Sparkles,          labelKey: 'editor.tabAi' },
 ];
 
+// Module-level counter so in-flight AI promises are correctly superseded even
+// when PhotoEditor unmounts and remounts (navigation away and back).
+const aiJobRef = { current: 0 };
+
 export default function PhotoEditor() {
   const { state, dispatch } = useApp();
   const { t } = useLang();
@@ -394,6 +398,7 @@ export default function PhotoEditor() {
   const selectedPhotos = state.selectedPhotos;
   const photoEdits = state.photoEdits;
   const aiTransformUsed = state.aiTransformUsed;
+  const aiJob = state.aiJob;
   const [photoIndex, setPhotoIndex] = useState(0);
   const currentPhoto = selectedPhotos[photoIndex];
   // Derived photos (AI result, collage) can't be re-transformed or re-framed.
@@ -415,11 +420,15 @@ export default function PhotoEditor() {
   );
   const [activeSlot, setActiveSlot] = useState(null);
   const [showSlotPicker, setShowSlotPicker] = useState(false);
-  // Non-blocking AI job: { status:'pending'|'ready'|'error', template, originalUrl, resultUrl?, errorMsg? }
-  const [aiJob, setAiJob] = useState(null);
+  // aiJob lives in global state (AppContext) — survives navigation away and back.
   const [aiResultOpen, setAiResultOpen] = useState(false);
-  const aiJobRef = useRef(0);
+  const [showDoneWarning, setShowDoneWarning] = useState(false);
   const [committingFrame, setCommittingFrame] = useState(false); // collage → new output upload
+
+  // When navigating back to the editor with a completed AI job, re-open the result modal.
+  useEffect(() => {
+    if (aiJob?.status === 'ready') setAiResultOpen(true);
+  }, [aiJob?.status]);
   const outletId = state.deviceConfig?.outlet?.id ?? null;
   const { stickers, loading: stickersLoading } = useStickers(outletId);
   const { layoutFrames, loading: layoutFramesLoading } = useLayoutFrames(outletId);
@@ -595,6 +604,16 @@ export default function PhotoEditor() {
   }
 
   function handleDone() {
+    if (aiJob?.status === 'pending') {
+      setShowDoneWarning(true);
+      return;
+    }
+    exportAndSave();
+    navigate('/cart');
+  }
+
+  function confirmDone() {
+    setShowDoneWarning(false);
     exportAndSave();
     navigate('/cart');
   }
@@ -608,11 +627,11 @@ export default function PhotoEditor() {
     const jobId = ++aiJobRef.current;
     const sourcePhotoId = currentPhoto?.photo_id ?? null;
     setAiResultOpen(false);
-    setAiJob({ status: 'pending', template, originalUrl });
+    dispatch({ type: 'SET_AI_JOB', payload: { status: 'pending', template, originalUrl } });
     try {
       const result = await aiTransform({ outletId, photoUrl: originalUrl, templateId: template.id, sourcePhotoId });
       if (aiJobRef.current !== jobId) return; // superseded / dismissed
-      setAiJob({ status: 'ready', template, originalUrl, resultUrl: result.image_url, resultPhotoId: result.photo_id ?? null });
+      dispatch({ type: 'SET_AI_JOB', payload: { status: 'ready', template, originalUrl, resultUrl: result.image_url, resultPhotoId: result.photo_id ?? null } });
       setAiResultOpen(true);
     } catch (err) {
       if (aiJobRef.current !== jobId) return;
@@ -620,7 +639,10 @@ export default function PhotoEditor() {
       // generation always leaves the free transform available for another try.
       let msg = t('ai.errorGeneric');
       let canRetry = true; // transient errors (network/timeout) are worth retrying
-      if (err instanceof ApiError && err.kind === 'rate_limit') {
+      if (err instanceof ApiError && err.kind === 'timeout') {
+        msg = t('ai.errorTimeout');
+        canRetry = true;
+      } else if (err instanceof ApiError && err.kind === 'rate_limit') {
         msg = t('ai.errorRateLimit');
         canRetry = false;
       } else if (err instanceof ApiError && err.status === 502) {
@@ -629,7 +651,7 @@ export default function PhotoEditor() {
         msg = t('ai.errorTemplate');
         canRetry = false;
       }
-      setAiJob({ status: 'error', template, originalUrl, errorMsg: msg, canRetry });
+      dispatch({ type: 'SET_AI_JOB', payload: { status: 'error', template, originalUrl, errorMsg: msg, canRetry } });
     }
   }
 
@@ -649,7 +671,7 @@ export default function PhotoEditor() {
     });
     aiJobRef.current++;
     setAiResultOpen(false);
-    setAiJob(null);
+    dispatch({ type: 'SET_AI_JOB', payload: null });
     setPhotoIndex(newIndex); // jump to the new AI photo so the customer sees it
   }
 
@@ -657,7 +679,7 @@ export default function PhotoEditor() {
   function dismissAiJob() {
     aiJobRef.current++; // invalidate any in-flight request
     setAiResultOpen(false);
-    setAiJob(null);
+    dispatch({ type: 'SET_AI_JOB', payload: null });
   }
 
   function retryAiJob() {
@@ -1301,6 +1323,44 @@ export default function PhotoEditor() {
           onRetry={retryAiJob}
           onDismiss={dismissAiJob}
         />
+      )}
+
+      {/* Confirmation overlay — shown when customer clicks Done while AI is still processing */}
+      {showDoneWarning && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="rounded-3xl p-7 flex flex-col gap-5 w-full"
+            style={{ background: '#fff', maxWidth: 400, boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+                <Loader2 size={15} className="animate-spin" /> {t('ai.pendingWarningTitle')}
+              </div>
+              <p className="text-base font-semibold leading-snug" style={{ color: 'var(--color-neutral-900)' }}>
+                {t('ai.pendingWarning')}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmDone}
+                className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+              >
+                {t('ai.pendingWarningConfirm')}
+              </button>
+              <button
+                onClick={() => setShowDoneWarning(false)}
+                className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
+              >
+                {t('ai.pendingWarningCancel')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

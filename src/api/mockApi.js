@@ -257,7 +257,7 @@ export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase6
   return res.json(); // { image_url, photo_id }
 }
 
-export async function aiTransform({ outletId, photoUrl, templateId, sourcePhotoId }, timeoutMs = 120000) {
+export async function aiTransform({ outletId, photoUrl, templateId, sourcePhotoId }, timeoutMs = 300000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res;
