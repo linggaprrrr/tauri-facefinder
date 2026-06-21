@@ -403,6 +403,8 @@ export default function PhotoEditor() {
   const currentPhoto = selectedPhotos[photoIndex];
   // Derived photos (AI result, collage) can't be re-transformed or re-framed.
   const currentIsDerived = !!(currentPhoto?.isAiGenerated || currentPhoto?.isComposite);
+  // face_count comes from the search-by-face response (total faces in photo from photo_faces table).
+  const currentPhotoFaceCount = currentPhoto?.face_count ?? 1;
 
   const savedEditsRef = useRef({ ...state.photoEdits });
 
@@ -1236,7 +1238,7 @@ export default function PhotoEditor() {
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
-            {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} />}
+            {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} faceCount={currentPhotoFaceCount} />}
 
             {!activePanel && (
               <div
