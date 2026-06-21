@@ -86,6 +86,7 @@ export async function scanFace(base64Image, timeoutMs = 20000) {
     bounding_box: item.bounding_box,
     uploaded_at: item.uploaded_at,
     price: item.photo_price ?? 0,
+    face_count: item.face_count ?? 1,
   }));
 
   return { photos };

@@ -403,11 +403,8 @@ export default function PhotoEditor() {
   const currentPhoto = selectedPhotos[photoIndex];
   // Derived photos (AI result, collage) can't be re-transformed or re-framed.
   const currentIsDerived = !!(currentPhoto?.isAiGenerated || currentPhoto?.isComposite);
-  // Count faces in the current photo from search results already in state.
-  // state.photos has one entry per photo_face, so same photo_id N times = N faces.
-  const currentPhotoFaceCount = currentPhoto?.photo_id
-    ? state.photos.filter(p => p.photo_id === currentPhoto.photo_id).length
-    : 1;
+  // face_count comes from the search-by-face response (total faces in photo from photo_faces table).
+  const currentPhotoFaceCount = currentPhoto?.face_count ?? 1;
 
   const savedEditsRef = useRef({ ...state.photoEdits });
 
