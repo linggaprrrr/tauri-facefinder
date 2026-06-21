@@ -3,7 +3,7 @@ import { Sparkles, Wand2, Loader2 } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 import AiPreviewModal from './AiPreviewModal';
 
-export default function AiTransformPanel({ templates, loading, onGenerate, aiTransformUsed, generating, currentIsAi }) {
+export default function AiTransformPanel({ templates, loading, onGenerate, aiTransformUsed, generating, currentIsAi, faceCount = 1 }) {
   const { t } = useLang();
   const [selected, setSelected] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null); // template shown in preview modal
@@ -49,6 +49,9 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
   }
 
   const disabled = !selected || aiTransformUsed || generating || currentIsAi;
+
+  const selectedTpl = templates.find((t) => t.id === selected) ?? null;
+  const faceWarning = selectedTpl?.max_persons && faceCount > selectedTpl.max_persons;
 
   function handleGenerateClick() {
     const tpl = templates.find((t) => t.id === selected);
@@ -114,6 +117,13 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
             );
           })}
         </div>
+
+        {/* Face count warning — inline, non-blocking */}
+        {faceWarning && (
+          <p className="text-xs leading-snug" style={{ color: '#d97706' }}>
+            ⚠ Kami mendeteksi {faceCount} orang di foto ini. Template ini dirancang untuk {selectedTpl.max_persons} orang. Tetap bisa digunakan, hasilnya mungkin kurang optimal.
+          </p>
+        )}
 
         {/* Hint */}
         {currentIsAi ? (
