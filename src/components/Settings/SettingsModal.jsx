@@ -30,6 +30,13 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [testMsg, setTestMsg] = useState(null); // null | 'sent' | 'fail'
   const [testing, setTesting] = useState(false);
 
+  // Receipt printing — a separate physical printer (thermal) from the photo
+  // printer above, so its own picker/test controls, independent of printEnabled
+  // (that toggle is the outlet's paid-photo-print business setting, not this).
+  const [receiptPrinterName, setReceiptPrinterName] = useState(state.deviceConfig.receiptPrinterName ?? '');
+  const [receiptTestMsg, setReceiptTestMsg] = useState(null);
+  const [receiptTesting, setReceiptTesting] = useState(false);
+
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -70,7 +77,7 @@ export default function SettingsModal({ onClose, forced = false }) {
     setOutlets([]);
     setError('');
     try {
-      const data = await getOutletsByUnit(unitId);
+      const data = await getOutletsByUnit(unitId, { isKiosk: true });
       setOutlets(data);
     } catch {
       setError(t('settings.errOutlets'));
@@ -106,23 +113,25 @@ export default function SettingsModal({ onClose, forced = false }) {
     return () => { cancelled = true; clearTimeout(id); };
   }, [step]);
 
-  async function handleTestPrint() {
-    setTesting(true);
-    setTestMsg(null);
+  async function testPrinter(name, setBusy, setMsg) {
+    setBusy(true);
+    setMsg(null);
     try {
-      await printImage(printerName, makeTestImageDataUrl(), 1);
-      setTestMsg('sent');
+      await printImage(name, makeTestImageDataUrl(), 1);
+      setMsg('sent');
     } catch {
-      setTestMsg('fail');
+      setMsg('fail');
     } finally {
-      setTesting(false);
+      setBusy(false);
     }
   }
+  const handleTestPrint = () => testPrinter(printerName, setTesting, setTestMsg);
+  const handleTestReceiptPrint = () => testPrinter(receiptPrinterName, setReceiptTesting, setReceiptTestMsg);
 
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, receiptPrinterName } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -169,7 +178,7 @@ export default function SettingsModal({ onClose, forced = false }) {
           </div>
         )}
 
-        <div className="px-6 py-6">
+        <div className="px-6 py-6 overflow-y-auto" style={{ maxHeight: '65vh' }}>
           {/* ── Step 1: Auth ── */}
           {step === 'auth' && (
             <form onSubmit={handleAuth} className="flex flex-col gap-4">
@@ -358,6 +367,56 @@ export default function SettingsModal({ onClose, forced = false }) {
                       )}
                     </>
                   )}
+
+                  {/* ── Receipt printer (thermal, separate device) ── */}
+                  <div className="flex flex-col gap-2 pt-3 mt-1" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
+                    <label className="font-semibold text-sm flex items-center gap-1.5" style={{ color: 'var(--color-neutral-700)' }}>
+                      <Printer size={16} /> {t('settings.receiptPrinter')}
+                    </label>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <select
+                          value={receiptPrinterName}
+                          onChange={(e) => { setReceiptPrinterName(e.target.value); setReceiptTestMsg(null); }}
+                          className="border rounded-lg px-3 py-2.5 text-sm w-full outline-none focus:ring-2"
+                          style={{ borderColor: 'var(--color-neutral-300)', '--tw-ring-color': 'var(--color-primary)' }}
+                        >
+                          <option value="">
+                            {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
+                          </option>
+                          {printers.map((p) => (
+                            <option key={p.name} value={p.name}>
+                              {p.name}{p.is_default ? ' (default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setPrintersLoading(true); listPrinters().then(setPrinters).finally(() => setPrintersLoading(false)); }}
+                        title={t('settings.refreshPrinters')}
+                        aria-label={t('settings.refreshPrinters')}
+                        className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
+                      >
+                        <RefreshCw size={16} className={printersLoading ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTestReceiptPrint}
+                      disabled={!receiptPrinterName || receiptTesting}
+                      className="text-sm font-semibold py-2 rounded-lg disabled:opacity-50"
+                      style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                    >
+                      {receiptTesting ? '…' : t('settings.testPrint')}
+                    </button>
+                    {receiptTestMsg && (
+                      <p className="text-xs text-center" style={{ color: receiptTestMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
+                        {t(receiptTestMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 

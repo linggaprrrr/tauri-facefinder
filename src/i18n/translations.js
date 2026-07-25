@@ -125,11 +125,11 @@ export const translations = {
   'access.recommended': { id: 'Disarankan', en: 'Recommended' },
   'access.emptyTitle':  { id: 'Belum ada cara pengambilan', en: 'No access methods available' },
   'access.emptyHelp':   { id: 'Hubungi petugas di {phone}', en: 'Please contact staff at {phone}' },
-  'method.qris.title':  { id: 'Bayar dengan QRIS', en: 'Pay with QRIS' },
+  'method.qris.title':  { id: 'QRIS', en: 'QRIS' },
   'method.qris.desc':   { id: 'Scan dengan e-wallet atau mobile banking', en: 'Scan with your e-wallet or mobile banking' },
-  'method.ticket.title': { id: 'Tiket Event', en: 'Event Ticket' },
+  'method.ticket.title': { id: 'Scan Tiket', en: 'Scan Ticket' },
   'method.ticket.desc':  { id: 'Pindai tiket dari penyelenggara acara', en: 'Scan the ticket from your event organiser' },
-  'method.voucher.title': { id: 'Voucher Promo', en: 'Promo Voucher' },
+  'method.voucher.title': { id: 'Gunakan Voucher', en: 'Use Voucher' },
   'method.voucher.desc':  { id: 'Pindai atau ketik kode voucher Anda', en: 'Scan or type your voucher code' },
 
   // ── Scan runner (Event Ticket / Promo Voucher) ──────────────────────────────
@@ -193,6 +193,9 @@ export const translations = {
   'download.qris':           { id: 'QRIS', en: 'QRIS' },
   'download.paid':           { id: 'Lunas', en: 'Paid' },
   'download.thanks':         { id: 'Terima kasih telah menggunakan Ownize AI Studio!', en: 'Thank you for using Ownize AI Studio!' },
+  'download.printReceipt':   { id: 'Cetak Struk', en: 'Print Receipt' },
+  'download.printingReceipt':{ id: 'Mencetak struk…', en: 'Printing receipt…' },
+  'download.receiptFail':    { id: 'Gagal mencetak struk', en: "Couldn't print receipt" },
 
   // ── Settings ────────────────────────────────────────────────────────────────
   'settings.wrongCode':      { id: 'Kode perangkat salah.', en: 'Wrong device code.' },
@@ -227,6 +230,7 @@ export const translations = {
   'settings.testPrint':      { id: 'Tes Cetak', en: 'Test Print' },
   'settings.testPrintSent':  { id: 'Terkirim ke printer ✓', en: 'Sent to printer ✓' },
   'settings.testPrintFail':  { id: 'Gagal mencetak', en: 'Print failed' },
+  'settings.receiptPrinter': { id: 'Printer Struk (Thermal)', en: 'Receipt Printer (Thermal)' },
 
   // ── Printing flow (paid) ─────────────────────────────────────────────────────
   'print.printBtn':      { id: 'Cetak Foto', en: 'Print Photos' },

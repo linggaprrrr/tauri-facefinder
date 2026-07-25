@@ -101,8 +101,12 @@ export async function getUnits() {
 }
 
 // Fetch outlets for a given unit
-export async function getOutletsByUnit(unitId) {
-  const res = await fetch(`${API_BASE}/outlets/get-outlets-by-unit/${unitId}`);
+// isKiosk: the device-setup picker in Settings only lists kiosk-flagged
+// outlets — a physical kiosk terminal has no business belonging to a
+// staffed, non-kiosk outlet.
+export async function getOutletsByUnit(unitId, { isKiosk } = {}) {
+  const params = isKiosk === undefined ? '' : `?is_kiosk=${isKiosk}`;
+  const res = await fetch(`${API_BASE}/outlets/get-outlets-by-unit/${unitId}${params}`);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const json = await res.json();
   return json.outlets ?? [];

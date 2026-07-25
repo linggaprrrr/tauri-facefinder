@@ -5,11 +5,12 @@ import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, 
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
-import { isTauri } from '../../native/print';
+import { isTauri, printImage } from '../../native/print';
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
 import { reprintPrintJob } from '../../api/mockApi';
 import { enqueuePrint } from '../../utils/printQueue';
+import { composeReceiptImage } from '../../utils/composeReceiptImage';
 import PrintModal from '../Print/PrintModal';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
@@ -42,6 +43,7 @@ export default function Download() {
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
   const [showPrint, setShowPrint] = useState(false);
+  const [receiptStatus, setReceiptStatus] = useState('idle'); // idle | printing | fail
   const outletId = deviceConfig?.outlet?.id;
 
   // Outlet-level business config (printing_enabled + default template),
@@ -110,6 +112,34 @@ export default function Download() {
   const discount = order.discount_amount ?? 0;
   const unitName = deviceConfig?.unit?.name ?? order.photos?.[0]?.unit?.name ?? '';
   const outletName = deviceConfig?.outlet?.name ?? '';
+
+  // Receipt printing — a separate, unqueued native print (no backend job to
+  // track/retry, unlike paid photo prints): the button itself is the retry.
+  const canPrintReceipt = isTauri() && !!deviceConfig?.receiptPrinterName;
+  async function handlePrintReceipt() {
+    setReceiptStatus('printing');
+    try {
+      const dataUrl = await composeReceiptImage({
+        outletName,
+        unitName,
+        trxCode,
+        date: order.created_at ?? order.paid_at,
+        items: photos.map((p, i) => ({
+          name: p.filename ?? p.name ?? t('common.photoN', { n: i + 1 }),
+          price: p.price ?? (finalPrice / photos.length),
+        })),
+        discount,
+        promoCode: order.promo_code_used,
+        total: finalPrice,
+        paymentLabel: `${isCash ? t('download.cash') : t('download.qris')}${order.paid ? ` · ${t('download.paid')}` : ''}`,
+        downloadUrl,
+      });
+      await printImage(deviceConfig.receiptPrinterName, dataUrl, 1);
+      setReceiptStatus('idle');
+    } catch {
+      setReceiptStatus('fail');
+    }
+  }
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
@@ -210,6 +240,21 @@ export default function Download() {
           <Button variant="secondary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
             <Printer size={20} /> {t('print.printBtn')}
           </Button>
+        )}
+
+        {canPrintReceipt && (
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handlePrintReceipt}
+            disabled={receiptStatus === 'printing'}
+            className="w-full"
+          >
+            <Printer size={20} /> {receiptStatus === 'printing' ? t('download.printingReceipt') : t('download.printReceipt')}
+          </Button>
+        )}
+        {receiptStatus === 'fail' && (
+          <p className="text-xs text-center" style={{ color: 'var(--color-error)' }}>{t('download.receiptFail')}</p>
         )}
 
         {/* Print jobs that failed after payment already succeeded — reprint
