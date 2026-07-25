@@ -108,8 +108,11 @@ export async function getOutletsByUnit(unitId) {
   return json.outlets ?? [];
 }
 
-// Create kiosk transaction — returns full transaction object from backend
-export async function createTransaction({ outletId, photos }) {
+// Create kiosk transaction — returns full transaction object from backend.
+// promoCode is optional: a Promo Voucher that only partially covers the cart
+// chains into this (see ScanRunner) so the remainder is still paid via QRIS,
+// discount already applied server-side.
+export async function createTransaction({ outletId, photos, promoCode }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -118,6 +121,7 @@ export async function createTransaction({ outletId, photos }) {
       // edited_image (base64 render) is persisted so the customer receives what
       // they actually made — stickers/text/filter, or a framed collage on top.
       photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
+      promo_code: promoCode ?? null,
     }),
   });
 
@@ -149,6 +153,64 @@ export async function getOutletPrintPrice(outletId) {
   return json.outlet?.print_price ?? null;
 }
 
+// Per-outlet access-method config (which checkout methods are enabled, order,
+// badges, copy overrides). No configured rows means "unconfigured" — the
+// backend synthesizes a QRIS-only default, so an unmigrated/unreachable
+// backend behaves exactly like today's QRIS-only checkout.
+export async function getOutletAccessMethods(outletId, etag = null) {
+  const res = await fetch(`${API_BASE}/outlets/${outletId}/access-methods`, {
+    headers: etag ? { 'If-None-Match': etag } : {},
+  });
+  if (res.status === 304) return { unchanged: true };
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return {
+    data: (await res.json()).data ?? [],
+    etag: res.headers.get('etag'),
+  };
+}
+
+// Check a scanned/typed code without creating anything — lets the runner
+// show "Voucher applied · Rp X off" or a rejection reason before the
+// customer commits. Always resolves to { outcome, ... }, never throws for a
+// rejected code (only for a genuine network/server failure).
+export async function validateAccessMethod({ outletId, methodKey, code, orderAmount }) {
+  const res = await fetch(`${API_BASE}/access/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({ outlet_id: outletId, method_key: methodKey, code, order_amount: orderAmount }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+// Zero-payment access grant (Event Ticket, or a Promo Voucher that fully
+// covers the cart) — re-validated server-side regardless of the prior
+// validateAccessMethod call. Returns the same flattened shape as
+// createTransaction so callers (SET_ORDER, /download) don't need to branch.
+export async function grantAccess({ outletId, methodKey, code, note, photos }) {
+  const res = await fetch(`${API_BASE}/transactions/kiosk/grant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({
+      device_id: outletId,
+      method_key: methodKey,
+      code,
+      note: note ?? null,
+      photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
+    }),
+  });
+  if (!res.ok) {
+    let detail = `Server error ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? body.message ?? body.error ?? JSON.stringify(body);
+    } catch { /* non-JSON body, keep default */ }
+    throw new Error(detail);
+  }
+  const json = await res.json();
+  return { ...(json.transaction ?? json) };
+}
+
 // Create a paid-print transaction (QRIS). Amount = outlet.print_price × copies,
 // computed server-side. Returns the same flattened shape as createTransaction.
 export async function createPrintTransaction({ outletId, copies }) {
@@ -172,6 +234,78 @@ export async function createPrintTransaction({ outletId, copies }) {
     token_id: json.token_id,
     payment_due_minutes: json['doku response']?.payment?.payment_due_date ?? 5,
   };
+}
+
+// Outlet-level printing config (enable/disable + default template), distinct
+// from deviceConfig.printEnabled/printerName which is the kiosk's own
+// hardware capability toggle. null default_template_id means printing is
+// enabled but no template has been assigned yet.
+export async function getOutletPrintSetting(outletId) {
+  const res = await fetch(`${API_BASE}/outlets/${outletId}/printing`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function getPrintTemplates(outletId, etag = null) {
+  const url = outletId
+    ? `${API_BASE}/print-templates/?outlet_id=${outletId}`
+    : `${API_BASE}/print-templates/`;
+  const res = await fetch(url, {
+    headers: etag ? { 'If-None-Match': etag } : {},
+  });
+  if (res.status === 304) return { unchanged: true };
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return {
+    data: (await res.json()).data ?? [],
+    etag: res.headers.get('etag'),
+  };
+}
+
+// Register a print attempt before the native print call — so a crash mid-print
+// still leaves a job the Download screen can offer to reprint. photoIds is
+// ordered by slot index (a single-slot print is just a 1-item array).
+export async function createPrintJob({ transactionId, outletId, templateVersionId, photoIds, copies }) {
+  const res = await fetch(`${API_BASE}/print-jobs/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({
+      transaction_id: transactionId,
+      outlet_id: outletId,
+      template_version_id: templateVersionId,
+      photo_ids: photoIds,
+      copies,
+    }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function updatePrintJobStatus(jobId, { status, message, printerName } = {}) {
+  const res = await fetch(`${API_BASE}/print-jobs/${jobId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({ status, message, printer_name: printerName }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function retryPrintJob(jobId) {
+  const res = await fetch(`${API_BASE}/print-jobs/${jobId}/retry`, {
+    method: 'POST',
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function reprintPrintJob(jobId) {
+  const res = await fetch(`${API_BASE}/print-jobs/${jobId}/reprint`, {
+    method: 'POST',
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
 
 // Get transaction status by ID
@@ -256,6 +390,24 @@ export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase6
     throw new ApiError('server', body.detail ?? `Server error ${res.status}`, res.status);
   }
   return res.json(); // { image_url, photo_id }
+}
+
+// Upserts this kiosk's row in kiosk_printers (by kiosk_id) — powers the admin
+// fleet view's online/offline + printer pairing display.
+export async function sendKioskHeartbeat({ kioskId, outletId, printerName, printerStatus, appVersion }) {
+  const res = await fetch(`${API_BASE}/kiosk-printers/heartbeat`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({
+      kiosk_id: kioskId,
+      outlet_id: outletId,
+      printer_name: printerName,
+      printer_status: printerStatus,
+      app_version: appVersion,
+    }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
 
 export async function aiTransform({ outletId, photoUrl, templateId, sourcePhotoId }, timeoutMs = 300000) {
