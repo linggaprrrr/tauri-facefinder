@@ -23,6 +23,9 @@ import OfflineBanner from './components/common/OfflineBanner';
 import OrderRecovery from './components/common/OrderRecovery';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { readPendingOrder } from './utils/pendingOrder';
+import { resumePrintQueue } from './utils/printQueue';
+import { startHeartbeat } from './utils/heartbeat';
+import { isTauri } from './native/print';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -60,6 +63,18 @@ function Layout() {
   useEffect(() => {
     if (!isConfigured) setShowSettings(true);
   }, [isConfigured]);
+
+  // Resume any print job left queued from a crash/restart, once on boot.
+  useEffect(() => {
+    if (isTauri()) resumePrintQueue();
+  }, []);
+
+  // Report this kiosk's printer pairing/status to the admin fleet view, once on
+  // boot and every 5 minutes. Restarts when deviceConfig changes (e.g. printer
+  // reassigned in Settings) so the next beat reflects the new config right away.
+  useEffect(() => {
+    if (isTauri()) return startHeartbeat(state.deviceConfig);
+  }, [state.deviceConfig]);
 
   const forced = !isConfigured;
 

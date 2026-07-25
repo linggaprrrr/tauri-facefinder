@@ -4,8 +4,7 @@ import { getUnits, getOutletsByUnit } from '../../api/mockApi';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
-
-const DEVICE_KEY = import.meta.env.VITE_DEVICE_KEY ?? '';
+import { verifyDeviceKey } from '../../utils/deviceAuth';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
 export default function SettingsModal({ onClose, forced = false }) {
@@ -44,7 +43,7 @@ export default function SettingsModal({ onClose, forced = false }) {
 
   function handleAuth(e) {
     e.preventDefault();
-    if (password === DEVICE_KEY) {
+    if (verifyDeviceKey(password)) {
       setStep('config');
       fetchUnits();
     } else {

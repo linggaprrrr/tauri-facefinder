@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
 import { isTauri } from '../../native/print';
+import { usePrintSetting } from '../../hooks/usePrintSetting';
+import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import { reprintPrintJob } from '../../api/mockApi';
+import { enqueuePrint } from '../../utils/printQueue';
 import PrintModal from '../Print/PrintModal';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
@@ -38,8 +42,51 @@ export default function Download() {
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
   const [showPrint, setShowPrint] = useState(false);
-  // Paid-print add-on: only in the kiosk app, when enabled + a printer is set.
-  const canPrint = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName && selectedPhotos.length > 0;
+  const outletId = deviceConfig?.outlet?.id;
+
+  // Outlet-level business config (printing_enabled + default template),
+  // distinct from the kiosk-local hardware toggle below. Not asset-cached —
+  // this gates a purchase decision and must reflect current server state.
+  const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
+  const { printTemplates } = usePrintTemplates(outletId);
+  const templateVersion = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id)?.currentVersion ?? null;
+
+  // Paid-print add-on: kiosk has a printer configured AND the outlet has
+  // printing enabled with a published default template assigned.
+  const canPrint = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
+    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion
+    && selectedPhotos.length > 0;
+
+  // Print jobs queued this session — printing never blocks the flow above, so
+  // outcomes land here asynchronously via the local queue's 'printjob:done'
+  // event, and a failed job gets a one-tap reprint (same composed bitmap,
+  // no need to redo the whole print flow).
+  const [printJobs, setPrintJobs] = useState([]);
+  useEffect(() => {
+    function onJobDone(e) {
+      const { jobId, status } = e.detail;
+      setPrintJobs((jobs) => jobs.map((j) => (j.jobId === jobId ? { ...j, status } : j)));
+    }
+    window.addEventListener('printjob:done', onJobDone);
+    return () => window.removeEventListener('printjob:done', onJobDone);
+  }, []);
+
+  function handleQueuedJobs(jobs) {
+    setPrintJobs((cur) => [...cur, ...jobs.map((j) => ({ ...j, status: 'queued' }))]);
+  }
+
+  async function handleReprint(job) {
+    setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'queued' } : j)));
+    try {
+      const newJob = await reprintPrintJob(job.jobId);
+      enqueuePrint({ jobId: newJob.id, printerName: job.printerName, dataUrl: job.dataUrl, copies: job.copies });
+      setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, jobId: newJob.id, status: 'queued' } : j)));
+    } catch {
+      setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'failed' } : j)));
+    }
+  }
+
+  const failedJobs = printJobs.filter((j) => j.status === 'failed');
 
   if (!order) {
     navigate('/');
@@ -163,6 +210,29 @@ export default function Download() {
           <Button variant="secondary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
             <Printer size={20} /> {t('print.printBtn')}
           </Button>
+        )}
+
+        {/* Print jobs that failed after payment already succeeded — reprint
+            reuses the already-composed bitmap, no new charge. */}
+        {failedJobs.length > 0 && (
+          <div
+            className="w-full rounded-2xl p-4 flex flex-col gap-2"
+            style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
+          >
+            <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
+              <AlertTriangle size={16} /> {t('print.someFailed', { count: failedJobs.length })}
+            </p>
+            {failedJobs.map((job) => (
+              <button
+                key={job.jobId}
+                onClick={() => handleReprint(job)}
+                className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: '#fff', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+              >
+                <RefreshCw size={14} /> {t('print.reprint')}
+              </button>
+            ))}
+          </div>
         )}
 
         <Button size="xl" onClick={handleRestart} className="w-full">
@@ -305,8 +375,13 @@ export default function Download() {
         <PrintModal
           photos={selectedPhotos}
           photoEdits={photoEdits}
-          outletId={deviceConfig?.outlet?.id}
+          outletId={outletId}
           printerName={deviceConfig?.printerName}
+          printSetting={printSetting}
+          templateVersion={templateVersion}
+          downloadUrl={downloadUrl}
+          outletName={outletName}
+          onJobQueued={handleQueuedJobs}
           onClose={() => setShowPrint(false)}
         />
       )}
