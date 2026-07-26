@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, Images, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
 import { isTauri, printImage } from '../../native/print';
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
-import { reprintPrintJob } from '../../api/mockApi';
+import { reprintPrintJob, createPrintJob } from '../../api/mockApi';
 import { enqueuePrint } from '../../utils/printQueue';
 import { composeReceiptImage } from '../../utils/composeReceiptImage';
+import { composePrintImage } from '../../utils/composePrintImage';
+import { resolvePrintSource } from '../../utils/resolvePrintSource';
 import PrintModal from '../Print/PrintModal';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
@@ -51,12 +53,15 @@ export default function Download() {
   // this gates a purchase decision and must reflect current server state.
   const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
   const { printTemplates } = usePrintTemplates(outletId);
-  const templateVersion = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id)?.currentVersion ?? null;
+  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
+  const templateVersion = activeTemplate?.currentVersion ?? null;
+  // Per-template, not per-outlet — paper size drives cost (e.g. 4R vs 6R).
+  const printPrice = activeTemplate?.price ?? null;
 
   // Paid-print add-on: kiosk has a printer configured AND the outlet has
   // printing enabled with a published default template assigned.
   const canPrint = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
-    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion
+    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice
     && selectedPhotos.length > 0;
 
   // Print jobs queued this session — printing never blocks the flow above, so
@@ -76,6 +81,54 @@ export default function Download() {
   function handleQueuedJobs(jobs) {
     setPrintJobs((cur) => [...cur, ...jobs.map((j) => ({ ...j, status: 'queued' }))]);
   }
+
+  // Print add-on paid for upfront at checkout — auto-compose and queue it,
+  // no second payment/button. Safe to re-run (remount, reload, manual retry
+  // below): createPrintJob is idempotent on (transaction_id,
+  // template_version_id, first photo), and enqueuePrint dedupes on jobId, so
+  // this can never double-print or double-charge.
+  const [addonPrintError, setAddonPrintError] = useState('');
+  const [addonPrintAttempt, setAddonPrintAttempt] = useState(0);
+  useEffect(() => {
+    const addon = order?.print_addon;
+    if (!addon || !templateVersion) return;
+    let cancelled = false;
+
+    (async () => {
+      setAddonPrintError('');
+      try {
+        const addonPhotos = addon.photo_ids
+          .map((pid) => selectedPhotos.find((p) => p.photo_id === pid))
+          .filter(Boolean);
+        if (addonPhotos.length === 0) return;
+
+        const tokens = {
+          outlet_name: deviceConfig?.outlet?.name ?? '',
+          download_url: `${DOWNLOAD_BASE}/myphotos/${order.download_token ?? order.trx_code}`,
+        };
+        const rawSrcs = await Promise.all(
+          addonPhotos.map((p) => resolvePrintSource(p, photoEdits[p.id]?.dataUrl ? 'edited' : 'original', photoEdits))
+        );
+        const finalDataUrl = await composePrintImage(templateVersion, rawSrcs, tokens);
+        const job = await createPrintJob({
+          transactionId: order.id,
+          outletId,
+          templateVersionId: templateVersion.id,
+          photoIds: addonPhotos.map((p) => p.photo_id),
+          copies: addon.copies,
+        });
+        if (cancelled) return;
+        const printerName = deviceConfig?.printerName;
+        enqueuePrint({ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies });
+        handleQueuedJobs([{ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies }]);
+      } catch (err) {
+        if (!cancelled) setAddonPrintError(err.message);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.print_addon, templateVersion, addonPrintAttempt]);
 
   async function handleReprint(job) {
     setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'queued' } : j)));
@@ -236,10 +289,28 @@ export default function Download() {
           </div>
         )}
 
-        {canPrint && (
-          <Button variant="secondary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
-            <Printer size={20} /> {t('print.printBtn')}
+        {canPrint && !order?.print_addon && (
+          <Button variant="primary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
+            <Images size={20} /> {t('print.printBtn')}
           </Button>
+        )}
+
+        {order?.print_addon && addonPrintError && (
+          <div
+            className="w-full rounded-2xl p-4 flex flex-col gap-2"
+            style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
+          >
+            <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
+              <AlertTriangle size={16} /> {t('print.addonErr')}
+            </p>
+            <button
+              onClick={() => setAddonPrintAttempt((n) => n + 1)}
+              className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
+              style={{ background: '#fff', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+            >
+              <RefreshCw size={14} /> {t('common.retry')}
+            </button>
+          </div>
         )}
 
         {canPrintReceipt && (
@@ -422,7 +493,7 @@ export default function Download() {
           photoEdits={photoEdits}
           outletId={outletId}
           printerName={deviceConfig?.printerName}
-          printSetting={printSetting}
+          printPrice={printPrice}
           templateVersion={templateVersion}
           downloadUrl={downloadUrl}
           outletName={outletName}

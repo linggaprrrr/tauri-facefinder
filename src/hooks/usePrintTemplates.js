@@ -11,6 +11,7 @@ function normalize(template) {
     paperSize: template.paper_size,
     isGlobal: template.is_global,
     isActive: template.is_active,
+    price: template.price ?? null,  // per-print price (IDR) — paper size drives cost
     // Rendering config for the currently-published version, or null if the
     // template has never been published — kiosk must treat that as unusable.
     currentVersion: template.current_version ?? null,

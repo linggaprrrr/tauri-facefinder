@@ -85,7 +85,6 @@ export default function PhotoCard({
   );
 
   return (
-    <div className="mb-4 break-inside-avoid">
     <div
       className="relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-200"
       style={{
@@ -113,7 +112,6 @@ export default function PhotoCard({
         src={photo.thumbnail}
         alt="Photo"
         className="absolute inset-0 block h-full w-full object-cover"
-        loading="lazy"
         onLoad={(e) => {
           const { naturalWidth, naturalHeight } = e.currentTarget;
           if (naturalWidth && naturalHeight) {
@@ -195,7 +193,6 @@ export default function PhotoCard({
           Rp {photo.price.toLocaleString('id-ID')}
         </span>
       </div>
-    </div>
     </div>
   );
 }

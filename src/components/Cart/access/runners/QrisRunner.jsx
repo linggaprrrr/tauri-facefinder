@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
-import { ArrowLeft, QrCode, Smartphone, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, QrCode, Smartphone, AlertTriangle, Printer } from 'lucide-react';
 import { useApp } from '../../../../store/AppContext';
 import { useLang } from '../../../../i18n/LanguageContext';
 import { createTransaction, getTransaction, cancelTransaction } from '../../../../api/mockApi';
 import { savePendingOrder, updatePendingOrder, clearPendingOrder } from '../../../../utils/pendingOrder';
+import { isTauri } from '../../../../native/print';
+import { usePrintSetting } from '../../../../hooks/usePrintSetting';
+import { usePrintTemplates } from '../../../../hooks/usePrintTemplates';
 import LoadingSpinner from '../../../common/LoadingSpinner';
 import Button from '../../../common/Button';
+import PrintAddonSelector from '../../../Print/PrintAddonSelector';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -41,6 +44,10 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   const [errorMsg, setErrorMsg] = useState('');
   // null | 'back' | 'cancel-only'
   const [confirmMode, setConfirmMode] = useState(null);
+  // Checkout-time print add-on — same gate Download.jsx's canPrint uses,
+  // minus the selectedPhotos.length check (trivially true here already).
+  const [addonChecked, setAddonChecked] = useState(false);
+  const [addonSelection, setAddonSelection] = useState(null); // {copies, photoIds, totalPrice, canSubmit}
 
   const pollRef = useRef(null);
   const countdownRef = useRef(null);
@@ -52,10 +59,22 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   useEffect(() => { statusRef.current = status; }, [status]);
 
   const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  // Once a transaction exists, its server-computed final_price is authoritative;
-  // before that, this is just an estimate for the confirm screen.
-  const displayTotal = transaction ? transaction.final_price : Math.max(total - discountAmount, 0);
   const { deviceConfig } = state;
+  const outletId = deviceConfig?.outlet?.id;
+
+  const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
+  const { printTemplates } = usePrintTemplates(outletId);
+  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
+  const templateVersion = activeTemplate?.currentVersion ?? null;
+  const printPrice = activeTemplate?.price ?? null;
+  const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
+    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
+
+  const addonEstimate = (canOfferPrintAddon && addonChecked && addonSelection?.canSubmit) ? addonSelection.totalPrice : 0;
+  // Once a transaction exists, its server-computed final_price is authoritative
+  // (it already folds in the print add-on server-side) — before that, this is
+  // just a client-side estimate for the confirm screen, same as discountAmount.
+  const displayTotal = transaction ? transaction.final_price : Math.max(total - discountAmount, 0) + addonEstimate;
 
   function stopPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -102,10 +121,14 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         ...p,
         edited_image: state.photoEdits[p.id]?.dataUrl ?? null,
       }));
+      const printAddon = (canOfferPrintAddon && addonChecked && addonSelection?.canSubmit)
+        ? { photoIds: addonSelection.photoIds, copies: addonSelection.copies }
+        : null;
       const trx = await createTransaction({
         outletId: deviceConfig.outlet.id,
         photos: photosWithEdits,
         promoCode,
+        printAddon,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment
@@ -234,6 +257,35 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             </div>
           </div>
 
+          {canOfferPrintAddon && (
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+            >
+              <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
+                <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
+                  <Printer size={18} /> {t('checkout.addPrint')}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={addonChecked}
+                  onChange={(e) => setAddonChecked(e.target.checked)}
+                  className="w-5 h-5"
+                />
+              </label>
+              {addonChecked && (
+                <div className="px-4 pb-4">
+                  <PrintAddonSelector
+                    photos={state.selectedPhotos}
+                    templateVersion={templateVersion}
+                    printPrice={printPrice}
+                    onSelectionChange={setAddonSelection}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <Button size="lg" onClick={handleQrisPay} className="w-full">
             <QrCode size={20} /> {t('checkout.payQris')}
           </Button>
@@ -272,18 +324,16 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               </div>
             </div>
 
-            {/* QR Code */}
-            <div
-              className="p-4 rounded-2xl"
-              style={{ background: 'var(--color-neutral-50)', border: '1.5px solid var(--color-neutral-200)' }}
-            >
-              <QRCodeSVG
-                value={transaction.payment_url}
-                size={220}
-                level="H"
-                fgColor="#013F65"
-              />
-            </div>
+            {/* DOKU's hosted checkout page, embedded — it has the actual QRIS
+                QR (payment_url is a checkout-link page, not a QRIS payload,
+                so rendering it as our own QR code isn't scannable by e-wallet
+                "scan QRIS" flows; embedding skips that dead end entirely). */}
+            <iframe
+              src={transaction.payment_url}
+              title="DOKU QRIS"
+              className="rounded-2xl"
+              style={{ width: 280, height: 480, border: '1.5px solid var(--color-neutral-200)' }}
+            />
 
             {/* Countdown */}
             <div className="flex flex-col items-center gap-1 w-full">

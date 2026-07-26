@@ -18,6 +18,7 @@ export default function FaceScan() {
   const navigate = useNavigate();
   const [status, setStatus] = useState('idle'); // idle | scanning | error
   const [errorKey, setErrorKey] = useState('scan.error');
+  const [cameraReady, setCameraReady] = useState(false);
 
   const handleCapture = useCallback(async () => {
     const image = capture();
@@ -78,6 +79,12 @@ export default function FaceScan() {
             screenshotFormat="image/jpeg"
             videoConstraints={VIDEO_CONSTRAINTS}
             className="block w-full h-full object-cover"
+            onUserMedia={() => setCameraReady(true)}
+            onUserMediaError={() => {
+              setCameraReady(false);
+              setErrorKey('scan.cameraError');
+              setStatus('error');
+            }}
           />
           <FaceOverlay />
         </div>
@@ -103,7 +110,7 @@ export default function FaceScan() {
       <Button
         size="lg"
         onClick={handleCapture}
-        disabled={status === 'scanning'}
+        disabled={status === 'scanning' || !cameraReady}
         className="w-full max-w-72"
       >
         {status === 'scanning' ? t('scan.scanning') : t('scan.cta')}

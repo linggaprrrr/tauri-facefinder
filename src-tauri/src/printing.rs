@@ -28,11 +28,12 @@ pub fn list_printers() -> Vec<PrinterInfo> {
 ///
 /// NOTE on rendering: the `printers` crate is used for *listing*, but the actual
 /// print goes through an OS image-print path — raw-spooling JPEG bytes does NOT
-/// render correctly on most drivers. Prefers a bundled
+/// render correctly on most drivers. On Windows, prefers a bundled
 /// `SumatraPDF.exe -print-to -silent` (reliable paper-size/margin fidelity,
 /// needed now that print templates target an exact physical size) and falls
 /// back to `mspaint /pt` when no bundled binary is present — see
-/// `resolve_sumatra_path`.
+/// `resolve_sumatra_path`. On macOS/Linux, CUPS's `lp` handles rasterizing
+/// and spooling directly.
 #[tauri::command]
 pub fn print_image(app: AppHandle, printer: String, bytes: Vec<u8>, copies: u32) -> Result<(), String> {
     if printer.trim().is_empty() {
@@ -106,7 +107,19 @@ fn print_one(path: &Path, printer: &str, sumatra: Option<&Path>) -> Result<(), S
     }
 }
 
+// macOS and Linux both ship CUPS; `lp` silently rasterizes and spools the
+// JPEG directly (no SumatraPDF-style helper needed here).
 #[cfg(not(windows))]
-fn print_one(_path: &Path, _printer: &str, _sumatra: Option<&Path>) -> Result<(), String> {
-    Err("Silent printing is only implemented for Windows".into())
+fn print_one(path: &Path, printer: &str, _sumatra: Option<&Path>) -> Result<(), String> {
+    let path_str = path.to_str().ok_or("invalid temp path")?;
+    let status = std::process::Command::new("lp")
+        .args(["-d", printer, path_str])
+        .status()
+        .map_err(|e| format!("spawn lp: {e}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("print failed (exit {:?})", status.code()))
+    }
 }

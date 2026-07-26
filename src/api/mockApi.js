@@ -116,7 +116,7 @@ export async function getOutletsByUnit(unitId, { isKiosk } = {}) {
 // promoCode is optional: a Promo Voucher that only partially covers the cart
 // chains into this (see ScanRunner) so the remainder is still paid via QRIS,
 // discount already applied server-side.
-export async function createTransaction({ outletId, photos, promoCode }) {
+export async function createTransaction({ outletId, photos, promoCode, printAddon }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -126,6 +126,9 @@ export async function createTransaction({ outletId, photos, promoCode }) {
       // they actually made — stickers/text/filter, or a framed collage on top.
       photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
       promo_code: promoCode ?? null,
+      // No price/template sent — server resolves both from the outlet's own
+      // print settings, same source-of-truth pattern as photo pricing.
+      print_addon: printAddon ? { photo_ids: printAddon.photoIds, copies: printAddon.copies } : null,
     }),
   });
 
@@ -147,14 +150,6 @@ export async function createTransaction({ outletId, photos, promoCode }) {
     token_id: json.token_id,
     payment_due_minutes: json['doku response']?.payment?.payment_due_date ?? 5,
   };
-}
-
-// Per-print price for an outlet (null = printing not offered there).
-export async function getOutletPrintPrice(outletId) {
-  const res = await fetch(`${API_BASE}/outlets/${outletId}`);
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const json = await res.json();
-  return json.outlet?.print_price ?? null;
 }
 
 // Per-outlet access-method config (which checkout methods are enabled, order,

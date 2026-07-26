@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer, Minus, Plus, CheckCircle2, AlertTriangle, ImagePlus } from 'lucide-react';
 import { createPrintTransaction, getTransaction, createPrintJob } from '../../api/mockApi';
 import { composePrintImage } from '../../utils/composePrintImage';
+import { resolvePrintSource } from '../../utils/resolvePrintSource';
 import { enqueuePrint } from '../../utils/printQueue';
 import { useLang } from '../../i18n/LanguageContext';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -21,10 +22,9 @@ const POLL_INTERVAL_MS = 3000;
 // print button once a template has resolved. Two modes based on its slots:
 // single-slot (Phase 1: per-cart-photo copies, one job per photo) or collage
 // (Phase 2: assign one cart photo per slot, one job for the whole sheet).
-export default function PrintModal({ photos, photoEdits, outletId, printerName, printSetting, templateVersion, downloadUrl, outletName, onJobQueued, onClose }) {
+export default function PrintModal({ photos, photoEdits, outletId, printerName, printPrice, templateVersion, downloadUrl, outletName, onJobQueued, onClose }) {
   const { t } = useLang();
   const [view, setView] = useState('select'); // select | creating | paying | printing | done | error
-  const printPrice = printSetting?.print_price ?? null;
   const [transaction, setTransaction] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const pollRef = useRef(null);
@@ -67,22 +67,6 @@ export default function PrintModal({ photos, photoEdits, outletId, printerName, 
   }
 
   const runPrints = useCallback(async () => {
-    // Original photos aren't printed via printFromUrl's raw-bytes path
-    // anymore — everything funnels through a dataURL so it can be composed
-    // onto the template and persisted in the local queue for retry-after-restart.
-    async function resolvePrintSource(photo, source) {
-      if (source === 'edited' && photoEdits[photo.id]?.dataUrl) return photoEdits[photo.id].dataUrl;
-      const resp = await fetch(photo.proxyUrl ?? photo.url);
-      if (!resp.ok) throw new Error(`Could not load image (${resp.status})`);
-      const blob = await resp.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Could not read image'));
-        reader.readAsDataURL(blob);
-      });
-    }
-
     setView('printing');
     setErrorMsg('');
     const tokens = { outlet_name: outletName ?? '', download_url: downloadUrl ?? '' };
@@ -91,7 +75,7 @@ export default function PrintModal({ photos, photoEdits, outletId, printerName, 
     if (isCollage) {
       try {
         const rawSrcs = await Promise.all(
-          slotAssignments.map((p) => resolvePrintSource(p, photoEdits[p.id]?.dataUrl ? 'edited' : 'original'))
+          slotAssignments.map((p) => resolvePrintSource(p, photoEdits[p.id]?.dataUrl ? 'edited' : 'original', photoEdits))
         );
         const finalDataUrl = await composePrintImage(templateVersion, rawSrcs, tokens);
         const job = await createPrintJob({
@@ -111,7 +95,7 @@ export default function PrintModal({ photos, photoEdits, outletId, printerName, 
         const { source, copies } = sel[p.id];
         if (copies < 1) continue;
         try {
-          const rawSrc = await resolvePrintSource(p, source);
+          const rawSrc = await resolvePrintSource(p, source, photoEdits);
           const finalDataUrl = await composePrintImage(templateVersion, [rawSrc], tokens);
           const job = await createPrintJob({
             transactionId: transaction.id,

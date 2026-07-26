@@ -171,7 +171,7 @@ function BackgroundImage({ src, filters, canvasW, canvasH, onLoad }) {
   useEffect(() => {
     if (status === 'loaded') {
       if (imageRef.current) imageRef.current.cache();
-      onLoad?.();
+      onLoad?.(image.naturalWidth, image.naturalHeight);
     }
   }, [image, status, filters, onLoad]);
 
@@ -449,11 +449,20 @@ export default function PhotoEditor() {
     }
   }, [isLayoutFrame, frame]);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const handleImageLoad = useCallback(() => setIsLoading(false), []);
-
+  const [isLoading, setIsLoading] = useState(true);
   const photoUrl = currentPhoto?.proxyUrl ?? currentPhoto?.url;
   const orientationCache = useRef({});
+
+  // Canvas sizing comes from the SAME image BackgroundImage renders (its
+  // onLoad reports naturalWidth/Height) — not a separate probe fetch. Two
+  // independent fetches of the same photo can resolve in either order, and
+  // if the render fetch wins, the photo paints before canvas has corrected
+  // to its real aspect ratio, stretching it into the wrong-shaped box.
+  const handleImageLoad = useCallback((natW, natH) => {
+    orientationCache.current[currentPhoto.id] = { natW, natH };
+    setCanvas(fitDimensions(natW, natH, maxCanvasW, maxCanvasH));
+    setIsLoading(false);
+  }, [currentPhoto?.id, maxCanvasW, maxCanvasH]);
 
   useEffect(() => {
     selectedPhotos.forEach((photo) => {
@@ -475,15 +484,9 @@ export default function PhotoEditor() {
       setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
       return;
     }
-    const img = new Image();
-    img.onload = () => {
-      orientationCache.current[currentPhoto.id] = { natW: img.naturalWidth, natH: img.naturalHeight };
-      setCanvas(fitDimensions(img.naturalWidth, img.naturalHeight, maxCanvasW, maxCanvasH));
-      setIsLoading(false);
-    };
-    img.onerror = () => setIsLoading(false);
+    // Not yet known — leave canvas at its current size and let
+    // handleImageLoad correct it once the real image reports its dimensions.
     setIsLoading(true);
-    img.src = photoUrl;
   }, [photoUrl, currentPhoto?.id, maxCanvasW, maxCanvasH]);
 
   const layoutCanvasSize = useMemo(() => {
