@@ -22,6 +22,7 @@ const initialState = {
   layoutEdits: {},          // { [frameId]: { slots, elements, dataUrl } }
   aiTransformUsed: false,   // 1 free AI transform per session
   aiJob: null,              // in-flight or ready AI job — survives navigation
+  printAddon: null,         // { copies, photoIds, totalPrice, canSubmit } — decided on Cart, paid in the same checkout transaction
 };
 
 function reducer(state, action) {
@@ -29,7 +30,9 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printAddon: null };
+    case 'SET_PRINT_ADDON':
+      return { ...state, printAddon: action.payload };
     case 'SET_AI_JOB':
       return { ...state, aiJob: action.payload };
     case 'ADD_AI_PHOTO': {
@@ -75,6 +78,10 @@ function reducer(state, action) {
         selectedPhotos: exists
           ? state.selectedPhotos.filter((p) => p.id !== action.payload.id)
           : [...state.selectedPhotos, action.payload],
+        // Cart composition just changed — a chosen print addon may reference
+        // a photo that's no longer (or now is) in the cart. Simplest safe
+        // reset: clear it, customer re-checks the box if they still want prints.
+        printAddon: null,
       };
     }
     case 'SET_EDITING_PHOTO':

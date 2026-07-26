@@ -101,6 +101,7 @@ export const translations = {
   'checkout.photosSelected':{ id: '{count} foto dipilih', en: '{count} photo(s) selected' },
   'checkout.payQris':       { id: 'Bayar dengan QRIS', en: 'Pay with QRIS' },
   'checkout.addPrint':      { id: 'Tambah cetak foto?', en: 'Add photo prints?' },
+  'checkout.printIncluded': { id: 'Cetak foto ({count}x) sudah termasuk', en: 'Photo print ({count}x) included' },
   'checkout.backToCart':    { id: 'Kembali ke Keranjang', en: 'Back to Cart' },
   'checkout.waiting':       { id: 'Menunggu pembayaran', en: 'Waiting for payment' },
   'checkout.dueLabel':      { id: 'Batas waktu pembayaran', en: 'Payment deadline' },

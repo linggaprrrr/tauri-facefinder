@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, Images, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
@@ -13,7 +13,6 @@ import { enqueuePrint } from '../../utils/printQueue';
 import { composeReceiptImage } from '../../utils/composeReceiptImage';
 import { composePrintImage } from '../../utils/composePrintImage';
 import { resolvePrintSource } from '../../utils/resolvePrintSource';
-import PrintModal from '../Print/PrintModal';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
 
@@ -44,25 +43,20 @@ export default function Download() {
   const navigate = useNavigate();
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
-  const [showPrint, setShowPrint] = useState(false);
   const [receiptStatus, setReceiptStatus] = useState('idle'); // idle | printing | fail
   const outletId = deviceConfig?.outlet?.id;
 
-  // Outlet-level business config (printing_enabled + default template),
-  // distinct from the kiosk-local hardware toggle below. Not asset-cached —
-  // this gates a purchase decision and must reflect current server state.
-  const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
+  // Printing is decided once, upfront at checkout (QrisRunner's print-addon
+  // checkbox) — no post-payment "pay to print" upsell here. Otherwise a
+  // customer who paid Rp 0 for photos via a 100%-off voucher would suddenly
+  // face a fresh charge just to print, which makes no sense. This lookup
+  // stays only to resolve the template the auto-print effect below composes
+  // against (order.print_addon already tells us copies/photos/pricing —
+  // resolved and charged server-side at checkout).
+  const { setting: printSetting } = usePrintSetting(outletId);
   const { printTemplates } = usePrintTemplates(outletId);
   const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
   const templateVersion = activeTemplate?.currentVersion ?? null;
-  // Per-template, not per-outlet — paper size drives cost (e.g. 4R vs 6R).
-  const printPrice = activeTemplate?.price ?? null;
-
-  // Paid-print add-on: kiosk has a printer configured AND the outlet has
-  // printing enabled with a published default template assigned.
-  const canPrint = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
-    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice
-    && selectedPhotos.length > 0;
 
   // Print jobs queued this session — printing never blocks the flow above, so
   // outcomes land here asynchronously via the local queue's 'printjob:done'
@@ -289,12 +283,6 @@ export default function Download() {
           </div>
         )}
 
-        {canPrint && !order?.print_addon && (
-          <Button variant="primary" size="lg" onClick={() => setShowPrint(true)} className="w-full">
-            <Images size={20} /> {t('print.printBtn')}
-          </Button>
-        )}
-
         {order?.print_addon && addonPrintError && (
           <div
             className="w-full rounded-2xl p-4 flex flex-col gap-2"
@@ -487,20 +475,6 @@ export default function Download() {
         </div>
       </div>
 
-      {showPrint && (
-        <PrintModal
-          photos={selectedPhotos}
-          photoEdits={photoEdits}
-          outletId={outletId}
-          printerName={deviceConfig?.printerName}
-          printPrice={printPrice}
-          templateVersion={templateVersion}
-          downloadUrl={downloadUrl}
-          outletName={outletName}
-          onJobQueued={handleQueuedJobs}
-          onClose={() => setShowPrint(false)}
-        />
-      )}
     </div>
   );
 }

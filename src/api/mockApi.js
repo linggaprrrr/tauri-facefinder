@@ -210,31 +210,6 @@ export async function grantAccess({ outletId, methodKey, code, note, photos }) {
   return { ...(json.transaction ?? json) };
 }
 
-// Create a paid-print transaction (QRIS). Amount = outlet.print_price × copies,
-// computed server-side. Returns the same flattened shape as createTransaction.
-export async function createPrintTransaction({ outletId, copies }) {
-  const res = await fetch(`${API_BASE}/transactions/kiosk/print/pay`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
-    body: JSON.stringify({ device_id: outletId, copies }),
-  });
-  if (!res.ok) {
-    let detail = `Server error ${res.status}`;
-    try {
-      const body = await res.json();
-      detail = body.detail ?? body.message ?? body.error ?? JSON.stringify(body);
-    } catch { /* keep default */ }
-    throw new Error(detail);
-  }
-  const json = await res.json();
-  return {
-    ...(json.transaction ?? json),
-    payment_url: json.payment_url ?? json.transaction?.payment_url,
-    token_id: json.token_id,
-    payment_due_minutes: json['doku response']?.payment?.payment_due_date ?? 5,
-  };
-}
-
 // Outlet-level printing config (enable/disable + default template), distinct
 // from deviceConfig.printEnabled/printerName which is the kiosk's own
 // hardware capability toggle. null default_template_id means printing is

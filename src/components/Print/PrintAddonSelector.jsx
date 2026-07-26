@@ -3,14 +3,14 @@ import { Minus, Plus, ImagePlus } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 import SlotPhotoPicker from '../Editor/SlotPhotoPicker';
 
-// Checkout-time print add-on picker — simpler than the after-the-fact
-// PrintModal on purpose: one shared copies count for the whole add-on
-// (matches the backend's single TransactionPrintAddon row: one template
-// version, one photo_ids list, one copies count). A collage template fills
-// its slots exactly like PrintModal already does; a single-slot template
-// prints ONE chosen cart photo, `copies` times. Printing several DIFFERENT
-// photos independently, each with its own copy count, stays a PrintModal-only
-// (post-payment) capability — this is a quick checkbox, not a full editor.
+// Checkout-time print add-on picker — deliberately simple: one shared copies
+// count for the whole add-on (matches the backend's single
+// TransactionPrintAddon row: one template version, one photo_ids list, one
+// copies count). A collage template fills its slots; a single-slot template
+// prints ONE chosen cart photo, `copies` times. Printing is decided here,
+// once, folded into the same checkout payment — there is no separate
+// post-payment print purchase, so a customer never faces a second charge
+// just to print.
 export default function PrintAddonSelector({ photos, templateVersion, printPrice, onSelectionChange }) {
   const { t } = useLang();
   const isCollage = templateVersion.slots?.length > 0;

@@ -6,7 +6,10 @@
 // for retry-after-restart.
 export async function resolvePrintSource(photo, source, photoEdits) {
   if (source === 'edited' && photoEdits[photo.id]?.dataUrl) return photoEdits[photo.id].dataUrl;
-  const resp = await fetch(photo.proxyUrl ?? photo.url);
+  // proxyUrl is a resized editor-preview render — fine for the canvas, wrong
+  // for a physical print. Prefer the true original; only fall back to proxy
+  // if the original genuinely isn't available.
+  const resp = await fetch(photo.url ?? photo.proxyUrl);
   if (!resp.ok) throw new Error(`Could not load image (${resp.status})`);
   const blob = await resp.blob();
   return new Promise((resolve, reject) => {

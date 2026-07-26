@@ -1,18 +1,40 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ShoppingCart, Check, X, Maximize2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShoppingCart, Check, X, Maximize2, Printer } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
+import { isTauri } from '../../native/print';
+import { usePrintSetting } from '../../hooks/usePrintSetting';
+import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import PrintAddonSelector from '../Print/PrintAddonSelector';
 import Button from '../common/Button';
 
 export default function Cart() {
   const { state, dispatch } = useApp();
   const { t } = useLang();
   const navigate = useNavigate();
-  const { selectedPhotos, photoEdits } = state;
+  const { selectedPhotos, photoEdits, deviceConfig, printAddon } = state;
   const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
   const [preview, setPreview] = useState(null);       // { src, label } | null
   const [confirmRemove, setConfirmRemove] = useState(null); // photo pending removal | null
+
+  // Print add-on — decided here so the total shown is the real total before
+  // ever reaching checkout, folded into the same payment (no post-payment
+  // "pay to print" upsell, see Download.jsx).
+  const outletId = deviceConfig?.outlet?.id;
+  const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
+  const { printTemplates } = usePrintTemplates(outletId);
+  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
+  const templateVersion = activeTemplate?.currentVersion ?? null;
+  const printPrice = activeTemplate?.price ?? null;
+  const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
+    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
+  const addonChecked = !!printAddon;
+  const addonEstimate = (addonChecked && printAddon.canSubmit) ? printAddon.totalPrice : 0;
+
+  function toggleAddon(checked) {
+    dispatch({ type: 'SET_PRINT_ADDON', payload: checked ? { copies: 1, photoIds: [], totalPrice: 0, canSubmit: false } : null });
+  }
 
   function handleRemove(photoId) {
     dispatch({ type: 'TOGGLE_PHOTO', payload: { id: photoId } });
@@ -145,6 +167,35 @@ export default function Cart() {
             })}
           </div>
 
+          {canOfferPrintAddon && (
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+            >
+              <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
+                <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
+                  <Printer size={18} /> {t('checkout.addPrint')}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={addonChecked}
+                  onChange={(e) => toggleAddon(e.target.checked)}
+                  className="w-5 h-5"
+                />
+              </label>
+              {addonChecked && (
+                <div className="px-4 pb-4">
+                  <PrintAddonSelector
+                    photos={selectedPhotos}
+                    templateVersion={templateVersion}
+                    printPrice={printPrice}
+                    onSelectionChange={(sel) => dispatch({ type: 'SET_PRINT_ADDON', payload: sel })}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Price summary */}
           <div
             className="p-5 rounded-lg flex items-center justify-between"
@@ -158,7 +209,7 @@ export default function Cart() {
                 {t('cart.photoCount', { count: selectedPhotos.length })}
               </p>
               <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
-                Rp {total.toLocaleString('id-ID')}
+                Rp {(total + addonEstimate).toLocaleString('id-ID')}
               </p>
             </div>
             <Button size="lg" onClick={() => navigate('/checkout')}>

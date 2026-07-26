@@ -5,20 +5,10 @@ import { useApp } from '../../../../store/AppContext';
 import { useLang } from '../../../../i18n/LanguageContext';
 import { createTransaction, getTransaction, cancelTransaction } from '../../../../api/mockApi';
 import { savePendingOrder, updatePendingOrder, clearPendingOrder } from '../../../../utils/pendingOrder';
-import { isTauri } from '../../../../native/print';
-import { usePrintSetting } from '../../../../hooks/usePrintSetting';
-import { usePrintTemplates } from '../../../../hooks/usePrintTemplates';
 import LoadingSpinner from '../../../common/LoadingSpinner';
 import Button from '../../../common/Button';
-import PrintAddonSelector from '../../../Print/PrintAddonSelector';
 
 const POLL_INTERVAL_MS = 3000;
-
-function formatCountdown(seconds) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = (seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
 
 // Extracted from Checkout.jsx verbatim (Phase A of the Access Method
 // redesign) — this IS today's whole checkout flow for the zero-props case.
@@ -40,14 +30,9 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   // 'idle' | 'creating' | 'waiting' | 'error'
   const [status, setStatus] = useState('idle');
   const [transaction, setTransaction] = useState(null);
-  const [countdown, setCountdown] = useState(300);
   const [errorMsg, setErrorMsg] = useState('');
   // null | 'back' | 'cancel-only'
   const [confirmMode, setConfirmMode] = useState(null);
-  // Checkout-time print add-on — same gate Download.jsx's canPrint uses,
-  // minus the selectedPhotos.length check (trivially true here already).
-  const [addonChecked, setAddonChecked] = useState(false);
-  const [addonSelection, setAddonSelection] = useState(null); // {copies, photoIds, totalPrice, canSubmit}
 
   const pollRef = useRef(null);
   const countdownRef = useRef(null);
@@ -59,18 +44,11 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   useEffect(() => { statusRef.current = status; }, [status]);
 
   const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  const { deviceConfig } = state;
-  const outletId = deviceConfig?.outlet?.id;
+  const { deviceConfig, printAddon } = state;
 
-  const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
-  const { printTemplates } = usePrintTemplates(outletId);
-  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
-  const templateVersion = activeTemplate?.currentVersion ?? null;
-  const printPrice = activeTemplate?.price ?? null;
-  const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
-    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
-
-  const addonEstimate = (canOfferPrintAddon && addonChecked && addonSelection?.canSubmit) ? addonSelection.totalPrice : 0;
+  // Decided back on the Cart screen — this screen just confirms + folds it
+  // into the same payment, it's not an editable control here.
+  const addonEstimate = printAddon?.canSubmit ? printAddon.totalPrice : 0;
   // Once a transaction exists, its server-computed final_price is authoritative
   // (it already folds in the print add-on server-side) — before that, this is
   // just a client-side estimate for the confirm screen, same as discountAmount.
@@ -95,7 +73,6 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
     const trxId = transactionRef.current?.id;
     setStatus('idle');
     setTransaction(null);
-    setCountdown(300);
     setErrorMsg('');
     // Explicit user cancel → drop the recovery record too.
     clearPendingOrder();
@@ -121,14 +98,13 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         ...p,
         edited_image: state.photoEdits[p.id]?.dataUrl ?? null,
       }));
-      const printAddon = (canOfferPrintAddon && addonChecked && addonSelection?.canSubmit)
-        ? { photoIds: addonSelection.photoIds, copies: addonSelection.copies }
-        : null;
       const trx = await createTransaction({
         outletId: deviceConfig.outlet.id,
         photos: photosWithEdits,
         promoCode,
-        printAddon,
+        printAddon: printAddon?.canSubmit
+          ? { photoIds: printAddon.photoIds, copies: printAddon.copies }
+          : null,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment
@@ -142,7 +118,6 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         })),
       });
       const dueSeconds = (trx.payment_due_minutes ?? 5) * 60;
-      setCountdown(dueSeconds);
       setStatus('waiting');
       startPolling(trx.id, dueSeconds);
     } catch (err) {
@@ -191,14 +166,8 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
     );
   }
 
-  const countdownColor = countdown <= 60
-    ? 'var(--color-error)'
-    : countdown <= 120
-      ? 'var(--color-warning)'
-      : 'var(--color-primary)';
-
   return (
-    <div className="flex flex-col items-center gap-8 max-w-3xl mx-auto w-full py-8">
+    <div className="flex flex-col items-center gap-8 max-w-6xl mx-auto w-full py-8">
 
       {/* ── Idle: summary + pay button ── */}
       {status === 'idle' && (
@@ -257,32 +226,15 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             </div>
           </div>
 
-          {canOfferPrintAddon && (
+          {/* Print add-on is decided back on the Cart screen (so the total is
+              known before reaching payment) — this just confirms what's
+              already folded into displayTotal above. */}
+          {printAddon?.canSubmit && (
             <div
-              className="rounded-2xl overflow-hidden"
-              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+              className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold"
+              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-800)' }}
             >
-              <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
-                <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
-                  <Printer size={18} /> {t('checkout.addPrint')}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={addonChecked}
-                  onChange={(e) => setAddonChecked(e.target.checked)}
-                  className="w-5 h-5"
-                />
-              </label>
-              {addonChecked && (
-                <div className="px-4 pb-4">
-                  <PrintAddonSelector
-                    photos={state.selectedPhotos}
-                    templateVersion={templateVersion}
-                    printPrice={printPrice}
-                    onSelectionChange={setAddonSelection}
-                  />
-                </div>
-              )}
+              <Printer size={18} /> {t('checkout.printIncluded', { count: printAddon.copies })}
             </div>
           )}
 
@@ -299,9 +251,11 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
       {status === 'waiting' && transaction && (
         <div className="flex flex-col sm:flex-row gap-6 w-full items-stretch sm:items-start">
 
-          {/* Left: QR Code card */}
+          {/* Left: DOKU payment gateway card — sized to be the focal point;
+              DOKU's own hosted page already shows its payment countdown, so
+              we don't duplicate one here. */}
           <div
-            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto sm:min-w-[300px]"
+            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto"
             style={{
               background: '#fff',
               boxShadow: 'var(--shadow-xl)',
@@ -332,61 +286,12 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               src={transaction.payment_url}
               title="DOKU QRIS"
               className="rounded-2xl"
-              style={{ width: 280, height: 480, border: '1.5px solid var(--color-neutral-200)' }}
+              style={{ width: 620, height: 640, maxWidth: '100%', border: '1.5px solid var(--color-neutral-200)' }}
             />
-
-            {/* Countdown */}
-            <div className="flex flex-col items-center gap-1 w-full">
-              <p className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
-                {t('checkout.dueLabel')}
-              </p>
-              <div
-                className="text-4xl font-black font-mono tabular-nums"
-                style={{ color: countdownColor, transition: 'color 0.5s' }}
-              >
-                {formatCountdown(countdown)}
-              </div>
-              {/* Progress bar */}
-              <div
-                className="w-full rounded-full overflow-hidden mt-1"
-                style={{ height: 6, background: 'var(--color-neutral-200)' }}
-              >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${(countdown / ((transaction.payment_due_minutes ?? 5) * 60)) * 100}%`,
-                    background: countdownColor,
-                    transition: 'width 1s linear, background 0.5s',
-                  }}
-                />
-              </div>
-            </div>
 
             <p className="text-xs text-center" style={{ color: 'var(--color-neutral-500)' }}>
               {t('checkout.scanInstr')}
             </p>
-
-            {/* Action buttons */}
-            <div className="flex flex-col gap-2 w-full">
-              <button
-                onClick={() => setConfirmMode('back')}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-                style={{
-                  background: 'var(--color-neutral-100)',
-                  color: 'var(--color-neutral-600)',
-                  border: '1.5px solid var(--color-neutral-200)',
-                }}
-              >
-                <ArrowLeft size={16} /> {t('checkout.backCancel')}
-              </button>
-              <button
-                onClick={() => setConfirmMode('cancel-only')}
-                className="w-full py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
-                style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}
-              >
-                {t('checkout.cancelTrx')}
-              </button>
-            </div>
           </div>
 
           {/* Right: Order summary */}
@@ -449,6 +354,27 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               >
                 <Smartphone size={24} />
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2 px-6 pb-6">
+              <button
+                onClick={() => setConfirmMode('back')}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                style={{
+                  background: 'var(--color-neutral-100)',
+                  color: 'var(--color-neutral-600)',
+                  border: '1.5px solid var(--color-neutral-200)',
+                }}
+              >
+                <ArrowLeft size={16} /> {t('checkout.backCancel')}
+              </button>
+              <button
+                onClick={() => setConfirmMode('cancel-only')}
+                className="w-full py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                style={{ color: 'var(--color-error)', background: 'var(--color-error-bg)' }}
+              >
+                {t('checkout.cancelTrx')}
+              </button>
             </div>
           </div>
         </div>
