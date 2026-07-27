@@ -17,6 +17,17 @@ async function resolveAppVersion() {
   }
 }
 
+// Print stock as of the last successful beat: { initial, printed, remaining,
+// threshold, low } or null when the backend says tracking isn't configured (or
+// no beat has landed yet). Read by SettingsModal — deliberately staff-facing
+// only, since "low on paper" is not something to put in front of a customer
+// mid-purchase. The 5-minute beat is precise enough for a consumable that
+// depletes one sheet at a time.
+let lastStock = null;
+export function getPrintStock() {
+  return lastStock;
+}
+
 async function sendHeartbeat(deviceConfig) {
   if (!deviceConfig?.outlet) return;
   const { printerName } = deviceConfig;
@@ -25,13 +36,15 @@ async function sendHeartbeat(deviceConfig) {
   const printers = await listPrinters();
   const printerStatus = printers.some((p) => p.name === printerName) ? 'online' : 'offline';
 
-  await sendKioskHeartbeat({
+  const res = await sendKioskHeartbeat({
     kioskId: getKioskId(),
     outletId: deviceConfig.outlet.id,
     printerName,
     printerStatus,
     appVersion: await resolveAppVersion(),
-  }).catch(() => {});
+  }).catch(() => null);
+
+  if (res?.stock) lastStock = res.stock.initial === null ? null : res.stock;
 }
 
 // Fires once immediately, then every 5 minutes. Returns a cleanup fn.

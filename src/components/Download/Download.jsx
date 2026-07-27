@@ -6,7 +6,6 @@ import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
 import { isTauri, printImage } from '../../native/print';
-import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
 import { reprintPrintJob, createPrintJob } from '../../api/mockApi';
 import { enqueuePrint } from '../../utils/printQueue';
@@ -46,17 +45,30 @@ export default function Download() {
   const [receiptStatus, setReceiptStatus] = useState('idle'); // idle | printing | fail
   const outletId = deviceConfig?.outlet?.id;
 
-  // Printing is decided once, upfront at checkout (QrisRunner's print-addon
+  // Printing is decided once, upfront at checkout (the Cart print-addon
   // checkbox) — no post-payment "pay to print" upsell here. Otherwise a
   // customer who paid Rp 0 for photos via a 100%-off voucher would suddenly
   // face a fresh charge just to print, which makes no sense. This lookup
   // stays only to resolve the template the auto-print effect below composes
   // against (order.print_addon already tells us copies/photos/pricing —
   // resolved and charged server-side at checkout).
-  const { setting: printSetting } = usePrintSetting(outletId);
-  const { printTemplates } = usePrintTemplates(outletId);
-  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
-  const templateVersion = activeTemplate?.currentVersion ?? null;
+  const { printTemplates, loading: templatesLoading } = usePrintTemplates(outletId);
+  // Compose against the exact version the customer was charged for, not
+  // whatever the outlet's settings point at now. With two print types those
+  // diverge the moment a customer buys a strip, and re-resolving from settings
+  // would print a 4R against a paid-for 2x6. The backend pins
+  // template_version_id on the addon at checkout precisely so this is knowable.
+  const paidVersionId = order?.print_addon?.template_version_id ?? null;
+  const templateVersion = printTemplates
+    .map((tpl) => tpl.currentVersion)
+    .find((v) => v && v.id === paidVersionId) ?? null;
+  // Paid for, but the exact version isn't among the outlet's current ones — an
+  // admin republishing the template between checkout and pickup repoints
+  // current_version and the paid id stops matching. Derived rather than set
+  // from the effect, and surfaced through the same banner as a print failure
+  // so the retry stays reachable. Printing the *new* layout instead would put
+  // a wrong-sized render on media the customer already paid for.
+  const paidVersionMissing = !!order?.print_addon && !templatesLoading && !templateVersion;
 
   // Print jobs queued this session — printing never blocks the flow above, so
   // outcomes land here asynchronously via the local queue's 'printjob:done'
@@ -122,7 +134,7 @@ export default function Download() {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.id, order?.print_addon, templateVersion, addonPrintAttempt]);
+  }, [order?.id, order?.print_addon, templateVersion, templatesLoading, addonPrintAttempt]);
 
   async function handleReprint(job) {
     setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'queued' } : j)));
@@ -283,7 +295,7 @@ export default function Download() {
           </div>
         )}
 
-        {order?.print_addon && addonPrintError && (
+        {order?.print_addon && (addonPrintError || paidVersionMissing) && (
           <div
             className="w-full rounded-2xl p-4 flex flex-col gap-2"
             style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}

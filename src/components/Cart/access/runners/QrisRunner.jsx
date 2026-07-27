@@ -103,7 +103,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         photos: photosWithEdits,
         promoCode,
         printAddon: printAddon?.canSubmit
-          ? { photoIds: printAddon.photoIds, copies: printAddon.copies }
+          ? { photoIds: printAddon.photoIds, copies: printAddon.copies, printType: printAddon.printType }
           : null,
       });
       setTransaction(trx);

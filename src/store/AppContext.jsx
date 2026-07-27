@@ -23,6 +23,11 @@ const initialState = {
   aiTransformUsed: false,   // 1 free AI transform per session
   aiJob: null,              // in-flight or ready AI job — survives navigation
   printAddon: null,         // { copies, photoIds, totalPrice, canSubmit } — decided on Cart, paid in the same checkout transaction
+  // Scopes phone uploads to one customer. Lives here rather than in the editor
+  // so it survives a trip to the cart and back, and it is regenerated on RESET
+  // and on a new face scan — inheriting the previous customer's session id
+  // would show their uploads to the next person at the kiosk.
+  uploadSessionId: crypto.randomUUID(),
 };
 
 function reducer(state, action) {
@@ -30,7 +35,7 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printAddon: null };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printAddon: null, uploadSessionId: crypto.randomUUID() };
     case 'SET_PRINT_ADDON':
       return { ...state, printAddon: action.payload };
     case 'SET_AI_JOB':
@@ -108,7 +113,10 @@ function reducer(state, action) {
       return { ...state, deviceConfig: action.payload };
     }
     case 'RESET':
-      return { ...initialState, deviceConfig: state.deviceConfig };
+      // Fresh session id, not initialState's — that object is built once at
+      // module load, so reusing it would hand the next customer the previous
+      // one's upload session.
+      return { ...initialState, deviceConfig: state.deviceConfig, uploadSessionId: crypto.randomUUID() };
     default:
       return state;
   }

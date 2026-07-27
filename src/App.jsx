@@ -18,6 +18,7 @@ import { useApp } from './store/AppContext';
 import { ConnectivityProvider } from './store/ConnectivityContext';
 import { useOutletFromURL } from './hooks/useOutletFromURL';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useBranding } from './hooks/useBranding';
 import ScrollHint from './components/common/ScrollHint';
 import OfflineBanner from './components/common/OfflineBanner';
 import OrderRecovery from './components/common/OrderRecovery';
@@ -45,6 +46,9 @@ function Layout() {
   // Mobile customers arrive via QR with ?outlet_id=... — auto-configure from URL.
   useOutletFromURL();
   const isConfigured = !!(state.deviceConfig.unit && state.deviceConfig.outlet);
+  // Applies the outlet's primary colour + background globally; the banner is
+  // the welcome screen's to render.
+  const { bannerUrl } = useBranding(state.deviceConfig.outlet?.id);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -208,6 +212,17 @@ function Layout() {
 
       {/* Page content */}
       <main key={location.pathname} className="flex-1 p-3 sm:p-6 overflow-auto no-scrollbar pop-in">
+        {/* Outlet banner — welcome screen only, so it greets rather than
+            follows the customer through checkout. */}
+        {isHome && bannerUrl && (
+          <img
+            src={bannerUrl}
+            alt=""
+            className="w-full max-w-4xl mx-auto mb-4 rounded-2xl object-cover"
+            style={{ maxHeight: 180 }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        )}
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />

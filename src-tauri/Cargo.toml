@@ -26,3 +26,14 @@ tauri-plugin-log = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 printers = "2"
+
+# Windows prints through GDI directly (see printing.rs) — `image` only decodes
+# the JPEG the kiosk composed, so JPEG is the only codec built in. Neither dep
+# is pulled into macOS/Linux builds, where CUPS `lp` rasterizes for us.
+[target.'cfg(windows)'.dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_Xps",
+] }

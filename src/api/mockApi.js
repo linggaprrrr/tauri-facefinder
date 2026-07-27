@@ -1,3 +1,5 @@
+import { getKioskId } from '../utils/kioskId';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001';
 const KIOSK_API_KEY = import.meta.env.VITE_KIOSK_API_KEY ?? '';
 
@@ -104,6 +106,46 @@ export async function getUnits() {
 // isKiosk: the device-setup picker in Settings only lists kiosk-flagged
 // outlets — a physical kiosk terminal has no business belonging to a
 // staffed, non-kiosk outlet.
+// Photos the customer uploaded from their phone into this editing session.
+// Returns [{ id, slot_id, status, url }] — one row per filled placeholder.
+export async function getSessionUploads(sessionId) {
+  const res = await fetch(`${API_BASE}/session-uploads/${sessionId}`, {
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new ApiError('server', `API error ${res.status}`, res.status);
+  return (await res.json()).data ?? [];
+}
+
+// The URL encoded into the placeholder's QR. The customer's phone opens this,
+// so it points at the public download/upload web app, not the kiosk.
+export function sessionUploadUrl(sessionId, slotId) {
+  const base = (import.meta.env.VITE_DOWNLOAD_LINK ?? 'https://myphoto.com').replace(/\/$/, '');
+  return `${base}/upload/${sessionId}/${slotId}`;
+}
+
+// Kiosk branding for an outlet — fetched at boot and cached, so a kiosk that
+// starts up offline still renders the operator's branding from last run.
+export async function getOutletKioskConfig(outletId) {
+  const res = await fetch(`${API_BASE}/outlets/${outletId}/kiosk-config`, {
+    headers: { 'api-key': KIOSK_API_KEY },
+  });
+  if (!res.ok) throw new ApiError('server', `API error ${res.status}`, res.status);
+  return res.json();
+}
+
+// Authoritative Settings-PIN check. Throws ApiError with .status 401 (wrong)
+// or 429 (server-side rate limit) — deviceAuth treats anything else as "could
+// not reach the server" and falls back to its offline credential.
+export async function verifyOutletPin(outletId, pin) {
+  const res = await fetch(`${API_BASE}/outlets/${outletId}/verify-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
+    body: JSON.stringify({ pin }),
+  });
+  if (!res.ok) throw new ApiError('server', `API error ${res.status}`, res.status);
+  return res.json();
+}
+
 export async function getOutletsByUnit(unitId, { isKiosk } = {}) {
   const params = isKiosk === undefined ? '' : `?is_kiosk=${isKiosk}`;
   const res = await fetch(`${API_BASE}/outlets/get-outlets-by-unit/${unitId}${params}`);
@@ -126,9 +168,13 @@ export async function createTransaction({ outletId, photos, promoCode, printAddo
       // they actually made — stickers/text/filter, or a framed collage on top.
       photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
       promo_code: promoCode ?? null,
-      // No price/template sent — server resolves both from the outlet's own
-      // print settings, same source-of-truth pattern as photo pricing.
-      print_addon: printAddon ? { photo_ids: printAddon.photoIds, copies: printAddon.copies } : null,
+      // No price/template id sent — print_type is a *mode* ('primary' photo
+      // layout vs 'secondary' photo strip) and the server maps it to the
+      // outlet's own configured template, same source-of-truth pattern as
+      // photo pricing.
+      print_addon: printAddon
+        ? { photo_ids: printAddon.photoIds, copies: printAddon.copies, print_type: printAddon.printType ?? 'primary' }
+        : null,
     }),
   });
 
@@ -258,7 +304,11 @@ export async function updatePrintJobStatus(jobId, { status, message, printerName
   const res = await fetch(`${API_BASE}/print-jobs/${jobId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
-    body: JSON.stringify({ status, message, printer_name: printerName }),
+    // kiosk_id is attached here rather than passed in by callers — it's how the
+    // backend attributes consumed sheets to the right physical printer, and a
+    // caller that forgot it would silently stop decrementing stock (see the
+    // print_type that QrisRunner dropped). One place, can't be forgotten.
+    body: JSON.stringify({ status, message, printer_name: printerName, kiosk_id: getKioskId() }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();

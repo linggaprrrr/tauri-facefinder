@@ -268,7 +268,20 @@ button:focus-visible {
    Applied to the app shell so every screen sits on a lively stage. */
 .app-bg {
   position: relative;
-  background: var(--gradient-hero);
+  /* --brand-bg-image is set per-outlet by useBranding; unset it falls through
+     to the stock hero gradient. The gradient stays underneath either way so a
+     transparent or slow-loading brand image never leaves a blank screen.
+     The scrim on top is not optional: every text colour in the app is a dark
+     neutral chosen against a light background, so an operator uploading a dark
+     photo would otherwise render the whole UI unreadable. Layering it here
+     keeps branding a safe, un-reviewable setting. */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.86)),
+    var(--brand-bg-image, none),
+    var(--gradient-hero);
+  background-size: auto, cover, auto;
+  background-position: center;
+  background-attachment: fixed, fixed, scroll;
   overflow: hidden;
 }
 .app-bg::before,
@@ -456,4 +469,18 @@ button:focus-visible {
   .gallery-masonry {
     grid-template-columns: repeat(8, 1fr);
   }
+}
+
+/* Wrong-PIN feedback. Short and lateral so it reads as "no" without looking
+   like the app broke. Respects reduced-motion like .pop-in / .bob above. */
+.pin-shake { animation: pinShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes pinShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-shake { animation: none; }
 }

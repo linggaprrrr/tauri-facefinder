@@ -1,12 +1,15 @@
-import { Undo2, Redo2, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, ChevronUp, ChevronDown, Trash2, Lock, LockOpen } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
 export default function EditorToolbar({
   canUndo, canRedo, onUndo, onRedo,
-  onDelete, onBringForward, onSendBackward,
-  hasSelection,
+  onDelete, onBringForward, onSendBackward, onToggleLock,
+  hasSelection, isLocked,
 }) {
   const { t } = useLang();
+  // A locked element can still be selected (that's how you unlock it), so the
+  // mutating controls key off "editable", not "selected".
+  const canEdit = hasSelection && !isLocked;
   // Compact on mobile (xs), full kiosk size on desktop (sm:+).
   const base = 'px-2 sm:px-4 py-1 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 min-h-7 sm:min-h-10 inline-flex items-center gap-1 sm:gap-1.5';
 
@@ -50,23 +53,23 @@ export default function EditorToolbar({
 
       {/* Layer controls */}
       <button
-        className={toolBtn(hasSelection)}
+        className={toolBtn(canEdit)}
         onClick={onBringForward}
-        disabled={!hasSelection}
+        disabled={!canEdit}
         style={{
-          background: hasSelection ? 'var(--color-neutral-100)' : 'var(--color-neutral-50)',
-          color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
+          background: canEdit ? 'var(--color-neutral-100)' : 'var(--color-neutral-50)',
+          color: canEdit ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
         <ChevronUp size={14} /> {t('toolbar.forward')}
       </button>
       <button
-        className={toolBtn(hasSelection)}
+        className={toolBtn(canEdit)}
         onClick={onSendBackward}
-        disabled={!hasSelection}
+        disabled={!canEdit}
         style={{
-          background: hasSelection ? 'var(--color-neutral-100)' : 'var(--color-neutral-50)',
-          color: hasSelection ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
+          background: canEdit ? 'var(--color-neutral-100)' : 'var(--color-neutral-50)',
+          color: canEdit ? 'var(--color-neutral-700)' : 'var(--color-neutral-300)',
         }}
       >
         <ChevronDown size={14} /> {t('toolbar.backward')}
@@ -75,14 +78,32 @@ export default function EditorToolbar({
       {/* Divider */}
       <div className="w-px self-stretch" style={{ background: 'var(--color-neutral-200)' }} />
 
+      {/* Editable on/off */}
+      <button
+        className={toolBtn(hasSelection)}
+        onClick={onToggleLock}
+        disabled={!hasSelection}
+        aria-pressed={isLocked}
+        title={t(isLocked ? 'toolbar.unlockHint' : 'toolbar.lockHint')}
+        style={{
+          background: !hasSelection ? 'var(--color-neutral-50)'
+            : isLocked ? 'var(--color-warning-bg)' : 'var(--color-neutral-100)',
+          color: !hasSelection ? 'var(--color-neutral-300)'
+            : isLocked ? 'var(--color-warning)' : 'var(--color-neutral-700)',
+        }}
+      >
+        {isLocked ? <Lock size={14} /> : <LockOpen size={14} />}
+        {t(isLocked ? 'toolbar.locked' : 'toolbar.unlocked')}
+      </button>
+
       {/* Delete */}
       <button
-        className={toolBtn(hasSelection, true)}
+        className={toolBtn(canEdit, true)}
         onClick={onDelete}
-        disabled={!hasSelection}
+        disabled={!canEdit}
         style={{
-          background: hasSelection ? 'var(--color-error-bg)' : 'var(--color-neutral-50)',
-          color: hasSelection ? 'var(--color-error)' : 'var(--color-neutral-300)',
+          background: canEdit ? 'var(--color-error-bg)' : 'var(--color-neutral-50)',
+          color: canEdit ? 'var(--color-error)' : 'var(--color-neutral-300)',
         }}
       >
         <Trash2 size={14} /> {t('toolbar.delete')}

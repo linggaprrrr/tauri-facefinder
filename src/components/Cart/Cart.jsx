@@ -24,16 +24,41 @@ export default function Cart() {
   const outletId = deviceConfig?.outlet?.id;
   const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
   const { printTemplates } = usePrintTemplates(outletId);
-  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
+
+  // Two products: Primary (normal photo layout) and Secondary (photo strip).
+  // A template is only offerable once it has a published version AND a price —
+  // an unpriced template would otherwise reach checkout and 400 there.
+  const usable = (id) => {
+    const tpl = printTemplates.find((t) => t.id === id) ?? null;
+    return tpl?.currentVersion && tpl.price ? tpl : null;
+  };
+  const primaryTemplate = usable(printSetting?.default_template_id);
+  const secondaryTemplate = usable(printSetting?.secondary_template_id);
+
+  // Leads with the normal print when both exist, but falls to strip when strip
+  // is the only thing this outlet offers.
+  const [printType, setPrintType] = useState('primary');
+  let effectiveType = 'primary';
+  if (printType === 'secondary' && secondaryTemplate) effectiveType = 'secondary';
+  else if (!primaryTemplate && secondaryTemplate) effectiveType = 'secondary';
+  const activeTemplate = effectiveType === 'secondary' ? secondaryTemplate : primaryTemplate;
   const templateVersion = activeTemplate?.currentVersion ?? null;
   const printPrice = activeTemplate?.price ?? null;
+
   const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
     && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
   const addonChecked = !!printAddon;
   const addonEstimate = (addonChecked && printAddon.canSubmit) ? printAddon.totalPrice : 0;
 
   function toggleAddon(checked) {
-    dispatch({ type: 'SET_PRINT_ADDON', payload: checked ? { copies: 1, photoIds: [], totalPrice: 0, canSubmit: false } : null });
+    dispatch({ type: 'SET_PRINT_ADDON', payload: checked ? { copies: 1, photoIds: [], totalPrice: 0, printType: effectiveType, canSubmit: false } : null });
+  }
+
+  // Switching mode invalidates the selection: the two templates have different
+  // slot counts, so photo_ids picked for one are meaningless for the other.
+  function changePrintType(next) {
+    setPrintType(next);
+    dispatch({ type: 'SET_PRINT_ADDON', payload: { copies: 1, photoIds: [], totalPrice: 0, printType: next, canSubmit: false } });
   }
 
   function handleRemove(photoId) {
@@ -184,12 +209,45 @@ export default function Cart() {
                 />
               </label>
               {addonChecked && (
-                <div className="px-4 pb-4">
+                <div className="px-4 pb-4 flex flex-col gap-3">
+                  {/* Only a choice when the outlet has configured both — one
+                      configured product is a fact, not a question. */}
+                  {primaryTemplate && secondaryTemplate && (
+                    <div className="flex gap-2">
+                      {[
+                        { type: 'primary', tpl: primaryTemplate, label: t('print.typePrimary') },
+                        { type: 'secondary', tpl: secondaryTemplate, label: t('print.typeSecondary') },
+                      ].map(({ type, tpl, label }) => {
+                        const active = effectiveType === type;
+                        return (
+                          <button
+                            key={type}
+                            onClick={() => changePrintType(type)}
+                            className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                            style={{
+                              background: active ? 'var(--color-primary-50)' : 'var(--color-neutral-50)',
+                              color: active ? 'var(--color-primary)' : 'var(--color-neutral-600)',
+                              border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-neutral-200)'}`,
+                            }}
+                          >
+                            <span className="block">{label}</span>
+                            <span className="block text-xs font-normal opacity-80">
+                              {tpl.paperSize} · Rp {(tpl.price ?? 0).toLocaleString('id-ID')}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   <PrintAddonSelector
+                    // Remount on mode change so copies/slot assignments reset
+                    // instead of carrying over to a template with a different
+                    // slot count.
+                    key={effectiveType}
                     photos={selectedPhotos}
                     templateVersion={templateVersion}
                     printPrice={printPrice}
-                    onSelectionChange={(sel) => dispatch({ type: 'SET_PRINT_ADDON', payload: sel })}
+                    onSelectionChange={(sel) => dispatch({ type: 'SET_PRINT_ADDON', payload: { ...sel, printType: effectiveType } })}
                   />
                 </div>
               )}

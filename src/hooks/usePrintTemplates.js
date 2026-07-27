@@ -9,6 +9,10 @@ function normalize(template) {
     id: template.id,
     label: template.label,
     paperSize: template.paper_size,
+    // 'primary' (normal photo layout) | 'secondary' (photo strip). The list
+    // returns both types for the outlet in one payload — the kiosk picks by id
+    // from the outlet's print settings, so there's no separate fetch per type.
+    printType: template.print_type ?? 'primary',
     isGlobal: template.is_global,
     isActive: template.is_active,
     price: template.price ?? null,  // per-print price (IDR) — paper size drives cost

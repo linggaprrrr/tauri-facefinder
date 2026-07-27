@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Printer, RefreshCw } from 'lucide-react';
+import { X, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
+import { getPrintStock } from '../../utils/heartbeat';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
-import { verifyDeviceKey } from '../../utils/deviceAuth';
+import PinPad from './PinPad';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
 export default function SettingsModal({ onClose, forced = false }) {
@@ -13,8 +14,8 @@ export default function SettingsModal({ onClose, forced = false }) {
 
   // Skip auth on first-run forced setup; require it when admin manually opens settings
   const [step, setStep] = useState(forced ? 'config' : 'auth');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  // Snapshot from the last heartbeat, read once on open — no fetch of its own.
+  const printStock = getPrintStock();
 
   const [units, setUnits] = useState([]);
   const [outlets, setOutlets] = useState([]);
@@ -48,14 +49,9 @@ export default function SettingsModal({ onClose, forced = false }) {
     if (forced) fetchUnits();
   });
 
-  function handleAuth(e) {
-    e.preventDefault();
-    if (verifyDeviceKey(password)) {
-      setStep('config');
-      fetchUnits();
-    } else {
-      setAuthError(t('settings.wrongCode'));
-    }
+  function handleAuthSuccess() {
+    setStep('config');
+    fetchUnits();
   }
 
   async function fetchUnits() {
@@ -181,33 +177,10 @@ export default function SettingsModal({ onClose, forced = false }) {
         <div className="px-6 py-6 overflow-y-auto" style={{ maxHeight: '65vh' }}>
           {/* ── Step 1: Auth ── */}
           {step === 'auth' && (
-            <form onSubmit={handleAuth} className="flex flex-col gap-4">
-              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
-                {t('settings.authHint')}
-              </p>
-              <input
-                type="password"
-                placeholder={t('settings.codePlaceholder')}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setAuthError(''); }}
-                autoFocus
-                autoComplete="off"
-                className="border rounded-lg px-4 py-3 text-base w-full outline-none focus:ring-2"
-                style={{
-                  borderColor: authError ? 'var(--color-error)' : 'var(--color-neutral-300)',
-                  '--tw-ring-color': 'var(--color-primary)',
-                }}
-              />
-              {authError && (
-                <p className="text-sm" style={{ color: 'var(--color-error)' }}>{authError}</p>
-              )}
-              <button
-                type="submit"
-                className="btn-primary w-full py-3 rounded-lg font-semibold text-base"
-              >
-                {t('settings.openSettings')}
-              </button>
-            </form>
+            <PinPad
+              outletId={state.deviceConfig.outlet?.id}
+              onSuccess={handleAuthSuccess}
+            />
           )}
 
           {/* ── Step 2: Config ── */}
@@ -366,6 +339,34 @@ export default function SettingsModal({ onClose, forced = false }) {
                         </p>
                       )}
                     </>
+                  )}
+
+                  {/* Print stock — staff-facing only, behind the PIN. A
+                      customer mid-purchase must never see "low on paper". */}
+                  {printStock && (
+                    <div
+                      className="flex flex-col gap-1.5 p-3 rounded-lg mt-1"
+                      style={{
+                        background: printStock.low ? 'var(--color-warning-bg)' : 'var(--color-neutral-50)',
+                        border: `1.5px solid ${printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-200)'}`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-600)' }}>
+                          {printStock.low && <AlertTriangle size={14} />} {t('settings.printStock')}
+                        </span>
+                        <span className="text-sm font-black" style={{ color: printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-800)' }}>
+                          {printStock.remaining}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                        <span>{t('settings.stockInitial')}: {printStock.initial}</span>
+                        <span>{t('settings.stockPrinted')}: {printStock.printed}</span>
+                      </div>
+                      {printStock.low && (
+                        <p className="text-xs" style={{ color: 'var(--color-warning)' }}>{t('settings.stockLowHint')}</p>
+                      )}
+                    </div>
                   )}
 
                   {/* ── Receipt printer (thermal, separate device) ── */}
