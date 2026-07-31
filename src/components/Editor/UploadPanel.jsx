@@ -1,9 +1,9 @@
 import { QrCode, Smartphone, Loader2, Check } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
-// Sidebar panel for the Upload Photo placeholder. The QR itself is drawn on
-// the canvas (so the customer can scan it while seeing where the photo will
-// land) — this panel is the instructions plus the live waiting/done state.
+// Sidebar panel for phone uploads. The QR opens in its own modal (see
+// PhoneUploadModal) rather than being placed on the canvas — this panel is the
+// entry point plus the instructions and the done state.
 export default function UploadPanel({ onAdd, awaitingCount, uploadedCount }) {
   const { t } = useLang();
 

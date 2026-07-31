@@ -151,9 +151,14 @@ export default function SettingsModal({ onClose, forced = false }) {
           className="flex items-center justify-between px-6 py-4"
           style={{ background: 'var(--color-primary)', color: '#fff' }}
         >
-          <span className="font-bold text-xl">
-            {forced ? t('settings.firstSetup') : t('settings.title')}
-          </span>
+          <div>
+            <span className="font-bold text-xl block">
+              {forced ? t('settings.firstSetup') : t('settings.title')}
+            </span>
+            {state.deviceConfig.outlet?.name && (
+              <span className="text-xs opacity-80">{state.deviceConfig.outlet.name}</span>
+            )}
+          </div>
           {!forced && (
             <button
               onClick={onClose}

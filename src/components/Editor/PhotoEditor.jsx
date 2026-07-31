@@ -8,6 +8,7 @@ import {
   Plus, Minus, Pencil, MousePointer, Loader2, Lock, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { readCachedBranding } from '../../hooks/useBranding';
 import { useLang } from '../../i18n/LanguageContext';
 import { useHistory } from '../../hooks/useHistory';
 import StickerPanel from './StickerPanel';
@@ -16,6 +17,7 @@ import FilterPanel from './FilterPanel';
 import FramePanel from './FramePanel';
 import SlotPhotoPicker from './SlotPhotoPicker';
 import UploadPanel from './UploadPanel';
+import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
 import { useSessionUploads } from '../../hooks/useSessionUploads';
 import { sessionUploadUrl } from '../../api/mockApi';
@@ -509,7 +511,16 @@ export default function PhotoEditor() {
   const initEdit = state.photoEdits[currentPhoto?.id] ?? {};
   const { state: elements, push: pushHistory, undo, redo, reset: resetHistory, canUndo, canRedo } = useHistory(initEdit.elements ?? []);
   const [selectedId, setSelectedId] = useState(null);
-  const [activePanel, setActivePanel] = useState('stickers');
+  // Admin-configured per outlet (Branding Kiosk modal), boot-cached same as
+  // colours/images — a toggle lands next reboot, not mid-session.
+  const disabledTools = readCachedBranding(state.deviceConfig.outlet?.id)?.disabled_tools ?? [];
+  const visibleSidebarTools = SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id));
+  // 'stickers' is the usual default panel (on load and whenever the editor
+  // resets to a neutral tool), but if an outlet has disabled exactly that
+  // tool, fall back to whatever's first available instead of landing on a
+  // panel with no matching sidebar button.
+  const defaultPanel = disabledTools.includes('stickers') ? (visibleSidebarTools[0]?.id ?? null) : 'stickers';
+  const [activePanel, setActivePanel] = useState(defaultPanel);
   const [filters, setFilters] = useState(initEdit.filters ?? DEFAULT_FILTERS);
   const [frame, setFrame] = useState(initEdit.frame ?? 'none');
   const [canvas, setCanvas] = useState(fitDimensions(null, null));
@@ -663,7 +674,7 @@ export default function PhotoEditor() {
       setFrame('none');
       setLayoutSlots([]);
       setSelectedId(null);
-      setActivePanel('stickers');
+      setActivePanel(defaultPanel);
       setPhotoIndex(newIndex);
     } catch (err) {
       console.error('Failed to commit collage:', err);
@@ -700,7 +711,7 @@ export default function PhotoEditor() {
     setFilters(saved?.filters ?? DEFAULT_FILTERS);
     setFrame(saved?.frame ?? 'none');
     setSelectedId(null);
-    setActivePanel('stickers');
+    setActivePanel(defaultPanel);
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
     setPhotoIndex(newIndex);
@@ -825,9 +836,14 @@ export default function PhotoEditor() {
   // ── Upload Photo placeholders ──────────────────────────────────────────────
   // Poll only while at least one placeholder is still empty; the hook idles
   // once this list is empty.
-  const pendingUploadSlots = elements
-    .filter((el) => el.type === 'upload' && !el.attrs.src)
-    .map((el) => el.attrs.slotId);
+  // { slotId, qrDataUrl } while the QR modal is open. The QR is deliberately
+  // not an element: the canvas should only ever hold the finished photo.
+  const [pendingUpload, setPendingUpload] = useState(null);
+  const pendingUploadSlots = [
+    // Placeholders from an earlier build of this feature still fill in.
+    ...elements.filter((el) => el.type === 'upload' && !el.attrs.src).map((el) => el.attrs.slotId),
+    ...(pendingUpload ? [pendingUpload.slotId] : []),
+  ];
   const sessionUploads = useSessionUploads(state.uploadSessionId, pendingUploadSlots);
 
   // The arriving photo is merged at render time rather than written back into
@@ -841,18 +857,27 @@ export default function PhotoEditor() {
   ));
   const awaitingUploadCount = renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length;
 
-  async function addUploadPlaceholder() {
+  async function startPhoneUpload() {
     const slotId = `up${Date.now().toString(36)}`;
     const url = sessionUploadUrl(state.uploadSessionId, slotId);
-    // Rasterized once at insert time — the QR never changes for this slot, and
-    // Konva needs a bitmap rather than the SVG qrcode.react renders inline.
     const qrDataUrl = await renderQrToDataUrl(url, 320).catch(() => null);
+    setPendingUpload({ slotId, qrDataUrl });
+  }
+
+  // The photo lands whenever the phone finishes uploading, so this has to be
+  // an effect. Clearing pendingUpload closes the modal and drops the slot out
+  // of the poll list in the same commit.
+  useEffect(() => {
+    if (!pendingUpload) return;
+    const src = sessionUploads[pendingUpload.slotId];
+    if (!src) return;
     pushHistory([...elements, {
       id: `upload-${Date.now()}`,
       type: 'upload',
-      attrs: { slotId, qrDataUrl, src: null, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
+      attrs: { slotId: pendingUpload.slotId, qrDataUrl: null, src, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
     }]);
-  }
+    setPendingUpload(null);
+  }, [sessionUploads, pendingUpload, elements, pushHistory]);
 
   const selectedElement = elements.find((el) => el.id === selectedId) ?? null;
   const isSelectionLocked = !!selectedElement?.locked;
@@ -985,7 +1010,7 @@ export default function PhotoEditor() {
             boxShadow: 'var(--shadow-sm)',
           }}
         >
-          {SIDEBAR_TOOLS.map(({ id, icon: Icon, labelKey }) => {
+          {visibleSidebarTools.map(({ id, icon: Icon, labelKey }) => {
             const isActive = activePanel === id;
             return (
               <button
@@ -1404,7 +1429,7 @@ export default function PhotoEditor() {
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
             {activePanel === 'upload'   && (
               <UploadPanel
-                onAdd={addUploadPlaceholder}
+                onAdd={startPhoneUpload}
                 awaitingCount={awaitingUploadCount}
                 uploadedCount={renderElements.filter((el) => el.type === 'upload' && el.attrs.src).length}
               />
@@ -1474,6 +1499,14 @@ export default function PhotoEditor() {
           slotIndex={activeSlot}
           onPick={handlePickPhoto}
           onClose={() => { setShowSlotPicker(false); setActiveSlot(null); }}
+        />
+      )}
+
+      {/* Phone upload QR — closes itself the moment the photo lands */}
+      {pendingUpload && (
+        <PhoneUploadModal
+          qrDataUrl={pendingUpload.qrDataUrl}
+          onCancel={() => setPendingUpload(null)}
         />
       )}
 

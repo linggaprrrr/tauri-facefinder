@@ -95,7 +95,7 @@ export function clearPinCache() {
 }
 
 /**
- * @returns {Promise<{ok: boolean, reason?: 'locked'|'wrong'|'no-pin', retryMs?: number}>}
+ * @returns {Promise<{ok: boolean, reason?: 'locked'|'wrong'|'no-pin'|'unknown-outlet', retryMs?: number}>}
  */
 export async function verifyDevicePin(pin, { outletId } = {}) {
   const retryMs = lockoutRemainingMs();
@@ -122,6 +122,12 @@ export async function verifyDevicePin(pin, { outletId } = {}) {
     if (err?.status === 401 || err?.status === 429) {
       return fail(err.status === 429 ? 'locked' : 'wrong');
     }
+    // 404 = this outlet does not exist on the server the kiosk is pointed at
+    // (usually a deviceConfig saved against a different backend than
+    // VITE_API_BASE_URL now targets). No PIN can ever match, so say that
+    // rather than blaming the digits — reporting it as 'wrong' sends whoever
+    // is standing at the kiosk into retry-and-lockout for a config problem.
+    if (err?.status === 404) return fail('unknown-outlet');
   }
 
   const cached = readCache(outletId);

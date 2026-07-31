@@ -11,7 +11,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', null, '0', 'del'];
 export default function PinPad({ outletId, onSuccess }) {
   const { t } = useLang();
   const [pin, setPin] = useState('');
-  const [status, setStatus] = useState('idle'); // idle | checking | wrong | locked
+  const [status, setStatus] = useState('idle'); // idle | checking | wrong | locked | no-pin
   const [retryS, setRetryS] = useState(0);
 
   const locked = status === 'locked' && retryS > 0;
@@ -39,6 +39,10 @@ export default function PinPad({ outletId, onSuccess }) {
     if (result.reason === 'locked') {
       setRetryS(Math.ceil((result.retryMs ?? 0) / 1000));
       setStatus('locked');
+    } else if (result.reason === 'no-pin') {
+      setStatus('no-pin');
+    } else if (result.reason === 'unknown-outlet') {
+      setStatus('unknown-outlet');
     } else {
       setStatus('wrong');
     }
@@ -57,7 +61,7 @@ export default function PinPad({ outletId, onSuccess }) {
       if (next.length === PIN_LENGTH) submit(next);
       return next;
     });
-    setStatus((s) => (s === 'wrong' ? 'idle' : s));
+    setStatus((s) => (s === 'wrong' || s === 'no-pin' ? 'idle' : s));
   }, [locked, status, submit]);
 
   // Physical numeric keypads are common on serviced kiosks — accept them too
@@ -81,7 +85,7 @@ export default function PinPad({ outletId, onSuccess }) {
 
       {/* Filled/empty dots — the PIN itself is never rendered. */}
       <div
-        className={`flex gap-3 ${status === 'wrong' ? 'pin-shake' : ''}`}
+        className={`flex gap-3 ${status === 'wrong' || status === 'no-pin' || status === 'unknown-outlet' ? 'pin-shake' : ''}`}
         role="status"
         aria-label={t('settings.pinEntered', { n: pin.length, total: PIN_LENGTH })}
       >
@@ -92,7 +96,7 @@ export default function PinPad({ outletId, onSuccess }) {
             style={{
               width: 16,
               height: 16,
-              background: status === 'wrong'
+              background: status === 'wrong' || status === 'no-pin' || status === 'unknown-outlet'
                 ? 'var(--color-error)'
                 : i < pin.length ? 'var(--color-primary)' : 'var(--color-neutral-200)',
               transform: i < pin.length ? 'scale(1)' : 'scale(0.8)',
@@ -107,6 +111,12 @@ export default function PinPad({ outletId, onSuccess }) {
         )}
         {status === 'wrong' && (
           <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{t('settings.pinWrong')}</p>
+        )}
+        {status === 'no-pin' && (
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{t('settings.pinNotSynced')}</p>
+        )}
+        {status === 'unknown-outlet' && (
+          <p className="text-sm font-semibold text-center" style={{ color: 'var(--color-error)' }}>{t('settings.pinNoOutlet')}</p>
         )}
         {locked && (
           <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
