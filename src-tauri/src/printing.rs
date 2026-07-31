@@ -2,7 +2,14 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct PrinterInfo {
+    /// Human-readable name — for the picker label only.
     pub name: String,
+    /// The queue name as the OS knows it, which is what printing must target.
+    /// On CUPS these differ whenever the description contains spaces: the
+    /// display name is "Xprinter USB Printer P" while the queue is
+    /// "Xprinter_USB_Printer_P_", and `lp -d` only accepts the latter. Passing
+    /// the display name made every print fail with "Invalid destination name".
+    pub system_name: String,
     pub is_default: bool,
     pub state: String,
 }
@@ -15,6 +22,7 @@ pub fn list_printers() -> Vec<PrinterInfo> {
         .into_iter()
         .map(|p| PrinterInfo {
             name: p.name.clone(),
+            system_name: p.system_name.clone(),
             is_default: p.is_default,
             state: format!("{:?}", p.state),
         })

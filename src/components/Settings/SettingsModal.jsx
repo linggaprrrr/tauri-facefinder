@@ -128,6 +128,13 @@ export default function SettingsModal({ onClose, forced = false }) {
   const handleTestPrint = () => testPrinter(printerName, setTesting, setTestMsg);
   const handleTestReceiptPrint = () => testPrinter(receiptPrinterName, setReceiptTesting, setReceiptTestMsg);
 
+  // Settings saved the display name until the system_name fix, so a config
+  // written by an older build still holds one. Match either way rather than
+  // showing no status for a printer that is in fact selected.
+  const findPrinter = (n) => (
+    n ? printers.find((p) => p.system_name === n) ?? printers.find((p) => p.name === n) : undefined
+  );
+
   // A reload is what actually applies the refresh — every asset hook fetches on
   // mount, so clearing the cache alone would do nothing until the next restart,
   // which is the problem this button exists to avoid.
@@ -334,7 +341,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                               {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
                             </option>
                             {printers.map((p) => (
-                              <option key={p.name} value={p.name}>
+                              <option key={p.system_name} value={p.system_name}>
                                 {p.name}{p.is_default ? ' (default)' : ''}
                               </option>
                             ))}
@@ -353,7 +360,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                       </div>
 
                       {printerName && (
-                        <PrinterStatus state={printers.find((p) => p.name === printerName)?.state} />
+                        <PrinterStatus state={findPrinter(printerName)?.state} />
                       )}
 
                       <button
@@ -418,7 +425,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                             {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
                           </option>
                           {printers.map((p) => (
-                            <option key={p.name} value={p.name}>
+                            <option key={p.system_name} value={p.system_name}>
                               {p.name}{p.is_default ? ' (default)' : ''}
                             </option>
                           ))}
@@ -436,7 +443,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                       </button>
                     </div>
                     {receiptPrinterName && (
-                      <PrinterStatus state={printers.find((p) => p.name === receiptPrinterName)?.state} />
+                      <PrinterStatus state={findPrinter(receiptPrinterName)?.state} />
                     )}
 
                     <button

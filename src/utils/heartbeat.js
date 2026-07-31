@@ -34,7 +34,22 @@ async function sendHeartbeat(deviceConfig) {
   if (!printerName) return; // no printer configured yet — nothing meaningful to report
 
   const printers = await listPrinters();
-  const printerStatus = printers.some((p) => p.name === printerName) ? 'online' : 'offline';
+  // Match system_name first: that is what Settings now stores and what the OS
+  // actually calls the queue. The display-name fallback keeps configs written
+  // by older builds reporting correctly instead of flipping to "offline".
+  const printer = printers.find((p) => p.system_name === printerName)
+    ?? printers.find((p) => p.name === printerName);
+
+  // A queue that exists but is paused or offline is not "online" — reporting
+  // it as such is how a kiosk sits there looking healthy in the fleet view
+  // while every print silently fails. UNKNOWN is left as online on purpose:
+  // it is what the crate returns when it simply cannot tell, and a false
+  // alarm every 5 minutes is how staff learn to ignore the indicator.
+  const printerStatus = !printer
+    ? 'offline'
+    : ['PAUSED', 'OFFLINE'].includes(String(printer.state).toUpperCase())
+      ? 'error'
+      : 'online';
 
   const res = await sendKioskHeartbeat({
     kioskId: getKioskId(),
