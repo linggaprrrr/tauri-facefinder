@@ -37,25 +37,35 @@ async function sendHeartbeat(deviceConfig) {
   // Match system_name first: that is what Settings now stores and what the OS
   // actually calls the queue. The display-name fallback keeps configs written
   // by older builds reporting correctly instead of flipping to "offline".
-  const printer = printers.find((p) => p.system_name === printerName)
-    ?? printers.find((p) => p.name === printerName);
+  const find = (n) => (
+    n ? printers.find((p) => p.system_name === n) ?? printers.find((p) => p.name === n) : undefined
+  );
 
   // A queue that exists but is paused or offline is not "online" — reporting
   // it as such is how a kiosk sits there looking healthy in the fleet view
   // while every print silently fails. UNKNOWN is left as online on purpose:
   // it is what the crate returns when it simply cannot tell, and a false
   // alarm every 5 minutes is how staff learn to ignore the indicator.
-  const printerStatus = !printer
-    ? 'offline'
-    : ['PAUSED', 'OFFLINE'].includes(String(printer.state).toUpperCase())
-      ? 'error'
-      : 'online';
+  const statusOf = (n) => {
+    const p = find(n);
+    if (!p) return 'offline';
+    return ['PAUSED', 'OFFLINE'].includes(String(p.state).toUpperCase()) ? 'error' : 'online';
+  };
+
+  const printerStatus = statusOf(printerName);
+
+  // The receipt printer is reported separately: it is a different physical
+  // device, and a kiosk keeps selling with it down. Sent as null when none is
+  // configured, which the fleet view shows as "not set" rather than a fault.
+  const { receiptPrinterName } = deviceConfig;
 
   const res = await sendKioskHeartbeat({
     kioskId: getKioskId(),
     outletId: deviceConfig.outlet.id,
     printerName,
     printerStatus,
+    receiptPrinterName: receiptPrinterName || null,
+    receiptPrinterStatus: receiptPrinterName ? statusOf(receiptPrinterName) : null,
     appVersion: await resolveAppVersion(),
   }).catch(() => null);
 

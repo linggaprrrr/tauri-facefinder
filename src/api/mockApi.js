@@ -418,7 +418,10 @@ export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase6
 
 // Upserts this kiosk's row in kiosk_printers (by kiosk_id) — powers the admin
 // fleet view's online/offline + printer pairing display.
-export async function sendKioskHeartbeat({ kioskId, outletId, printerName, printerStatus, appVersion }) {
+export async function sendKioskHeartbeat({
+  kioskId, outletId, printerName, printerStatus,
+  receiptPrinterName, receiptPrinterStatus, appVersion,
+}) {
   const res = await fetch(`${API_BASE}/kiosk-printers/heartbeat`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -427,6 +430,8 @@ export async function sendKioskHeartbeat({ kioskId, outletId, printerName, print
       outlet_id: outletId,
       printer_name: printerName,
       printer_status: printerStatus,
+      receipt_printer_name: receiptPrinterName ?? null,
+      receipt_printer_status: receiptPrinterStatus ?? null,
       app_version: appVersion,
     }),
   });
