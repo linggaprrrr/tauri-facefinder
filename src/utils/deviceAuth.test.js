@@ -96,4 +96,21 @@ describe('verifyDevicePin', () => {
     expect(result.ok).toBe(false); // VITE_DEVICE_KEY is unset in tests
     expect(result.reason).toBe('no-pin');
   });
+
+  it('reports an outlet missing on this server without burning lockout budget', async () => {
+    // A 404 means the kiosk points at a server that has no such outlet, so no
+    // PIN can match. Counting those toward the lockout is how a config mistake
+    // ends up refusing the correct PIN afterwards: fixing the outlet needs
+    // Settings, and the lockout is exactly what keeps staff out of Settings.
+    verifyOutletPin.mockRejectedValue(apiError(404));
+    for (let i = 0; i < 8; i += 1) {
+      const r = await verifyDevicePin('123123', { outletId: OUTLET });
+      expect(r.reason).toBe('unknown-outlet');
+    }
+
+    // Point it at a server that does have the outlet: the right PIN works
+    // immediately, with no leftover lockout from the misconfigured period.
+    verifyOutletPin.mockResolvedValue({ status: 'success' });
+    expect(await verifyDevicePin('123123', { outletId: OUTLET })).toEqual({ ok: true });
+  });
 });

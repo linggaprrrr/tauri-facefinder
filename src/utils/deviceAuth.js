@@ -58,6 +58,15 @@ function fail(reason) {
   return { ok: false, reason: retryMs > 0 ? 'locked' : reason, retryMs };
 }
 
+// A misconfiguration is not a guess — the kiosk is pointed at a server with no
+// such outlet, so no PIN could ever match. Counting it toward the lockout locks
+// staff out of the one screen where the outlet could be corrected, and the
+// escalating backoff means a few minutes of a wrong deviceConfig can leave a
+// correct PIN refused for many minutes afterwards.
+function rejectWithoutPenalty(reason) {
+  return { ok: false, reason };
+}
+
 // Salted with the outlet id so the cached value from one kiosk is useless on
 // an outlet it wasn't derived for.
 async function derive(pin, outletId) {
@@ -127,7 +136,7 @@ export async function verifyDevicePin(pin, { outletId } = {}) {
     // VITE_API_BASE_URL now targets). No PIN can ever match, so say that
     // rather than blaming the digits — reporting it as 'wrong' sends whoever
     // is standing at the kiosk into retry-and-lockout for a config problem.
-    if (err?.status === 404) return fail('unknown-outlet');
+    if (err?.status === 404) return rejectWithoutPenalty('unknown-outlet');
   }
 
   const cached = readCache(outletId);
