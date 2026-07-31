@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
 import { getPrintStock } from '../../utils/heartbeat';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
+import { clearAssetCache } from '../../utils/assetCache';
+import PrinterStatus from './PrinterStatus';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
@@ -41,6 +43,8 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [confirmingSync, setConfirmingSync] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
@@ -123,6 +127,25 @@ export default function SettingsModal({ onClose, forced = false }) {
   }
   const handleTestPrint = () => testPrinter(printerName, setTesting, setTestMsg);
   const handleTestReceiptPrint = () => testPrinter(receiptPrinterName, setReceiptTesting, setReceiptTestMsg);
+
+  // A reload is what actually applies the refresh — every asset hook fetches on
+  // mount, so clearing the cache alone would do nothing until the next restart,
+  // which is the problem this button exists to avoid.
+  function runSync() {
+    setSyncing(true);
+    clearAssetCache();
+    window.location.reload();
+  }
+
+  // Selected photos and edits live in memory only, so a reload discards them.
+  // Ask first when a customer is mid-session; go straight through otherwise.
+  function handleSync() {
+    if (state.photos.length > 0 || state.selectedPhotos.length > 0) {
+      setConfirmingSync(true);
+      return;
+    }
+    runSync();
+  }
 
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
@@ -329,6 +352,10 @@ export default function SettingsModal({ onClose, forced = false }) {
                         </button>
                       </div>
 
+                      {printerName && (
+                        <PrinterStatus state={printers.find((p) => p.name === printerName)?.state} />
+                      )}
+
                       <button
                         type="button"
                         onClick={handleTestPrint}
@@ -408,6 +435,10 @@ export default function SettingsModal({ onClose, forced = false }) {
                         <RefreshCw size={16} className={printersLoading ? 'animate-spin' : ''} />
                       </button>
                     </div>
+                    {receiptPrinterName && (
+                      <PrinterStatus state={printers.find((p) => p.name === receiptPrinterName)?.state} />
+                    )}
+
                     <button
                       type="button"
                       onClick={handleTestReceiptPrint}
@@ -443,6 +474,55 @@ export default function SettingsModal({ onClose, forced = false }) {
               >
                 {saved ? <>{t('settings.savedBtn')} <Check size={18} strokeWidth={3} /></> : saving ? t('settings.saving') : t('settings.saveBtn')}
               </button>
+
+              {/* Sync — content is cached at boot, so without this an admin
+                  change only lands on the next power cycle. */}
+              {!forced && (
+                <div className="flex flex-col gap-2 pt-3" style={{ borderTop: '1px solid var(--color-neutral-200)' }}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
+                      {t('settings.syncTitle')}
+                    </span>
+                    <span className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-500)' }}>
+                      {t('settings.syncHint')}
+                    </span>
+                  </div>
+
+                  {confirmingSync ? (
+                    <>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--color-error)' }}>
+                        {t('settings.syncConfirm')}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={runSync}
+                          className="flex-1 py-2.5 rounded-lg font-semibold text-sm"
+                          style={{ background: 'var(--color-error)', color: '#fff' }}
+                        >
+                          {t('settings.syncConfirmYes')}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingSync(false)}
+                          className="flex-1 py-2.5 rounded-lg font-semibold text-sm"
+                          style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+                        >
+                          {t('settings.syncCancel')}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleSync}
+                      disabled={syncing}
+                      className="w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                      style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+                    >
+                      <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                      {syncing ? t('settings.syncing') : t('settings.syncBtn')}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
