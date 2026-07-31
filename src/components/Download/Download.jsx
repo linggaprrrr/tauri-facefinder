@@ -183,8 +183,11 @@ export default function Download() {
         unitName,
         trxCode,
         date: order.created_at ?? order.paid_at,
+        // Always "Foto N", never the stored filename: names like
+        // AhaConvert_IMG_7280.png mean nothing to the customer, and on a 58mm
+        // roll they were the one line long enough to force a wrap.
         items: photos.map((p, i) => ({
-          name: p.filename ?? p.name ?? t('common.photoN', { n: i + 1 }),
+          name: t('common.photoN', { n: i + 1 }),
           price: p.price ?? (finalPrice / photos.length),
         })),
         discount,
