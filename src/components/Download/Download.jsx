@@ -309,14 +309,27 @@ export default function Download() {
       shortName: t('common.photoN', { n: i + 1 }),
       price: p.price ?? (photos.length ? photoSubtotal / photos.length : 0),
     })),
-    // One row per print line: a 4R and a strip on one bill must not collapse
-    // into a single unexplained amount.
-    ...paidItems.map((item, i) => ({
-      key: `print-${i}`,
-      name: t('download.printItem', { n: item.copies }),
-      shortName: t('download.printItem', { n: item.copies }),
-      price: item.total_price ?? 0,
-    })),
+    // One row per print line, named by product: a 4R and a strip on one bill
+    // must not collapse into a single unexplained amount, and two rows reading
+    // "Cetak foto - 1 lembar" at different prices reads as a billing error.
+    // Falls back to the generic label when the template can't be resolved
+    // (republished between checkout and pickup) — a vaguer line is far better
+    // than a missing one on something the customer paid for.
+    ...resolvedItems.map(({ item, template }, i) => {
+      const type = t(template?.printType === 'secondary' ? 'print.typeSecondary' : 'print.typePrimary');
+      return {
+        key: `print-${i}`,
+        name: template
+          ? t('download.printLine', { type, n: item.copies })
+          : t('download.printItem', { n: item.copies }),
+        // Kept narrow deliberately: at 58mm the roll is 48mm printable, and a
+        // long item name is the one line that forces a wrap.
+        shortName: template
+          ? t('download.printLineShort', { type, n: item.copies })
+          : t('download.printItem', { n: item.copies }),
+        price: item.total_price ?? 0,
+      };
+    }),
   ];
   const unitName = deviceConfig?.unit?.name ?? order.photos?.[0]?.unit?.name ?? '';
   const outletName = deviceConfig?.outlet?.name ?? '';

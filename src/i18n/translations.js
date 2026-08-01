@@ -198,6 +198,9 @@ export const translations = {
   'download.paid':           { id: 'Lunas', en: 'Paid' },
   'download.thanks':         { id: 'Terima kasih telah menggunakan Ownize AI Studio!', en: 'Thank you for using Ownize AI Studio!' },
   'download.printItem':      { id: 'Cetak foto — {n} lembar', en: 'Photo print — {n} copies' },
+  'download.printLine':      { id: '{type} — {n} lembar', en: '{type} — {n} copies' },
+  // Thermal roll is 48mm printable; the long form is the one line that wraps.
+  'download.printLineShort': { id: '{type} x{n}', en: '{type} x{n}' },
   'download.printReceipt':   { id: 'Cetak Struk', en: 'Print Receipt' },
   'download.printingReceipt':{ id: 'Mencetak struk…', en: 'Printing receipt…' },
   'download.receiptFail':    { id: 'Gagal mencetak struk', en: "Couldn't print receipt" },
