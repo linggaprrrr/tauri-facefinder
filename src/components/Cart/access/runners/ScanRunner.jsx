@@ -47,13 +47,13 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
   const [rejectReason, setRejectReason] = useState(null);
   const inputRef = useRef(null);
 
-  const { deviceConfig, selectedPhotos, photoEdits, printAddon } = state;
+  const { deviceConfig, selectedPhotos, photoEdits, printItems } = state;
   // The print add-on counts toward the amount a voucher has to cover: a grant
   // covers the whole order, prints included. Validating against photos alone
   // let a Rp 100 voucher report "fully covers" a Rp 300 cart and take the grant
   // path, which then dropped the paid print instead of chaining to QRIS for the
   // remainder.
-  const addonTotal = printAddon?.canSubmit ? printAddon.totalPrice : 0;
+  const addonTotal = printItems.reduce((sum, item) => sum + (item.canSubmit ? item.totalPrice : 0), 0);
   const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0) + addonTotal;
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
         methodKey: method.key,
         code: trimmed,
         photos: photosWithEdits,
-        printAddon: printAddon?.canSubmit ? printAddon : null,
+        printItems,
       });
       dispatch({ type: 'SET_ORDER', payload: order });
       navigate('/download');

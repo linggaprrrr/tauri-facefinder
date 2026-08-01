@@ -44,11 +44,12 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   useEffect(() => { statusRef.current = status; }, [status]);
 
   const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  const { deviceConfig, printAddon } = state;
+  const { deviceConfig, printItems } = state;
 
   // Decided back on the Cart screen — this screen just confirms + folds it
   // into the same payment, it's not an editable control here.
-  const addonEstimate = printAddon?.canSubmit ? printAddon.totalPrice : 0;
+  const billableItems = printItems.filter((item) => item.canSubmit);
+  const addonEstimate = billableItems.reduce((sum, item) => sum + item.totalPrice, 0);
   // Once a transaction exists, its server-computed final_price is authoritative
   // (it already folds in the print add-on server-side) — before that, this is
   // just a client-side estimate for the confirm screen, same as discountAmount.
@@ -106,9 +107,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         outletId: deviceConfig.outlet.id,
         photos: photosWithEdits,
         promoCode,
-        printAddon: printAddon?.canSubmit
-          ? { photoIds: printAddon.photoIds, copies: printAddon.copies, printType: printAddon.printType }
-          : null,
+        printItems,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment
@@ -218,8 +217,9 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             {/* Itemised, not just announced by the pill below: at Rp 100 photo
                 − Rp 100 voucher = Rp 200 total, an unlisted print makes the
                 screen look like it is overcharging. */}
-            {addonEstimate > 0 && (
+            {billableItems.map((item) => (
               <div
+                key={item.id}
                 className="flex items-center justify-between px-4 py-3"
                 style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
               >
@@ -231,14 +231,15 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
                     <Printer size={14} />
                   </div>
                   <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
-                    {t('download.printItem', { n: printAddon.copies })}
+                    {t(item.printType === 'secondary' ? 'print.typeSecondary' : 'print.typePrimary')}
+                    {' · '}{t('download.printItem', { n: item.copies })}
                   </span>
                 </div>
                 <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
-                  Rp {addonEstimate.toLocaleString('id-ID')}
+                  Rp {item.totalPrice.toLocaleString('id-ID')}
                 </span>
               </div>
-            )}
+            ))}
             {discountAmount > 0 && (
               <div className="flex items-center justify-between px-4 pt-3">
                 <span className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('scan.discountApplied')}</span>

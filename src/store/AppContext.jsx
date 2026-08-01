@@ -22,7 +22,11 @@ const initialState = {
   layoutEdits: {},          // { [frameId]: { slots, elements, dataUrl } }
   aiTransformUsed: false,   // 1 free AI transform per session
   aiJob: null,              // in-flight or ready AI job — survives navigation
-  printAddon: null,         // { copies, photoIds, totalPrice, canSubmit } — decided on Cart, paid in the same checkout transaction
+  // Lines of a print order — [{ id, printType, copies, photoIds, sources,
+  // totalPrice, canSubmit }] — decided on Cart, paid in the same checkout
+  // transaction. A list, not one add-on: two prints of different photos, or a
+  // 4R plus a strip, are separate lines (see fr/docs/print-line-items.md).
+  printItems: [],
   // Scopes phone uploads to one customer. Lives here rather than in the editor
   // so it survives a trip to the cart and back, and it is regenerated on RESET
   // and on a new face scan — inheriting the previous customer's session id
@@ -35,9 +39,9 @@ function reducer(state, action) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
-      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printAddon: null, uploadSessionId: crypto.randomUUID() };
-    case 'SET_PRINT_ADDON':
-      return { ...state, printAddon: action.payload };
+      return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printItems: [], uploadSessionId: crypto.randomUUID() };
+    case 'SET_PRINT_ITEMS':
+      return { ...state, printItems: action.payload };
     case 'SET_AI_JOB':
       return { ...state, aiJob: action.payload };
     case 'ADD_AI_PHOTO': {
@@ -83,10 +87,13 @@ function reducer(state, action) {
         selectedPhotos: exists
           ? state.selectedPhotos.filter((p) => p.id !== action.payload.id)
           : [...state.selectedPhotos, action.payload],
-        // Cart composition just changed — a chosen print addon may reference
-        // a photo that's no longer (or now is) in the cart. Simplest safe
-        // reset: clear it, customer re-checks the box if they still want prints.
-        printAddon: null,
+        // Cart composition just changed — a print line may reference a photo
+        // that is no longer in the cart. Drop only the lines that actually
+        // named it; clearing every line would punish someone who added a
+        // second photo after configuring their prints.
+        printItems: state.printItems.filter(
+          (item) => !item.photoIds?.includes(action.payload.photo_id)
+        ),
       };
     }
     case 'SET_EDITING_PHOTO':

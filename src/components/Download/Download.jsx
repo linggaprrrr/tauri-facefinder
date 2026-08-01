@@ -123,31 +123,42 @@ export default function Download() {
   // against (order.print_addon already tells us copies/photos/pricing —
   // resolved and charged server-side at checkout).
   const { printTemplates, loading: templatesLoading } = usePrintTemplates(outletId);
-  // Compose against the exact version the customer was charged for, not
-  // whatever the outlet's settings point at now. With two print types those
-  // diverge the moment a customer buys a strip, and re-resolving from settings
-  // would print a 4R against a paid-for 2x6. The backend pins
-  // template_version_id on the addon at checkout precisely so this is knowable.
-  const paidVersionId = order?.print_addon?.template_version_id ?? null;
-  // The owning template is kept, not just its version: printType lives on the
-  // template and decides which physical printer the job goes to.
-  const paidTemplate = printTemplates.find((tpl) => tpl.currentVersion?.id === paidVersionId) ?? null;
-  const templateVersion = paidTemplate?.currentVersion ?? null;
+  // A print order is a list of lines; older backends (and older orders) carry a
+  // single print_addon, which is exactly one line.
+  const paidItems = order?.print_items?.length
+    ? order.print_items
+    : (order?.print_addon ? [order.print_addon] : []);
 
-  // Strips ('secondary') go to their own printer when one is configured.
-  // Falling back to the primary keeps every existing single-printer outlet
-  // working exactly as before — an unset secondary printer must never mean
-  // "don't print", since the customer has already paid for the strip.
-  const targetPrinterName = paidTemplate?.printType === 'secondary'
-    ? (deviceConfig?.secondaryPrinterName || deviceConfig?.printerName)
-    : deviceConfig?.printerName;
+  // Compose each line against the exact version it was charged for, not
+  // whatever the outlet's settings point at now — those diverge the moment a
+  // customer buys a strip, and re-resolving from settings would print a 4R
+  // against a paid-for 2x6. The backend pins template_version_id per line
+  // precisely so this is knowable.
+  //
+  // Printer routing is per line, not per order: a 4R and a strip bought
+  // together are two sheets on two different devices. Falling back to the
+  // primary keeps every single-printer outlet working exactly as before — an
+  // unset secondary printer must never mean "don't print", since the customer
+  // has already paid for the strip.
+  const resolvedItems = paidItems.map((item) => {
+    const template = printTemplates.find((tpl) => tpl.currentVersion?.id === item.template_version_id) ?? null;
+    return {
+      item,
+      template,
+      templateVersion: template?.currentVersion ?? null,
+      printerName: template?.printType === 'secondary'
+        ? (deviceConfig?.secondaryPrinterName || deviceConfig?.printerName)
+        : deviceConfig?.printerName,
+    };
+  });
   // Paid for, but the exact version isn't among the outlet's current ones — an
   // admin republishing the template between checkout and pickup repoints
   // current_version and the paid id stops matching. Derived rather than set
   // from the effect, and surfaced through the same banner as a print failure
   // so the retry stays reachable. Printing the *new* layout instead would put
   // a wrong-sized render on media the customer already paid for.
-  const paidVersionMissing = !!order?.print_addon && !templatesLoading && !templateVersion;
+  const paidVersionMissing = paidItems.length > 0 && !templatesLoading
+    && resolvedItems.some((r) => !r.templateVersion);
 
   // Print jobs queued this session — printing never blocks the flow above, so
   // outcomes land here asynchronously via the local queue's 'printjob:done'
@@ -175,37 +186,46 @@ export default function Download() {
   const [addonPrintError, setAddonPrintError] = useState('');
   const [addonPrintAttempt, setAddonPrintAttempt] = useState(0);
   useEffect(() => {
-    const addon = order?.print_addon;
-    if (!addon || !templateVersion) return;
+    const printable = resolvedItems.filter((r) => r.templateVersion);
+    if (printable.length === 0) return;
     let cancelled = false;
 
     (async () => {
       setAddonPrintError('');
       try {
-        const addonPhotos = addon.photo_ids
-          .map((pid) => selectedPhotos.find((p) => p.photo_id === pid))
-          .filter(Boolean);
-        if (addonPhotos.length === 0) return;
-
         const tokens = {
           outlet_name: deviceConfig?.outlet?.name ?? '',
           download_url: `${DOWNLOAD_BASE}/myphotos/${order.download_token ?? order.trx_code}`,
         };
-        const rawSrcs = await Promise.all(
-          addonPhotos.map((p) => resolvePrintSource(p, photoEdits[p.id]?.dataUrl ? 'edited' : 'original', photoEdits))
-        );
-        const finalDataUrl = await composePrintImage(templateVersion, rawSrcs, tokens);
-        const job = await createPrintJob({
-          transactionId: order.id,
-          outletId,
-          templateVersionId: templateVersion.id,
-          photoIds: addonPhotos.map((p) => p.photo_id),
-          copies: addon.copies,
-        });
-        if (cancelled) return;
-        const printerName = targetPrinterName;
-        enqueuePrint({ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies });
-        handleQueuedJobs([{ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies }]);
+        // Sequential, not Promise.all: these are physical print jobs on
+        // (possibly) one device, and the local queue is what serialises them.
+        // Firing every compose at once just spikes memory on a kiosk PC.
+        for (const { item, templateVersion: version, printerName } of printable) {
+          const itemPhotos = item.photo_ids
+            .map((pid) => selectedPhotos.find((p) => p.photo_id === pid))
+            .filter(Boolean);
+          if (itemPhotos.length === 0) continue;
+
+          const rawSrcs = await Promise.all(itemPhotos.map((p) => {
+            // The customer's per-photo choice, recorded at checkout. Absent
+            // (older orders, older kiosk builds) falls back to the implicit
+            // rule those prints were made under: edited when one exists.
+            const chosen = item.photo_sources?.[p.photo_id]
+              ?? (photoEdits[p.id]?.dataUrl ? 'edited' : 'original');
+            return resolvePrintSource(p, chosen, photoEdits);
+          }));
+          const finalDataUrl = await composePrintImage(version, rawSrcs, tokens);
+          const job = await createPrintJob({
+            transactionId: order.id,
+            outletId,
+            templateVersionId: version.id,
+            photoIds: itemPhotos.map((p) => p.photo_id),
+            copies: item.copies,
+          });
+          if (cancelled) return;
+          enqueuePrint({ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: item.copies });
+          handleQueuedJobs([{ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: item.copies }]);
+        }
       } catch (err) {
         if (!cancelled) setAddonPrintError(err.message);
       }
@@ -213,7 +233,7 @@ export default function Download() {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.id, order?.print_addon, templateVersion, templatesLoading, addonPrintAttempt]);
+  }, [order?.id, order?.print_items, order?.print_addon, templatesLoading, addonPrintAttempt]);
 
   // True from the moment a paid print exists until its paper is actually out.
   // Starts true before the job is even created (printJobs is still empty then)
@@ -221,7 +241,7 @@ export default function Download() {
   // most damaging, since nothing has printed yet. A failed/unresolvable print
   // clears it: the error banner has its own retry, and holding the kiosk for
   // seven minutes over paper that is never coming just blocks the queue.
-  const printPending = !!order?.print_addon
+  const printPending = paidItems.length > 0
     && !paidVersionMissing
     && !addonPrintError
     && !printJobs.some((j) => j.status === 'printed');
@@ -275,7 +295,7 @@ export default function Download() {
   // and folded straight into final_price, so a receipt that lists only photos
   // shows a total the customer cannot add up. One list, used by both the
   // on-screen receipt and the thermal one, so they can't drift apart again.
-  const addonTotal = order.print_addon?.total_price ?? 0;
+  const addonTotal = paidItems.reduce((sum, item) => sum + (item.total_price ?? 0), 0);
   // Per-photo price is missing on some orders; the fallback splits the bill
   // evenly, and must split what was paid for *photos* — not the print too.
   const photoSubtotal = Math.max(0, finalPrice - addonTotal);
@@ -289,12 +309,14 @@ export default function Download() {
       shortName: t('common.photoN', { n: i + 1 }),
       price: p.price ?? (photos.length ? photoSubtotal / photos.length : 0),
     })),
-    ...(order.print_addon ? [{
-      key: 'print-addon',
-      name: t('download.printItem', { n: order.print_addon.copies }),
-      shortName: t('download.printItem', { n: order.print_addon.copies }),
-      price: addonTotal,
-    }] : []),
+    // One row per print line: a 4R and a strip on one bill must not collapse
+    // into a single unexplained amount.
+    ...paidItems.map((item, i) => ({
+      key: `print-${i}`,
+      name: t('download.printItem', { n: item.copies }),
+      shortName: t('download.printItem', { n: item.copies }),
+      price: item.total_price ?? 0,
+    })),
   ];
   const unitName = deviceConfig?.unit?.name ?? order.photos?.[0]?.unit?.name ?? '';
   const outletName = deviceConfig?.outlet?.name ?? '';
@@ -485,7 +507,7 @@ export default function Download() {
           </div>
         )}
 
-        {order?.print_addon && (addonPrintError || paidVersionMissing) && (
+        {paidItems.length > 0 && (addonPrintError || paidVersionMissing) && (
           <div
             className="w-full rounded-2xl p-4 flex flex-col gap-2"
             style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
@@ -587,7 +609,7 @@ export default function Download() {
 
           <div className="flex flex-col gap-2">
             {lineItems.length > 0 ? lineItems.map((item, i) => {
-              const isPrint = item.key === 'print-addon';
+              const isPrint = item.key.startsWith('print-');
               return (
                 <div
                   key={item.key}

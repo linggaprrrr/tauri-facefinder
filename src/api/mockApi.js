@@ -161,7 +161,23 @@ export async function getOutletsByUnit(unitId, { isKiosk } = {}) {
 // promoCode is optional: a Promo Voucher that only partially covers the cart
 // chains into this (see ScanRunner) so the remainder is still paid via QRIS,
 // discount already applied server-side.
-export async function createTransaction({ outletId, photos, promoCode, printAddon }) {
+// Wire shape for a print order. No price/template id is ever sent — print_type
+// is a *mode* ('primary' photo layout vs 'secondary' photo strip) and the server
+// maps it to the outlet's own configured template, same source-of-truth pattern
+// as photo pricing. photo_sources carries the customer's original-vs-edited
+// choice, which used to live only in kiosk state and was lost on reload.
+function printItemsPayload(printItems) {
+  return (printItems ?? [])
+    .filter((item) => item.canSubmit)
+    .map((item) => ({
+      photo_ids: item.photoIds,
+      copies: item.copies,
+      print_type: item.printType ?? 'primary',
+      photo_sources: item.sources ?? {},
+    }));
+}
+
+export async function createTransaction({ outletId, photos, promoCode, printItems }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -171,13 +187,7 @@ export async function createTransaction({ outletId, photos, promoCode, printAddo
       // they actually made — stickers/text/filter, or a framed collage on top.
       photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
       promo_code: promoCode ?? null,
-      // No price/template id sent — print_type is a *mode* ('primary' photo
-      // layout vs 'secondary' photo strip) and the server maps it to the
-      // outlet's own configured template, same source-of-truth pattern as
-      // photo pricing.
-      print_addon: printAddon
-        ? { photo_ids: printAddon.photoIds, copies: printAddon.copies, print_type: printAddon.printType ?? 'primary' }
-        : null,
+      print_items: printItemsPayload(printItems),
     }),
   });
 
@@ -235,7 +245,7 @@ export async function validateAccessMethod({ outletId, methodKey, code, orderAmo
 // covers the cart) — re-validated server-side regardless of the prior
 // validateAccessMethod call. Returns the same flattened shape as
 // createTransaction so callers (SET_ORDER, /download) don't need to branch.
-export async function grantAccess({ outletId, methodKey, code, note, photos, printAddon }) {
+export async function grantAccess({ outletId, methodKey, code, note, photos, printItems }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/grant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -248,9 +258,7 @@ export async function grantAccess({ outletId, methodKey, code, note, photos, pri
       // Same shape createTransaction sends. Omitting it silently dropped a
       // paid-for print from the order: nothing charged, nothing printed, no
       // receipt line — the customer just lost the print they selected.
-      print_addon: printAddon
-        ? { photo_ids: printAddon.photoIds, copies: printAddon.copies, print_type: printAddon.printType ?? 'primary' }
-        : null,
+      print_items: printItemsPayload(printItems),
     }),
   });
   if (!res.ok) {
