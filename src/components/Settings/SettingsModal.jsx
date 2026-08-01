@@ -7,6 +7,9 @@ import PrinterStatus from './PrinterStatus';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
+import { usePrintSetting } from '../../hooks/usePrintSetting';
+import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import { printAddonStatus } from '../../utils/printAddonStatus';
 import PinPad from './PinPad';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
@@ -24,6 +27,19 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [selectedUnit, setSelectedUnit] = useState(state.deviceConfig.unit);
   const [selectedOutlet, setSelectedOutlet] = useState(state.deviceConfig.outlet);
   const [helpNumber, setHelpNumber] = useState(state.deviceConfig.helpNumber ?? '');
+
+  // Diagnostic only — keyed off the SAVED outlet, so it reports what customers
+  // are actually seeing rather than what an unsaved edit on this screen would
+  // produce. Same hooks the Cart uses, so it can't disagree with the real gate.
+  const savedOutletId = state.deviceConfig.outlet?.id;
+  const { setting: livePrintSetting, loading: livePrintSettingLoading } = usePrintSetting(savedOutletId);
+  const { printTemplates: liveTemplates } = usePrintTemplates(savedOutletId);
+  const addonStatus = printAddonStatus({
+    deviceConfig: state.deviceConfig,
+    printSetting: livePrintSetting,
+    printSettingLoading: livePrintSettingLoading,
+    printTemplates: liveTemplates,
+  });
 
   // Printing (kiosk/.exe only — native silent print)
   const [printEnabled, setPrintEnabled] = useState(!!state.deviceConfig.printEnabled);
@@ -364,6 +380,29 @@ export default function SettingsModal({ onClose, forced = false }) {
                       {printerName && (
                         <PrinterStatus state={findPrinter(printerName)?.state} />
                       )}
+
+                      {/* Why customers are (or aren't) being offered prints.
+                          Reads the saved config and live outlet settings, not
+                          this form's pending state — it answers "what is the
+                          kiosk doing right now", which is the question staff
+                          have when the checkout checkbox is missing and every
+                          field on this screen looks correct. */}
+                      <div
+                        className="rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs font-medium"
+                        style={{
+                          background: addonStatus.ok ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                          color: addonStatus.ok ? 'var(--color-success)' : 'var(--color-warning)',
+                        }}
+                      >
+                        {addonStatus.ok
+                          ? <Check size={14} className="shrink-0 mt-0.5" />
+                          : <AlertTriangle size={14} className="shrink-0 mt-0.5" />}
+                        <span>
+                          {addonStatus.ok
+                            ? t('settings.printReady')
+                            : t(`settings.printBlocked.${addonStatus.reason}`, { label: addonStatus.label ?? '' })}
+                        </span>
+                      </div>
 
                       <button
                         type="button"

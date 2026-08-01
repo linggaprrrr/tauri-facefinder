@@ -54,9 +54,19 @@ export default function Download() {
   // carries the same QR — the customer still has their link on paper. It
   // deliberately does NOT trigger on a photo print: that gives them a photo,
   // not the link, so cutting to a minute could strand someone still scanning.
+  //
+  // A paid photo print outranks both: dye-sub paper takes minutes to come out,
+  // and resetting to the welcome screen while the customer is still waiting on
+  // it reads as "the kiosk lost my order". While a print is in flight the
+  // screen holds for a full 7 minutes and says so in a banner instead.
   const AUTO_RESET_IDLE_MS = 5 * 60 * 1000;
   const AUTO_RESET_PRINTED_MS = 60 * 1000;
+  const AUTO_RESET_PRINTING_MS = 7 * 60 * 1000;
   const resetWindowRef = useRef(AUTO_RESET_IDLE_MS);
+  // Sticky: once a receipt is out, the customer keeps the QR on paper for the
+  // rest of the session, so the shorter window still applies after a print
+  // finishes and releases its own hold.
+  const receiptPrintedRef = useRef(false);
   const [resetAt, setResetAt] = useState(() => Date.now() + AUTO_RESET_IDLE_MS);
   const [secondsLeft, setSecondsLeft] = useState(Math.round(AUTO_RESET_IDLE_MS / 1000));
 
@@ -98,6 +108,10 @@ export default function Download() {
     if (!deviceConfig?.autoPrintReceipt) return;
     if (!isTauri() || !deviceConfig?.receiptPrinterName) return;
     autoReceiptPrintedRef.current = true;
+    // The declaration sits below the `if (!order) return null` guard, and every
+    // hook has to stay above that guard — so this forward reference can't be
+    // untangled by reordering. It is safe: an effect body runs after render.
+    // eslint-disable-next-line react-hooks/immutability
     handlePrintReceipt();
   }, [order, deviceConfig?.autoPrintReceipt, deviceConfig?.receiptPrinterName]);
 
@@ -201,6 +215,28 @@ export default function Download() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id, order?.print_addon, templateVersion, templatesLoading, addonPrintAttempt]);
 
+  // True from the moment a paid print exists until its paper is actually out.
+  // Starts true before the job is even created (printJobs is still empty then)
+  // — the compose+create round trip is exactly when an early reset would be
+  // most damaging, since nothing has printed yet. A failed/unresolvable print
+  // clears it: the error banner has its own retry, and holding the kiosk for
+  // seven minutes over paper that is never coming just blocks the queue.
+  const printPending = !!order?.print_addon
+    && !paidVersionMissing
+    && !addonPrintError
+    && !printJobs.some((j) => j.status === 'printed');
+
+  // Printing outranks the post-receipt shortening, so this lives in its own
+  // effect rather than inside handlePrintReceipt: the receipt normally prints
+  // first, and whichever of the two finishes last should own the remaining time.
+  useEffect(() => {
+    resetWindowRef.current = printPending
+      ? AUTO_RESET_PRINTING_MS
+      : (receiptPrintedRef.current ? AUTO_RESET_PRINTED_MS : AUTO_RESET_IDLE_MS);
+    setResetAt(Date.now() + resetWindowRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printPending]);
+
   async function handleReprint(job) {
     setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'queued' } : j)));
     try {
@@ -234,6 +270,32 @@ export default function Download() {
   const photos = order.photos ?? selectedPhotos ?? [];
   const finalPrice = order.final_price ?? order.total ?? selectedPhotos?.reduce((s, p) => s + p.price, 0) ?? 0;
   const discount = order.discount_amount ?? 0;
+
+  // The paid print is charged server-side as TransactionPrintAddon.total_price
+  // and folded straight into final_price, so a receipt that lists only photos
+  // shows a total the customer cannot add up. One list, used by both the
+  // on-screen receipt and the thermal one, so they can't drift apart again.
+  const addonTotal = order.print_addon?.total_price ?? 0;
+  // Per-photo price is missing on some orders; the fallback splits the bill
+  // evenly, and must split what was paid for *photos* — not the print too.
+  const photoSubtotal = Math.max(0, finalPrice - addonTotal);
+  const lineItems = [
+    ...photos.map((p, i) => ({
+      key: p.id ?? `photo-${i}`,
+      name: p.filename ?? p.name ?? t('common.photoN', { n: i + 1 }),
+      // Never the stored filename on the thermal roll: names like
+      // AhaConvert_IMG_7280.png mean nothing to the customer, and at 58mm they
+      // were the one line long enough to force a wrap.
+      shortName: t('common.photoN', { n: i + 1 }),
+      price: p.price ?? (photos.length ? photoSubtotal / photos.length : 0),
+    })),
+    ...(order.print_addon ? [{
+      key: 'print-addon',
+      name: t('download.printItem', { n: order.print_addon.copies }),
+      shortName: t('download.printItem', { n: order.print_addon.copies }),
+      price: addonTotal,
+    }] : []),
+  ];
   const unitName = deviceConfig?.unit?.name ?? order.photos?.[0]?.unit?.name ?? '';
   const outletName = deviceConfig?.outlet?.name ?? '';
 
@@ -248,26 +310,32 @@ export default function Download() {
         unitName,
         trxCode,
         date: order.created_at ?? order.paid_at,
-        // Always "Foto N", never the stored filename: names like
-        // AhaConvert_IMG_7280.png mean nothing to the customer, and on a 58mm
-        // roll they were the one line long enough to force a wrap.
-        items: photos.map((p, i) => ({
-          name: t('common.photoN', { n: i + 1 }),
-          price: p.price ?? (finalPrice / photos.length),
-        })),
+        items: lineItems.map((it) => ({ name: it.shortName, price: it.price })),
         discount,
         promoCode: order.promo_code_used,
         total: finalPrice,
         paymentLabel: `${isCash ? t('download.cash') : t('download.qris')}${order.paid ? ` · ${t('download.paid')}` : ''}`,
         downloadUrl,
+        // Same number as the on-screen help FAB (Settings → Nomor Bantuan), so
+        // staff configure it once and the paper agrees with the screen.
+        helpNumber: deviceConfig?.helpNumber,
       });
       await printImage(deviceConfig.receiptPrinterName, dataUrl, 1);
       setReceiptStatus('idle');
       // The printed receipt carries the same download QR, so the customer is
       // no longer dependent on this screen — shorten the wait to free the
-      // kiosk for the next person.
-      resetWindowRef.current = AUTO_RESET_PRINTED_MS;
-      setResetAt(Date.now() + AUTO_RESET_PRINTED_MS);
+      // kiosk for the next person. Unless a photo print is still in flight:
+      // they have to stand there for the paper regardless, and the printPending
+      // effect above restores the shorter window once it lands.
+      receiptPrintedRef.current = true;
+      if (!printPending) {
+        resetWindowRef.current = AUTO_RESET_PRINTED_MS;
+        // Not render-time: this line only runs after `await printImage`, inside
+        // a click handler or effect. The compiler reads the whole function as
+        // render-phase because of the forward reference flagged above.
+        // eslint-disable-next-line react-hooks/purity
+        setResetAt(Date.now() + AUTO_RESET_PRINTED_MS);
+      }
     } catch {
       setReceiptStatus('fail');
     }
@@ -278,6 +346,32 @@ export default function Download() {
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
+
+      {/* Floating, not inline: this screen scrolls on shorter kiosk panels, and
+          a countdown that scrolls out of view is the same as resetting without
+          warning. Fixed to the viewport it is unmissable at any scroll offset.
+          pointer-events-none so it can never swallow a tap meant for the
+          receipt underneath — every tap here restarts the clock. */}
+      <div
+        className="fixed z-50 pointer-events-none flex flex-col items-center px-8 py-4 rounded-3xl"
+        style={{
+          top: 24,
+          right: 24,
+          background: '#fff',
+          boxShadow: 'var(--shadow-xl)',
+          border: `2px solid ${secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-200)'}`,
+        }}
+      >
+        <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+          {t('download.autoResetLabel')}
+        </span>
+        <span
+          className="text-5xl font-black tabular-nums leading-none mt-1"
+          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-900)' }}
+        >
+          {countdown}
+        </span>
+      </div>
 
       {/* ── Left: QR download ── */}
       <div className="flex flex-col items-center gap-5 shrink-0 w-full sm:w-auto">
@@ -371,6 +465,26 @@ export default function Download() {
           </div>
         )}
 
+        {/* Held above the error/receipt blocks: while this is up the kiosk is
+            deliberately not resetting, and the customer needs to know the wait
+            is the printer, not a stuck screen. */}
+        {printPending && (
+          <div
+            className="w-full rounded-2xl p-5 flex items-center gap-4"
+            style={{ background: 'var(--color-primary-50)', border: '2px solid var(--color-primary)' }}
+          >
+            <Printer size={32} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+            <div className="min-w-0">
+              <p className="text-lg font-black leading-tight" style={{ color: 'var(--color-primary)' }}>
+                {t('print.inProgressTitle')}
+              </p>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-600)' }}>
+                {t('print.inProgressHint')}
+              </p>
+            </div>
+          </div>
+        )}
+
         {order?.print_addon && (addonPrintError || paidVersionMissing) && (
           <div
             className="w-full rounded-2xl p-4 flex flex-col gap-2"
@@ -427,16 +541,6 @@ export default function Download() {
           </div>
         )}
 
-        {/* Above the buttons, not below: this screen is tall enough that a
-            footnote under the last button sits off-screen, and a countdown
-            nobody sees is the same as resetting without warning. */}
-        <p
-          className="text-sm font-semibold text-center"
-          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-500)' }}
-        >
-          {t('download.autoReset', { t: countdown })}
-        </p>
-
         <Button size="xl" onClick={handleRestart} className="w-full">
           {t('download.newTransaction')}
         </Button>
@@ -482,12 +586,11 @@ export default function Download() {
           </p>
 
           <div className="flex flex-col gap-2">
-            {photos.length > 0 ? photos.map((photo, i) => {
-              const name = photo.filename ?? photo.name ?? t('common.photoN', { n: i + 1 });
-              const price = photo.price ?? (finalPrice / photos.length);
+            {lineItems.length > 0 ? lineItems.map((item, i) => {
+              const isPrint = item.key === 'print-addon';
               return (
                 <div
-                  key={photo.id ?? i}
+                  key={item.key}
                   className="flex items-center justify-between py-2"
                   style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
                 >
@@ -496,18 +599,18 @@ export default function Download() {
                       className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
                       style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
                     >
-                      {i + 1}
+                      {isPrint ? <Printer size={14} /> : i + 1}
                     </div>
                     <span
                       className="text-sm truncate"
                       style={{ color: 'var(--color-neutral-700)' }}
-                      title={name}
+                      title={item.name}
                     >
-                      {name}
+                      {item.name}
                     </span>
                   </div>
                   <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
-                    {formatRp(price)}
+                    {formatRp(item.price)}
                   </span>
                 </div>
               );

@@ -85,6 +85,25 @@ function lockedTransformerProps(locked) {
     : {};
 }
 
+// A Transformer is a node ON the stage, so toDataURL() bakes the selection
+// handles into the exported image whenever an element is still selected — the
+// customer's photo then carries blue squares into the cart, the print and the
+// download. Hiding beats deselecting: clearing React state wouldn't have
+// repainted the stage before this synchronous export ran anyway.
+const EXPORT_OPTS = { pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 };
+function exportStage(stage) {
+  if (!stage) return undefined;
+  const transformers = stage.find('Transformer').filter((tr) => tr.isVisible());
+  transformers.forEach((tr) => tr.hide());
+  stage.batchDraw();
+  try {
+    return stage.toDataURL(EXPORT_OPTS);
+  } finally {
+    transformers.forEach((tr) => tr.show());
+    stage.batchDraw();
+  }
+}
+
 function CanvasElement({ element, isSelected, onSelect, onChange }) {
   const shapeRef = useRef(null);
   const transformerRef = useRef(null);
@@ -630,7 +649,7 @@ export default function PhotoEditor() {
 
     let dataUrl;
     try {
-      dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+      dataUrl = exportStage(stageRef.current);
     } catch (e) {
       console.warn('Canvas export failed (cross-origin frame?):', e);
     }
@@ -647,7 +666,7 @@ export default function PhotoEditor() {
     if (!isLayoutFrame || committingFrame) return;
     let dataUrl;
     try {
-      dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+      dataUrl = exportStage(stageRef.current);
     } catch (e) {
       console.warn('Collage export failed (cross-origin?):', e);
     }

@@ -235,7 +235,7 @@ export async function validateAccessMethod({ outletId, methodKey, code, orderAmo
 // covers the cart) — re-validated server-side regardless of the prior
 // validateAccessMethod call. Returns the same flattened shape as
 // createTransaction so callers (SET_ORDER, /download) don't need to branch.
-export async function grantAccess({ outletId, methodKey, code, note, photos }) {
+export async function grantAccess({ outletId, methodKey, code, note, photos, printAddon }) {
   const res = await fetch(`${API_BASE}/transactions/kiosk/grant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
@@ -245,6 +245,12 @@ export async function grantAccess({ outletId, methodKey, code, note, photos }) {
       code,
       note: note ?? null,
       photos: photos.map((p) => ({ photo_id: p.photo_id, edited_image: p.edited_image ?? null })),
+      // Same shape createTransaction sends. Omitting it silently dropped a
+      // paid-for print from the order: nothing charged, nothing printed, no
+      // receipt line — the customer just lost the print they selected.
+      print_addon: printAddon
+        ? { photo_ids: printAddon.photoIds, copies: printAddon.copies, print_type: printAddon.printType ?? 'primary' }
+        : null,
     }),
   });
   if (!res.ok) {

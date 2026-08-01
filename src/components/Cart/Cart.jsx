@@ -6,6 +6,7 @@ import { useLang } from '../../i18n/LanguageContext';
 import { isTauri } from '../../native/print';
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import { printAddonStatus } from '../../utils/printAddonStatus';
 import PrintAddonSelector from '../Print/PrintAddonSelector';
 import Button from '../common/Button';
 
@@ -26,14 +27,11 @@ export default function Cart() {
   const { printTemplates } = usePrintTemplates(outletId);
 
   // Two products: Primary (normal photo layout) and Secondary (photo strip).
-  // A template is only offerable once it has a published version AND a price —
-  // an unpriced template would otherwise reach checkout and 400 there.
-  const usable = (id) => {
-    const tpl = printTemplates.find((t) => t.id === id) ?? null;
-    return tpl?.currentVersion && tpl.price ? tpl : null;
-  };
-  const primaryTemplate = usable(printSetting?.default_template_id);
-  const secondaryTemplate = usable(printSetting?.secondary_template_id);
+  // Offerability now lives in printAddonStatus, so the Settings screen can
+  // explain a missing print option to staff using the very logic that hid it.
+  const addonStatus = printAddonStatus({ deviceConfig, printSetting, printSettingLoading, printTemplates });
+  const primaryTemplate = addonStatus.primary;
+  const secondaryTemplate = addonStatus.secondary;
 
   // Leads with the normal print when both exist, but falls to strip when strip
   // is the only thing this outlet offers.
@@ -45,8 +43,7 @@ export default function Cart() {
   const templateVersion = activeTemplate?.currentVersion ?? null;
   const printPrice = activeTemplate?.price ?? null;
 
-  const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
-    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
+  const canOfferPrintAddon = isTauri() && addonStatus.ok && !!templateVersion && !!printPrice;
   const addonChecked = !!printAddon;
   const addonEstimate = (addonChecked && printAddon.canSubmit) ? printAddon.totalPrice : 0;
 
@@ -247,6 +244,11 @@ export default function Cart() {
                     photos={selectedPhotos}
                     templateVersion={templateVersion}
                     printPrice={printPrice}
+                    // Restores the customer's choice when they come back from
+                    // payment. Only for the mode it was made in — a strip's
+                    // slot assignments must never seed a 4R with a different
+                    // slot count, which is the same reason `key` remounts here.
+                    initial={printAddon?.printType === effectiveType ? printAddon : null}
                     onSelectionChange={(sel) => dispatch({ type: 'SET_PRINT_ADDON', payload: { ...sel, printType: effectiveType } })}
                   />
                 </div>

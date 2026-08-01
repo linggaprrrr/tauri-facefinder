@@ -94,7 +94,7 @@ function loadImage(src) {
 }
 
 // receipt: { outletName, unitName, trxCode, date, items:[{name,price}],
-//            discount, promoCode, total, paymentLabel, downloadUrl }
+//            discount, promoCode, total, paymentLabel, downloadUrl, helpNumber }
 export async function composeReceiptImage(receipt) {
   const qrDataUrl = await renderQrToDataUrl(receipt.downloadUrl, QR_SIZE).catch(() => null);
   const qrImg = qrDataUrl ? await loadImage(qrDataUrl) : null;
@@ -154,10 +154,23 @@ export async function composeReceiptImage(receipt) {
     // what makes an otherwise fine code slow to scan.
     ctx.drawImage(qrImg, (RECEIPT_WIDTH_PX - QR_SIZE) / 2, y, QR_SIZE, QR_SIZE);
     y += QR_SIZE + 14;
-    y = center(ctx, y, 'Scan untuk unduh foto', `bold 16px ${MONO}`, 24);
+    y = center(ctx, y, 'Scan untuk unduh foto Anda', `bold 16px ${MONO}`, 24);
+    y = center(ctx, y, 'Berlaku 7 hari', `bold 16px ${MONO}`, 24);
   }
   y += 8;
   y = center(ctx, y, 'Terima kasih!', `bold 22px ${MONO}`, 36);
+
+  // Support line last, so it survives a customer tearing the roll short and is
+  // the thing still in hand when something goes wrong. Only printed when the
+  // outlet actually configured a number in Settings — a receipt telling people
+  // to contact a blank is worse than one that says nothing.
+  if (receipt.helpNumber) {
+    y = dashes(ctx, y);
+    y = center(ctx, y, 'Butuh bantuan?', `bold 17px ${MONO}`, 24);
+    y = center(ctx, y, `WhatsApp ${receipt.helpNumber}`, `bold 19px ${MONO}`, 26);
+    y = center(ctx, y, 'Simpan struk ini sebagai bukti', `bold 15px ${MONO}`, 24);
+  }
+
   y += 30; // paper feed
 
   const finalCanvas = document.createElement('canvas');
