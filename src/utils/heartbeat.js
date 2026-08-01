@@ -28,10 +28,22 @@ export function getPrintStock() {
   return lastStock;
 }
 
+// Subscribers are notified when a beat brings new stock numbers, so the shell
+// can badge the Settings button the moment media runs low instead of waiting
+// for someone to open Settings and look.
+const stockListeners = new Set();
+export function subscribePrintStock(fn) {
+  stockListeners.add(fn);
+  return () => stockListeners.delete(fn);
+}
+
 async function sendHeartbeat(deviceConfig) {
   if (!deviceConfig?.outlet) return;
+  // Beat even with no photo printer configured. Bailing here meant a kiosk
+  // running receipts only never registered at all, so it was invisible in the
+  // fleet view — exactly the install an admin most needs to see, and the
+  // reason a freshly configured kiosk appeared to never show up.
   const { printerName } = deviceConfig;
-  if (!printerName) return; // no printer configured yet — nothing meaningful to report
 
   const printers = await listPrinters();
   // Match system_name first: that is what Settings now stores and what the OS
@@ -71,7 +83,10 @@ async function sendHeartbeat(deviceConfig) {
     appVersion: await resolveAppVersion(),
   }).catch(() => null);
 
-  if (res?.stock) lastStock = res.stock.initial === null ? null : res.stock;
+  if (res?.stock) {
+    lastStock = res.stock.initial === null ? null : res.stock;
+    stockListeners.forEach((fn) => fn(lastStock));
+  }
 }
 
 // Fires once immediately, then every 5 minutes. Returns a cleanup fn.

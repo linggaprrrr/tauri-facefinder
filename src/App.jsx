@@ -25,7 +25,7 @@ import OrderRecovery from './components/common/OrderRecovery';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { readPendingOrder } from './utils/pendingOrder';
 import { resumePrintQueue } from './utils/printQueue';
-import { startHeartbeat } from './utils/heartbeat';
+import { startHeartbeat, getPrintStock, subscribePrintStock } from './utils/heartbeat';
 import { isTauri } from './native/print';
 
 const ROUTE_STEP = {
@@ -68,6 +68,24 @@ function Layout() {
     if (!isConfigured) setShowSettings(true);
   }, [isConfigured]);
 
+  // Backspace outside a text field is the browser's "go back" shortcut, and
+  // the kiosk runs in a WebView that still honours it — a stray press on an
+  // attached keyboard walked the customer back out of the page they were on,
+  // losing the step they were in. Only the navigation is suppressed: the event
+  // still reaches other listeners, so the Settings PIN pad's own Backspace
+  // (delete a digit) keeps working.
+  useEffect(() => {
+    function blockBackspaceNav(e) {
+      if (e.key !== 'Backspace') return;
+      const el = e.target;
+      const editable = el?.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.tagName);
+      if (!editable) e.preventDefault();
+    }
+    window.addEventListener('keydown', blockBackspaceNav);
+    return () => window.removeEventListener('keydown', blockBackspaceNav);
+  }, []);
+
   // Resume any print job left queued from a crash/restart, once on boot.
   useEffect(() => {
     if (isTauri()) resumePrintQueue();
@@ -79,6 +97,11 @@ function Layout() {
   useEffect(() => {
     if (isTauri()) return startHeartbeat(state.deviceConfig);
   }, [state.deviceConfig]);
+
+  // Media running out is the one fault staff can actually fix on the spot, so
+  // surface it without them having to unlock Settings to find out.
+  const [lowStock, setLowStock] = useState(() => !!getPrintStock()?.low);
+  useEffect(() => subscribePrintStock((stock) => setLowStock(!!stock?.low)), []);
 
   const forced = !isConfigured;
 
@@ -136,12 +159,27 @@ function Layout() {
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                title={t('app.settings')}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                title={lowStock ? t('settings.stockLow') : t('app.settings')}
+                className="relative flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ color: 'var(--color-neutral-500)', background: 'var(--color-neutral-100)' }}
               >
                 <Settings size={18} />
                 <span className="hidden sm:inline">{t('app.settings')}</span>
+                {/* Low media is staff business, not the customer's: a dot on
+                    the gear reads as "needs attention" to whoever maintains
+                    the kiosk and as nothing at all to a customer, so it never
+                    announces "we're nearly out of paper" mid-queue. */}
+                {lowStock && (
+                  <span
+                    aria-hidden
+                    className="absolute rounded-full"
+                    style={{
+                      top: 6, right: 6, width: 8, height: 8,
+                      background: 'var(--color-warning)',
+                      boxShadow: '0 0 0 2px var(--color-neutral-100)',
+                    }}
+                  />
+                )}
               </button>
             </>
           )}

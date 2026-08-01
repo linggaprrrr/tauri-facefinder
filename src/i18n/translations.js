@@ -248,6 +248,7 @@ export const translations = {
   'settings.stockInitial':   { id: 'Awal', en: 'Initial' },
   'settings.stockPrinted':   { id: 'Tercetak', en: 'Printed' },
   'settings.stockLowHint':   { id: 'Segera isi ulang kertas/ribbon, lalu reset hitungan di dashboard.', en: 'Restock paper/ribbon soon, then reset the count in the dashboard.' },
+  'settings.stockLow':       { id: 'Kertas menipis — buka Pengaturan', en: 'Media running low — open Settings' },
   'settings.printEnable':    { id: 'Aktifkan cetak foto', en: 'Enable photo printing' },
   'settings.printer':        { id: 'Printer', en: 'Printer' },
   'settings.selectPrinter':  { id: '— Pilih Printer —', en: '— Select Printer —' },
