@@ -25,6 +25,7 @@ import OrderRecovery from './components/common/OrderRecovery';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { readPendingOrder } from './utils/pendingOrder';
 import { resumePrintQueue } from './utils/printQueue';
+import { checkForUpdateAtBoot } from './utils/autoUpdate';
 import { startHeartbeat, getPrintStock, subscribePrintStock } from './utils/heartbeat';
 import { isTauri } from './native/print';
 import { clearAssetCache } from './utils/assetCache';
@@ -99,6 +100,13 @@ function Layout() {
   // Resume any print job left queued from a crash/restart, once on boot.
   useEffect(() => {
     if (isTauri()) resumePrintQueue();
+  }, []);
+
+  // Self-update at boot only — see autoUpdate.js. Deliberately after the queue
+  // resume above: an update relaunches the app, and a job left over from a
+  // crash should be back on disk and owned by the queue before that happens.
+  useEffect(() => {
+    if (isTauri()) checkForUpdateAtBoot();
   }, []);
 
   // Report this kiosk's printer pairing/status to the admin fleet view, once on
