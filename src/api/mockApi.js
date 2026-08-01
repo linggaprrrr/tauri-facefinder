@@ -420,6 +420,7 @@ export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase6
 // fleet view's online/offline + printer pairing display.
 export async function sendKioskHeartbeat({
   kioskId, outletId, printerName, printerStatus,
+  secondaryPrinterName, secondaryPrinterStatus,
   receiptPrinterName, receiptPrinterStatus, appVersion,
 }) {
   const res = await fetch(`${API_BASE}/kiosk-printers/heartbeat`, {
@@ -430,6 +431,8 @@ export async function sendKioskHeartbeat({
       outlet_id: outletId,
       printer_name: printerName,
       printer_status: printerStatus,
+      secondary_printer_name: secondaryPrinterName ?? null,
+      secondary_printer_status: secondaryPrinterStatus ?? null,
       receipt_printer_name: receiptPrinterName ?? null,
       receipt_printer_status: receiptPrinterStatus ?? null,
       app_version: appVersion,

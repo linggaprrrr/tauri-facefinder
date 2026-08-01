@@ -32,6 +32,10 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [printersLoading, setPrintersLoading] = useState(false);
   const [testMsg, setTestMsg] = useState(null); // null | 'sent' | 'fail'
   const [testing, setTesting] = useState(false);
+  // Optional second photo printer, used for the outlet's strip template.
+  const [secondaryPrinterName, setSecondaryPrinterName] = useState(state.deviceConfig.secondaryPrinterName ?? '');
+  const [secondaryTestMsg, setSecondaryTestMsg] = useState(null);
+  const [secondaryTesting, setSecondaryTesting] = useState(false);
 
   // Receipt printing — a separate physical printer (thermal) from the photo
   // printer above, so its own picker/test controls, independent of printEnabled
@@ -44,7 +48,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [loadingOutlets, setLoadingOutlets] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [confirmingSync, setConfirmingSync] = useState(false);
+  const [syncedCount, setSyncedCount] = useState(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
@@ -127,6 +131,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   }
   const handleTestPrint = () => testPrinter(printerName, setTesting, setTestMsg);
   const handleTestReceiptPrint = () => testPrinter(receiptPrinterName, setReceiptTesting, setReceiptTestMsg);
+  const handleSecondaryTestPrint = () => testPrinter(secondaryPrinterName, setSecondaryTesting, setSecondaryTestMsg);
 
   // Settings saved the display name until the system_name fix, so a config
   // written by an older build still holds one. Match either way rather than
@@ -135,29 +140,25 @@ export default function SettingsModal({ onClose, forced = false }) {
     n ? printers.find((p) => p.system_name === n) ?? printers.find((p) => p.name === n) : undefined
   );
 
-  // A reload is what actually applies the refresh — every asset hook fetches on
-  // mount, so clearing the cache alone would do nothing until the next restart,
-  // which is the problem this button exists to avoid.
-  function runSync() {
-    setSyncing(true);
-    clearAssetCache();
-    window.location.reload();
-  }
-
-  // Selected photos and edits live in memory only, so a reload discards them.
-  // Ask first when a customer is mid-session; go straight through otherwise.
+  // No reload: staff are usually mid-task in here, and restarting the app
+  // under them (dropping any in-progress customer session) is a heavy price
+  // for refreshing content. clearAssetCache() drops both the localStorage
+  // copies and the hooks' in-memory ones, so each screen refetches the next
+  // time it mounts — the editor picks up new stickers/frames when it is next
+  // opened. Branding is the exception: it is applied once at boot, so a
+  // colour or banner change still lands on the next restart.
   function handleSync() {
-    if (state.photos.length > 0 || state.selectedPhotos.length > 0) {
-      setConfirmingSync(true);
-      return;
-    }
-    runSync();
+    setSyncing(true);
+    const cleared = clearAssetCache();
+    setSyncing(false);
+    setSyncedCount(cleared);
+    setTimeout(() => setSyncedCount(null), 4000);
   }
 
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, receiptPrinterName } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, secondaryPrinterName, receiptPrinterName } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -377,6 +378,48 @@ export default function SettingsModal({ onClose, forced = false }) {
                           {t(testMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
                         </p>
                       )}
+
+                      {/* Secondary printer — for the outlet's strip template.
+                          Optional: left unset, strips print on the primary,
+                          which is how every existing single-printer outlet
+                          already works. */}
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <label className="text-xs font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+                          {t('settings.secondaryPrinter')}
+                        </label>
+                        <select
+                          value={secondaryPrinterName}
+                          onChange={(e) => { setSecondaryPrinterName(e.target.value); setSecondaryTestMsg(null); }}
+                          className="border rounded-lg px-3 py-2.5 text-sm w-full outline-none focus:ring-2"
+                          style={{ borderColor: 'var(--color-neutral-300)', '--tw-ring-color': 'var(--color-primary)' }}
+                        >
+                          <option value="">{t('settings.secondaryPrinterNone')}</option>
+                          {printers.map((p) => (
+                            <option key={p.system_name} value={p.system_name}>
+                              {p.name}{p.is_default ? ' (default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {secondaryPrinterName && (
+                          <PrinterStatus state={findPrinter(secondaryPrinterName)?.state} />
+                        )}
+                        {secondaryPrinterName && (
+                          <button
+                            type="button"
+                            onClick={handleSecondaryTestPrint}
+                            disabled={secondaryTesting}
+                            className="text-sm font-semibold py-2 rounded-lg disabled:opacity-50"
+                            style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                          >
+                            {secondaryTesting ? '…' : t('settings.testPrint')}
+                          </button>
+                        )}
+                        {secondaryTestMsg && (
+                          <p className="text-xs text-center" style={{ color: secondaryTestMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
+                            {t(secondaryTestMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
+                          </p>
+                        )}
+                      </div>
                     </>
                   )}
 
@@ -495,39 +538,24 @@ export default function SettingsModal({ onClose, forced = false }) {
                     </span>
                   </div>
 
-                  {confirmingSync ? (
-                    <>
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--color-error)' }}>
-                        {t('settings.syncConfirm')}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={runSync}
-                          className="flex-1 py-2.5 rounded-lg font-semibold text-sm"
-                          style={{ background: 'var(--color-error)', color: '#fff' }}
-                        >
-                          {t('settings.syncConfirmYes')}
-                        </button>
-                        <button
-                          onClick={() => setConfirmingSync(false)}
-                          className="flex-1 py-2.5 rounded-lg font-semibold text-sm"
-                          style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
-                        >
-                          {t('settings.syncCancel')}
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <button
-                      onClick={handleSync}
-                      disabled={syncing}
-                      className="w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                      style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+                  {syncedCount !== null && (
+                    <p
+                      className="text-xs font-semibold flex items-center gap-1.5"
+                      style={{ color: 'var(--color-success)' }}
                     >
-                      <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-                      {syncing ? t('settings.syncing') : t('settings.syncBtn')}
-                    </button>
+                      <Check size={14} strokeWidth={3} /> {t('settings.syncDone')}
+                    </p>
                   )}
+
+                  <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+                  >
+                    <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                    {syncing ? t('settings.syncing') : t('settings.syncBtn')}
+                  </button>
                 </div>
               )}
             </div>

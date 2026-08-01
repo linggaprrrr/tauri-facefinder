@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -45,6 +45,46 @@ export default function Download() {
   const [receiptStatus, setReceiptStatus] = useState('idle'); // idle | printing | fail
   const outletId = deviceConfig?.outlet?.id;
 
+  // Auto-return to the welcome screen. This is a privacy control before it is
+  // a convenience one: the QR on this screen is a live download link valid for
+  // days, so leaving it up lets the next person at the kiosk scan it and take
+  // the previous customer's photos.
+  //
+  // The short window applies once the receipt is printed, because the receipt
+  // carries the same QR — the customer still has their link on paper. It
+  // deliberately does NOT trigger on a photo print: that gives them a photo,
+  // not the link, so cutting to a minute could strand someone still scanning.
+  const AUTO_RESET_IDLE_MS = 5 * 60 * 1000;
+  const AUTO_RESET_PRINTED_MS = 60 * 1000;
+  const resetWindowRef = useRef(AUTO_RESET_IDLE_MS);
+  const [resetAt, setResetAt] = useState(() => Date.now() + AUTO_RESET_IDLE_MS);
+  const [secondsLeft, setSecondsLeft] = useState(Math.round(AUTO_RESET_IDLE_MS / 1000));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ms = resetAt - Date.now();
+      setSecondsLeft(Math.max(0, Math.round(ms / 1000)));
+      if (ms <= 0) {
+        clearPendingOrder();
+        dispatch({ type: 'RESET' });
+        navigate('/');
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resetAt, dispatch, navigate]);
+
+  // Any touch or keypress means somebody is still standing there, so the clock
+  // restarts — otherwise a customer reading the screen gets reset mid-scan.
+  useEffect(() => {
+    const bump = () => setResetAt(Date.now() + resetWindowRef.current);
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    return () => {
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+    };
+  }, []);
+
   // Printing is decided once, upfront at checkout (the Cart print-addon
   // checkbox) — no post-payment "pay to print" upsell here. Otherwise a
   // customer who paid Rp 0 for photos via a 100%-off voucher would suddenly
@@ -59,9 +99,18 @@ export default function Download() {
   // would print a 4R against a paid-for 2x6. The backend pins
   // template_version_id on the addon at checkout precisely so this is knowable.
   const paidVersionId = order?.print_addon?.template_version_id ?? null;
-  const templateVersion = printTemplates
-    .map((tpl) => tpl.currentVersion)
-    .find((v) => v && v.id === paidVersionId) ?? null;
+  // The owning template is kept, not just its version: printType lives on the
+  // template and decides which physical printer the job goes to.
+  const paidTemplate = printTemplates.find((tpl) => tpl.currentVersion?.id === paidVersionId) ?? null;
+  const templateVersion = paidTemplate?.currentVersion ?? null;
+
+  // Strips ('secondary') go to their own printer when one is configured.
+  // Falling back to the primary keeps every existing single-printer outlet
+  // working exactly as before — an unset secondary printer must never mean
+  // "don't print", since the customer has already paid for the strip.
+  const targetPrinterName = paidTemplate?.printType === 'secondary'
+    ? (deviceConfig?.secondaryPrinterName || deviceConfig?.printerName)
+    : deviceConfig?.printerName;
   // Paid for, but the exact version isn't among the outlet's current ones — an
   // admin republishing the template between checkout and pickup repoints
   // current_version and the paid id stops matching. Derived rather than set
@@ -124,7 +173,7 @@ export default function Download() {
           copies: addon.copies,
         });
         if (cancelled) return;
-        const printerName = deviceConfig?.printerName;
+        const printerName = targetPrinterName;
         enqueuePrint({ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies });
         handleQueuedJobs([{ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: addon.copies }]);
       } catch (err) {
@@ -198,10 +247,17 @@ export default function Download() {
       });
       await printImage(deviceConfig.receiptPrinterName, dataUrl, 1);
       setReceiptStatus('idle');
+      // The printed receipt carries the same download QR, so the customer is
+      // no longer dependent on this screen — shorten the wait to free the
+      // kiosk for the next person.
+      resetWindowRef.current = AUTO_RESET_PRINTED_MS;
+      setResetAt(Date.now() + AUTO_RESET_PRINTED_MS);
     } catch {
       setReceiptStatus('fail');
     }
   }
+
+  const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
@@ -357,6 +413,15 @@ export default function Download() {
         <Button size="xl" onClick={handleRestart} className="w-full">
           {t('download.newTransaction')}
         </Button>
+
+        {/* Shown rather than silent: a screen that resets itself with no
+            warning reads as a crash to whoever is standing in front of it. */}
+        <p
+          className="text-xs text-center"
+          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-400)' }}
+        >
+          {t('download.autoReset', { t: countdown })}
+        </p>
       </div>
 
       {/* ── Right: Receipt ── */}

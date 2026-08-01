@@ -57,13 +57,15 @@ async function sendHeartbeat(deviceConfig) {
   // The receipt printer is reported separately: it is a different physical
   // device, and a kiosk keeps selling with it down. Sent as null when none is
   // configured, which the fleet view shows as "not set" rather than a fault.
-  const { receiptPrinterName } = deviceConfig;
+  const { receiptPrinterName, secondaryPrinterName } = deviceConfig;
 
   const res = await sendKioskHeartbeat({
     kioskId: getKioskId(),
     outletId: deviceConfig.outlet.id,
     printerName,
     printerStatus,
+    secondaryPrinterName: secondaryPrinterName || null,
+    secondaryPrinterStatus: secondaryPrinterName ? statusOf(secondaryPrinterName) : null,
     receiptPrinterName: receiptPrinterName || null,
     receiptPrinterStatus: receiptPrinterName ? statusOf(receiptPrinterName) : null,
     appVersion: await resolveAppVersion(),
