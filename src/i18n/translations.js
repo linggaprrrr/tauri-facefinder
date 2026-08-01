@@ -219,6 +219,8 @@ export const translations = {
   'printerState.offline':    { id: 'Offline', en: 'Offline' },
   'printerState.unknown':    { id: 'Status tidak diketahui', en: 'Unknown status' },
   'download.autoReset':      { id: 'Kembali otomatis dalam {t}', en: 'Returning automatically in {t}' },
+  'settings.autoPrintReceipt':     { id: 'Cetak struk otomatis', en: 'Print receipt automatically' },
+  'settings.autoPrintReceiptHint': { id: 'Struk langsung tercetak setelah pembayaran berhasil, tanpa pelanggan menekan tombol.', en: 'The receipt prints as soon as payment succeeds, without the customer pressing anything.' },
   'settings.secondaryPrinter':     { id: 'Printer Sekunder (strip) — opsional', en: 'Secondary printer (strips) — optional' },
   'settings.secondaryPrinterNone': { id: '— Pakai printer utama —', en: '— Use the primary printer —' },
   'settings.syncTitle':      { id: 'Sinkronkan dengan Server', en: 'Sync with server' },

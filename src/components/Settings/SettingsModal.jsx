@@ -41,6 +41,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   // printer above, so its own picker/test controls, independent of printEnabled
   // (that toggle is the outlet's paid-photo-print business setting, not this).
   const [receiptPrinterName, setReceiptPrinterName] = useState(state.deviceConfig.receiptPrinterName ?? '');
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(!!state.deviceConfig.autoPrintReceipt);
   const [receiptTestMsg, setReceiptTestMsg] = useState(null);
   const [receiptTesting, setReceiptTesting] = useState(false);
 
@@ -158,7 +159,7 @@ export default function SettingsModal({ onClose, forced = false }) {
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, secondaryPrinterName, receiptPrinterName } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, secondaryPrinterName, receiptPrinterName, autoPrintReceipt } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -502,6 +503,26 @@ export default function SettingsModal({ onClose, forced = false }) {
                       <p className="text-xs text-center" style={{ color: receiptTestMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
                         {t(receiptTestMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
                       </p>
+                    )}
+
+                    {/* Only meaningful once a receipt printer is paired. */}
+                    {receiptPrinterName && (
+                      <label className="flex items-start gap-2.5 cursor-pointer mt-1">
+                        <input
+                          type="checkbox"
+                          checked={autoPrintReceipt}
+                          onChange={(e) => setAutoPrintReceipt(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 shrink-0"
+                        />
+                        <span className="flex flex-col">
+                          <span className="text-sm font-medium" style={{ color: 'var(--color-neutral-700)' }}>
+                            {t('settings.autoPrintReceipt')}
+                          </span>
+                          <span className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                            {t('settings.autoPrintReceiptHint')}
+                          </span>
+                        </span>
+                      </label>
                     )}
                   </div>
                 </div>

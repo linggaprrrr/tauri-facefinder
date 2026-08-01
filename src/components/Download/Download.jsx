@@ -85,6 +85,22 @@ export default function Download() {
     };
   }, []);
 
+  // Auto-print the receipt once the transaction lands, when the outlet opted
+  // in. Guarded by a ref, not state: this screen re-renders on every countdown
+  // tick, and printing is a physical side effect that must happen exactly once
+  // — handing a customer two receipts, or burning a roll through a render
+  // loop, is worse than no automation. handlePrintReceipt is a hoisted
+  // function declaration, so calling it from up here is safe; the effect only
+  // runs after the first render completes.
+  const autoReceiptPrintedRef = useRef(false);
+  useEffect(() => {
+    if (!order || autoReceiptPrintedRef.current) return;
+    if (!deviceConfig?.autoPrintReceipt) return;
+    if (!isTauri() || !deviceConfig?.receiptPrinterName) return;
+    autoReceiptPrintedRef.current = true;
+    handlePrintReceipt();
+  }, [order, deviceConfig?.autoPrintReceipt, deviceConfig?.receiptPrinterName]);
+
   // Printing is decided once, upfront at checkout (the Cart print-addon
   // checkbox) — no post-payment "pay to print" upsell here. Otherwise a
   // customer who paid Rp 0 for photos via a 100%-off voucher would suddenly
@@ -259,6 +275,7 @@ export default function Download() {
 
   const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
+
   return (
     <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
 
@@ -410,18 +427,19 @@ export default function Download() {
           </div>
         )}
 
-        <Button size="xl" onClick={handleRestart} className="w-full">
-          {t('download.newTransaction')}
-        </Button>
-
-        {/* Shown rather than silent: a screen that resets itself with no
-            warning reads as a crash to whoever is standing in front of it. */}
+        {/* Above the buttons, not below: this screen is tall enough that a
+            footnote under the last button sits off-screen, and a countdown
+            nobody sees is the same as resetting without warning. */}
         <p
-          className="text-xs text-center"
-          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-400)' }}
+          className="text-sm font-semibold text-center"
+          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-500)' }}
         >
           {t('download.autoReset', { t: countdown })}
         </p>
+
+        <Button size="xl" onClick={handleRestart} className="w-full">
+          {t('download.newTransaction')}
+        </Button>
       </div>
 
       {/* ── Right: Receipt ── */}
