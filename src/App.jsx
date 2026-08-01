@@ -18,14 +18,17 @@ import { useApp } from './store/AppContext';
 import { ConnectivityProvider } from './store/ConnectivityContext';
 import { useOutletFromURL } from './hooks/useOutletFromURL';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useBranding } from './hooks/useBranding';
 import ScrollHint from './components/common/ScrollHint';
 import OfflineBanner from './components/common/OfflineBanner';
 import OrderRecovery from './components/common/OrderRecovery';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { readPendingOrder } from './utils/pendingOrder';
 import { resumePrintQueue } from './utils/printQueue';
-import { startHeartbeat } from './utils/heartbeat';
+import { startHeartbeat, getPrintStock, subscribePrintStock } from './utils/heartbeat';
 import { isTauri } from './native/print';
+import { clearAssetCache } from './utils/assetCache';
+import BannerSplash from './components/Home/BannerSplash';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -45,6 +48,17 @@ function Layout() {
   // Mobile customers arrive via QR with ?outlet_id=... — auto-configure from URL.
   useOutletFromURL();
   const isConfigured = !!(state.deviceConfig.unit && state.deviceConfig.outlet);
+  // Applies the outlet's primary colour + background globally; the banner is
+  // the welcome screen's to render.
+  const { bannerUrl, bannerCtaPosition, bannerCtaLabel } = useBranding(state.deviceConfig.outlet?.id);
+
+  // Attract screen. Re-armed every time the kiosk returns to home so each new
+  // customer meets it, and dismissed for the rest of the visit once someone
+  // starts — it is a greeting, not something to walk back into mid-session.
+  const [splashDismissed, setSplashDismissed] = useState(false);
+  useEffect(() => {
+    if (isHome) setSplashDismissed(false);
+  }, [isHome]);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -64,6 +78,24 @@ function Layout() {
     if (!isConfigured) setShowSettings(true);
   }, [isConfigured]);
 
+  // Backspace outside a text field is the browser's "go back" shortcut, and
+  // the kiosk runs in a WebView that still honours it — a stray press on an
+  // attached keyboard walked the customer back out of the page they were on,
+  // losing the step they were in. Only the navigation is suppressed: the event
+  // still reaches other listeners, so the Settings PIN pad's own Backspace
+  // (delete a digit) keeps working.
+  useEffect(() => {
+    function blockBackspaceNav(e) {
+      if (e.key !== 'Backspace') return;
+      const el = e.target;
+      const editable = el?.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.tagName);
+      if (!editable) e.preventDefault();
+    }
+    window.addEventListener('keydown', blockBackspaceNav);
+    return () => window.removeEventListener('keydown', blockBackspaceNav);
+  }, []);
+
   // Resume any print job left queued from a crash/restart, once on boot.
   useEffect(() => {
     if (isTauri()) resumePrintQueue();
@@ -75,6 +107,24 @@ function Layout() {
   useEffect(() => {
     if (isTauri()) return startHeartbeat(state.deviceConfig);
   }, [state.deviceConfig]);
+
+  // Hourly content refresh, so an outlet that updates stickers or branding in
+  // the morning does not wait for a power cycle. Deliberately skipped unless
+  // the kiosk is idle on the welcome screen: a sync mid-session would refetch
+  // assets under a customer who is part-way through editing, and the whole
+  // point of this is to be invisible. Skipping just defers to the next tick.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const busy = state.photos.length > 0 || state.selectedPhotos.length > 0;
+      if (isHome && !busy) clearAssetCache();
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [isHome, state.photos.length, state.selectedPhotos.length]);
+
+  // Media running out is the one fault staff can actually fix on the spot, so
+  // surface it without them having to unlock Settings to find out.
+  const [lowStock, setLowStock] = useState(() => !!getPrintStock()?.low);
+  useEffect(() => subscribePrintStock((stock) => setLowStock(!!stock?.low)), []);
 
   const forced = !isConfigured;
 
@@ -132,12 +182,27 @@ function Layout() {
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                title={t('app.settings')}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                title={lowStock ? t('settings.stockLow') : t('app.settings')}
+                className="relative flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 style={{ color: 'var(--color-neutral-500)', background: 'var(--color-neutral-100)' }}
               >
                 <Settings size={18} />
                 <span className="hidden sm:inline">{t('app.settings')}</span>
+                {/* Low media is staff business, not the customer's: a dot on
+                    the gear reads as "needs attention" to whoever maintains
+                    the kiosk and as nothing at all to a customer, so it never
+                    announces "we're nearly out of paper" mid-queue. */}
+                {lowStock && (
+                  <span
+                    aria-hidden
+                    className="absolute rounded-full"
+                    style={{
+                      top: 6, right: 6, width: 8, height: 8,
+                      background: 'var(--color-warning)',
+                      boxShadow: '0 0 0 2px var(--color-neutral-100)',
+                    }}
+                  />
+                )}
               </button>
             </>
           )}
@@ -206,8 +271,21 @@ function Layout() {
         </div>
       )}
 
+      {isHome && bannerUrl && !splashDismissed && !forced && !showSettings && (
+        <BannerSplash
+          bannerUrl={bannerUrl}
+          ctaPosition={bannerCtaPosition}
+          ctaLabel={bannerCtaLabel}
+          primaryColor={getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim()}
+          onStart={() => setSplashDismissed(true)}
+          onClose={() => setSplashDismissed(true)}
+        />
+      )}
+
       {/* Page content */}
       <main key={location.pathname} className="flex-1 p-3 sm:p-6 overflow-auto no-scrollbar pop-in">
+        {/* Outlet banner — welcome screen only, so it greets rather than
+            follows the customer through checkout. */}
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />

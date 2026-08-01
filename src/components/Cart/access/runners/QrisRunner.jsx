@@ -44,15 +44,20 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   useEffect(() => { statusRef.current = status; }, [status]);
 
   const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  const { deviceConfig, printAddon } = state;
+  const { deviceConfig, printItems } = state;
 
   // Decided back on the Cart screen — this screen just confirms + folds it
   // into the same payment, it's not an editable control here.
-  const addonEstimate = printAddon?.canSubmit ? printAddon.totalPrice : 0;
+  const billableItems = printItems.filter((item) => item.canSubmit);
+  const addonEstimate = billableItems.reduce((sum, item) => sum + item.totalPrice, 0);
   // Once a transaction exists, its server-computed final_price is authoritative
   // (it already folds in the print add-on server-side) — before that, this is
   // just a client-side estimate for the confirm screen, same as discountAmount.
-  const displayTotal = transaction ? transaction.final_price : Math.max(total - discountAmount, 0) + addonEstimate;
+  //
+  // The print is discountable, so it belongs INSIDE the max(): added after it,
+  // the way the server used to, the screen showed "diskon 100%" next to a total
+  // that still charged full price for the print.
+  const displayTotal = transaction ? transaction.final_price : Math.max(total + addonEstimate - discountAmount, 0);
 
   function stopPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -102,9 +107,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         outletId: deviceConfig.outlet.id,
         photos: photosWithEdits,
         promoCode,
-        printAddon: printAddon?.canSubmit
-          ? { photoIds: printAddon.photoIds, copies: printAddon.copies }
-          : null,
+        printItems,
       });
       setTransaction(trx);
       // Persist immediately — before payment — so even a crash mid-payment
@@ -144,7 +147,11 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
     let remaining = dueSeconds;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
-      setCountdown(remaining);
+      // No setCountdown any more — the visible timer was dropped once DOKU's
+      // hosted page started showing its own. The call outlived the state and
+      // threw every tick, which killed this interval's body before it could
+      // reach the expiry branch: the payment never timed out and the pending
+      // transaction was never cancelled.
       if (remaining <= 0) {
         stopPolling();
         setErrorMsg(t('checkout.errTimeout'));
@@ -207,6 +214,32 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
                 </span>
               </div>
             ))}
+            {/* Itemised, not just announced by the pill below: at Rp 100 photo
+                − Rp 100 voucher = Rp 200 total, an unlisted print makes the
+                screen look like it is overcharging. */}
+            {billableItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between px-4 py-3"
+                style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                  >
+                    <Printer size={14} />
+                  </div>
+                  <span className="text-sm truncate" style={{ color: 'var(--color-neutral-700)' }}>
+                    {t(item.printType === 'secondary' ? 'print.typeSecondary' : 'print.typePrimary')}
+                    {' · '}{t('download.printItem', { n: item.copies })}
+                  </span>
+                </div>
+                <span className="text-sm font-semibold shrink-0 ml-3" style={{ color: 'var(--color-neutral-800)' }}>
+                  Rp {item.totalPrice.toLocaleString('id-ID')}
+                </span>
+              </div>
+            ))}
             {discountAmount > 0 && (
               <div className="flex items-center justify-between px-4 pt-3">
                 <span className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('scan.discountApplied')}</span>
@@ -225,18 +258,6 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               </span>
             </div>
           </div>
-
-          {/* Print add-on is decided back on the Cart screen (so the total is
-              known before reaching payment) — this just confirms what's
-              already folded into displayTotal above. */}
-          {printAddon?.canSubmit && (
-            <div
-              className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold"
-              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-800)' }}
-            >
-              <Printer size={18} /> {t('checkout.printIncluded', { count: printAddon.copies })}
-            </div>
-          )}
 
           <Button size="lg" onClick={handleQrisPay} className="w-full">
             <QrCode size={20} /> {t('checkout.payQris')}

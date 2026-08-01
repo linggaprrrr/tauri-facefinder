@@ -16,27 +16,30 @@ export async function listPrinters() {
   }
 }
 
-// Silently print a JPEG dataURL to the named printer, `copies` times.
+// Silently print a JPEG dataURL to the named printer, `copies` sheets.
+// Resolves with the spooler's job id (0 on CUPS, which has none to give) —
+// the Rust side only returns Ok once the spooler has actually accepted the
+// document, so resolving here means it really is queued at the printer.
+// Printing must target the OS queue name, but Settings saved the display name
+// until that was fixed, and CUPS rejects it outright ("Invalid destination
+// name") — the job never reaches the queue, so it surfaces as a bare "print
+// failed". Translating here rather than at each call site means an existing
+// kiosk keeps printing instead of having to re-pick its printer first.
+async function resolvePrinterName(name) {
+  const printers = await listPrinters();
+  const match = printers.find((p) => p.system_name === name)
+    ?? printers.find((p) => p.name === name);
+  return match?.system_name ?? name;
+}
+
 export async function printImage(printerName, dataUrl, copies = 1) {
   if (!isTauri()) throw new Error('Printing is only available in the kiosk app');
   if (!printerName) throw new Error('No printer selected');
-  await invoke('print_image', {
-    printer: printerName,
+  return invoke('print_image', {
+    printer: await resolvePrinterName(printerName),
     bytes: dataUrlToBytes(dataUrl),
     copies,
   });
-}
-
-// Fetch an image by URL (e.g. an original photo from storage) and print it.
-// Storage serves CORS-enabled images (the editor already canvas-exports them),
-// so a plain fetch works.
-export async function printFromUrl(printerName, url, copies = 1) {
-  if (!isTauri()) throw new Error('Printing is only available in the kiosk app');
-  if (!printerName) throw new Error('No printer selected');
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Could not load image (${resp.status})`);
-  const buf = new Uint8Array(await resp.arrayBuffer());
-  await invoke('print_image', { printer: printerName, bytes: Array.from(buf), copies });
 }
 
 // A throwaway image so staff can validate silent printing without a real photo.

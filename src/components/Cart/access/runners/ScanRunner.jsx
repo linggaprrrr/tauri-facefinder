@@ -47,8 +47,14 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
   const [rejectReason, setRejectReason] = useState(null);
   const inputRef = useRef(null);
 
-  const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  const { deviceConfig, selectedPhotos, photoEdits } = state;
+  const { deviceConfig, selectedPhotos, photoEdits, printItems } = state;
+  // The print add-on counts toward the amount a voucher has to cover: a grant
+  // covers the whole order, prints included. Validating against photos alone
+  // let a Rp 100 voucher report "fully covers" a Rp 300 cart and take the grant
+  // path, which then dropped the paid print instead of chaining to QRIS for the
+  // remainder.
+  const addonTotal = printItems.reduce((sum, item) => sum + (item.canSubmit ? item.totalPrice : 0), 0);
+  const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0) + addonTotal;
 
   useEffect(() => {
     if (status === 'arm' || status === 'rejected') inputRef.current?.focus();
@@ -89,6 +95,7 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
         methodKey: method.key,
         code: trimmed,
         photos: photosWithEdits,
+        printItems,
       });
       dispatch({ type: 'SET_ORDER', payload: order });
       navigate('/download');
@@ -165,12 +172,22 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
       )}
 
       {status !== 'rejected' && (
+        /* A real button, like the cart's back control: as faint centred text
+           this read as a caption, leaving a customer who picked the wrong
+           method with nothing that looked pressable. */
         <button
           onClick={onBack}
-          className="flex items-center justify-center gap-1.5 py-1 text-sm font-semibold"
-          style={{ color: 'var(--color-neutral-500)' }}
+          className="mx-auto flex items-center justify-center gap-2 rounded-full font-bold active:scale-95 transition-transform"
+          style={{
+            padding: '12px 28px',
+            fontSize: 16,
+            background: '#fff',
+            color: 'var(--color-neutral-700)',
+            border: '2px solid var(--color-neutral-300)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
         >
-          <ArrowLeft size={16} /> {t('scan.tryAnother')}
+          <ArrowLeft size={18} /> {t('scan.tryAnother')}
         </button>
       )}
     </div>

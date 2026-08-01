@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, X, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../../store/AppContext';
 import { useLang } from '../../../i18n/LanguageContext';
-import { verifyDeviceKey } from '../../../utils/deviceAuth';
+import PinPad from '../../Settings/PinPad';
 import { grantAccess } from '../../../api/mockApi';
 import LoadingSpinner from '../../common/LoadingSpinner';
 import Button from '../../common/Button';
@@ -22,22 +22,11 @@ export default function StaffGrantModal({ onClose }) {
   const navigate = useNavigate();
 
   const [step, setStep] = useState('auth'); // auth | form | granting | error
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
   const [reason, setReason] = useState('complimentary');
   const [note, setNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const { deviceConfig, selectedPhotos, photoEdits } = state;
-
-  function handleAuth(e) {
-    e.preventDefault();
-    if (verifyDeviceKey(password)) {
-      setStep('form');
-    } else {
-      setAuthError(t('settings.wrongCode'));
-    }
-  }
 
   async function handleGrant() {
     setStep('granting');
@@ -72,21 +61,10 @@ export default function StaffGrantModal({ onClose }) {
 
         <div className="p-5 flex flex-col gap-4">
           {step === 'auth' && (
-            <form onSubmit={handleAuth} className="flex flex-col gap-4">
-              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('staff.authHint')}</p>
-              <input
-                type="password"
-                placeholder={t('settings.codePlaceholder')}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setAuthError(''); }}
-                autoFocus
-                autoComplete="off"
-                className="border rounded-lg px-4 py-3 text-base w-full outline-none focus:ring-2"
-                style={{ borderColor: authError ? 'var(--color-error)' : 'var(--color-neutral-300)', '--tw-ring-color': 'var(--color-primary)' }}
-              />
-              {authError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{authError}</p>}
-              <Button type="submit" className="w-full">{t('staff.unlock')}</Button>
-            </form>
+            <PinPad
+              outletId={deviceConfig.outlet?.id}
+              onSuccess={() => setStep('form')}
+            />
           )}
 
           {step === 'form' && (

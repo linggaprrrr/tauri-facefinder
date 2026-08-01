@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Printer, RefreshCw } from 'lucide-react';
+import { X, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
+import { getPrintStock } from '../../utils/heartbeat';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
+import { clearAssetCache } from '../../utils/assetCache';
+import PrinterStatus from './PrinterStatus';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
-import { verifyDeviceKey } from '../../utils/deviceAuth';
+import { usePrintSetting } from '../../hooks/usePrintSetting';
+import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import { printAddonStatus } from '../../utils/printAddonStatus';
+import { usePrinterHealth } from '../../hooks/usePrinterHealth';
+import { getOldestQueuedAgeMs, getQueuedCount } from '../../utils/printQueue';
+import PinPad from './PinPad';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
 export default function SettingsModal({ onClose, forced = false }) {
@@ -13,14 +21,36 @@ export default function SettingsModal({ onClose, forced = false }) {
 
   // Skip auth on first-run forced setup; require it when admin manually opens settings
   const [step, setStep] = useState(forced ? 'config' : 'auth');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  // Snapshot from the last heartbeat, read once on open — no fetch of its own.
+  const printStock = getPrintStock();
 
   const [units, setUnits] = useState([]);
   const [outlets, setOutlets] = useState([]);
   const [selectedUnit, setSelectedUnit] = useState(state.deviceConfig.unit);
   const [selectedOutlet, setSelectedOutlet] = useState(state.deviceConfig.outlet);
   const [helpNumber, setHelpNumber] = useState(state.deviceConfig.helpNumber ?? '');
+
+  // Diagnostic only — keyed off the SAVED outlet, so it reports what customers
+  // are actually seeing rather than what an unsaved edit on this screen would
+  // produce. Same hooks the Cart uses, so it can't disagree with the real gate.
+  const savedOutletId = state.deviceConfig.outlet?.id;
+  const { setting: livePrintSetting, loading: livePrintSettingLoading } = usePrintSetting(savedOutletId);
+  const { printTemplates: liveTemplates } = usePrintTemplates(savedOutletId);
+  const livePrinterHealth = usePrinterHealth(state.deviceConfig ?? {});
+  // Read once on open — same rationale as printStock above. A job older than
+  // this has stopped being "printing" and started being "stuck"; on Windows the
+  // usual cause is a wedged spooler, which leaves the printer looking online.
+  const STALL_MS = 10 * 60 * 1000;
+  const queueAgeMs = getOldestQueuedAgeMs();
+  const queueStalled = queueAgeMs != null && queueAgeMs >= STALL_MS;
+  const addonStatus = printAddonStatus({
+    deviceConfig: state.deviceConfig,
+    printSetting: livePrintSetting,
+    printSettingLoading: livePrintSettingLoading,
+    printTemplates: liveTemplates,
+    printerHealth: livePrinterHealth,
+    printStock,
+  });
 
   // Printing (kiosk/.exe only — native silent print)
   const [printEnabled, setPrintEnabled] = useState(!!state.deviceConfig.printEnabled);
@@ -29,17 +59,24 @@ export default function SettingsModal({ onClose, forced = false }) {
   const [printersLoading, setPrintersLoading] = useState(false);
   const [testMsg, setTestMsg] = useState(null); // null | 'sent' | 'fail'
   const [testing, setTesting] = useState(false);
+  // Optional second photo printer, used for the outlet's strip template.
+  const [secondaryPrinterName, setSecondaryPrinterName] = useState(state.deviceConfig.secondaryPrinterName ?? '');
+  const [secondaryTestMsg, setSecondaryTestMsg] = useState(null);
+  const [secondaryTesting, setSecondaryTesting] = useState(false);
 
   // Receipt printing — a separate physical printer (thermal) from the photo
   // printer above, so its own picker/test controls, independent of printEnabled
   // (that toggle is the outlet's paid-photo-print business setting, not this).
   const [receiptPrinterName, setReceiptPrinterName] = useState(state.deviceConfig.receiptPrinterName ?? '');
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(!!state.deviceConfig.autoPrintReceipt);
   const [receiptTestMsg, setReceiptTestMsg] = useState(null);
   const [receiptTesting, setReceiptTesting] = useState(false);
 
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedCount, setSyncedCount] = useState(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,14 +85,9 @@ export default function SettingsModal({ onClose, forced = false }) {
     if (forced) fetchUnits();
   });
 
-  function handleAuth(e) {
-    e.preventDefault();
-    if (verifyDeviceKey(password)) {
-      setStep('config');
-      fetchUnits();
-    } else {
-      setAuthError(t('settings.wrongCode'));
-    }
+  function handleAuthSuccess() {
+    setStep('config');
+    fetchUnits();
   }
 
   async function fetchUnits() {
@@ -127,11 +159,34 @@ export default function SettingsModal({ onClose, forced = false }) {
   }
   const handleTestPrint = () => testPrinter(printerName, setTesting, setTestMsg);
   const handleTestReceiptPrint = () => testPrinter(receiptPrinterName, setReceiptTesting, setReceiptTestMsg);
+  const handleSecondaryTestPrint = () => testPrinter(secondaryPrinterName, setSecondaryTesting, setSecondaryTestMsg);
+
+  // Settings saved the display name until the system_name fix, so a config
+  // written by an older build still holds one. Match either way rather than
+  // showing no status for a printer that is in fact selected.
+  const findPrinter = (n) => (
+    n ? printers.find((p) => p.system_name === n) ?? printers.find((p) => p.name === n) : undefined
+  );
+
+  // No reload: staff are usually mid-task in here, and restarting the app
+  // under them (dropping any in-progress customer session) is a heavy price
+  // for refreshing content. clearAssetCache() drops both the localStorage
+  // copies and the hooks' in-memory ones, so each screen refetches the next
+  // time it mounts — the editor picks up new stickers/frames when it is next
+  // opened. Branding is the exception: it is applied once at boot, so a
+  // colour or banner change still lands on the next restart.
+  function handleSync() {
+    setSyncing(true);
+    const cleared = clearAssetCache();
+    setSyncing(false);
+    setSyncedCount(cleared);
+    setTimeout(() => setSyncedCount(null), 4000);
+  }
 
   async function handleSave() {
     if (!selectedUnit || !selectedOutlet) return;
     setSaving(true);
-    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, receiptPrinterName } });
+    dispatch({ type: 'SET_DEVICE_CONFIG', payload: { unit: selectedUnit, outlet: selectedOutlet, helpNumber, printEnabled, printerName, secondaryPrinterName, receiptPrinterName, autoPrintReceipt } });
     await new Promise((r) => setTimeout(r, 400));
     setSaving(false);
     setSaved(true);
@@ -155,9 +210,14 @@ export default function SettingsModal({ onClose, forced = false }) {
           className="flex items-center justify-between px-6 py-4"
           style={{ background: 'var(--color-primary)', color: '#fff' }}
         >
-          <span className="font-bold text-xl">
-            {forced ? t('settings.firstSetup') : t('settings.title')}
-          </span>
+          <div>
+            <span className="font-bold text-xl block">
+              {forced ? t('settings.firstSetup') : t('settings.title')}
+            </span>
+            {state.deviceConfig.outlet?.name && (
+              <span className="text-xs opacity-80">{state.deviceConfig.outlet.name}</span>
+            )}
+          </div>
           {!forced && (
             <button
               onClick={onClose}
@@ -181,33 +241,10 @@ export default function SettingsModal({ onClose, forced = false }) {
         <div className="px-6 py-6 overflow-y-auto" style={{ maxHeight: '65vh' }}>
           {/* ── Step 1: Auth ── */}
           {step === 'auth' && (
-            <form onSubmit={handleAuth} className="flex flex-col gap-4">
-              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
-                {t('settings.authHint')}
-              </p>
-              <input
-                type="password"
-                placeholder={t('settings.codePlaceholder')}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setAuthError(''); }}
-                autoFocus
-                autoComplete="off"
-                className="border rounded-lg px-4 py-3 text-base w-full outline-none focus:ring-2"
-                style={{
-                  borderColor: authError ? 'var(--color-error)' : 'var(--color-neutral-300)',
-                  '--tw-ring-color': 'var(--color-primary)',
-                }}
-              />
-              {authError && (
-                <p className="text-sm" style={{ color: 'var(--color-error)' }}>{authError}</p>
-              )}
-              <button
-                type="submit"
-                className="btn-primary w-full py-3 rounded-lg font-semibold text-base"
-              >
-                {t('settings.openSettings')}
-              </button>
-            </form>
+            <PinPad
+              outletId={state.deviceConfig.outlet?.id}
+              onSuccess={handleAuthSuccess}
+            />
           )}
 
           {/* ── Step 2: Config ── */}
@@ -333,7 +370,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                               {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
                             </option>
                             {printers.map((p) => (
-                              <option key={p.name} value={p.name}>
+                              <option key={p.system_name} value={p.system_name}>
                                 {p.name}{p.is_default ? ' (default)' : ''}
                               </option>
                             ))}
@@ -351,6 +388,48 @@ export default function SettingsModal({ onClose, forced = false }) {
                         </button>
                       </div>
 
+                      {printerName && (
+                        <PrinterStatus state={findPrinter(printerName)?.state} />
+                      )}
+
+                      {queueStalled && (
+                        <div
+                          className="rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs font-medium"
+                          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+                        >
+                          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                          <span>
+                            {t('settings.printStalled', {
+                              n: getQueuedCount(),
+                              mins: Math.floor(queueAgeMs / 60000),
+                            })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Why customers are (or aren't) being offered prints.
+                          Reads the saved config and live outlet settings, not
+                          this form's pending state — it answers "what is the
+                          kiosk doing right now", which is the question staff
+                          have when the checkout checkbox is missing and every
+                          field on this screen looks correct. */}
+                      <div
+                        className="rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs font-medium"
+                        style={{
+                          background: addonStatus.ok ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                          color: addonStatus.ok ? 'var(--color-success)' : 'var(--color-warning)',
+                        }}
+                      >
+                        {addonStatus.ok
+                          ? <Check size={14} className="shrink-0 mt-0.5" />
+                          : <AlertTriangle size={14} className="shrink-0 mt-0.5" />}
+                        <span>
+                          {addonStatus.ok
+                            ? t('settings.printReady')
+                            : t(`settings.printBlocked.${addonStatus.reason}`, { label: addonStatus.label ?? '' })}
+                        </span>
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleTestPrint}
@@ -365,7 +444,77 @@ export default function SettingsModal({ onClose, forced = false }) {
                           {t(testMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
                         </p>
                       )}
+
+                      {/* Secondary printer — for the outlet's strip template.
+                          Optional: left unset, strips print on the primary,
+                          which is how every existing single-printer outlet
+                          already works. */}
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <label className="text-xs font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+                          {t('settings.secondaryPrinter')}
+                        </label>
+                        <select
+                          value={secondaryPrinterName}
+                          onChange={(e) => { setSecondaryPrinterName(e.target.value); setSecondaryTestMsg(null); }}
+                          className="border rounded-lg px-3 py-2.5 text-sm w-full outline-none focus:ring-2"
+                          style={{ borderColor: 'var(--color-neutral-300)', '--tw-ring-color': 'var(--color-primary)' }}
+                        >
+                          <option value="">{t('settings.secondaryPrinterNone')}</option>
+                          {printers.map((p) => (
+                            <option key={p.system_name} value={p.system_name}>
+                              {p.name}{p.is_default ? ' (default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {secondaryPrinterName && (
+                          <PrinterStatus state={findPrinter(secondaryPrinterName)?.state} />
+                        )}
+                        {secondaryPrinterName && (
+                          <button
+                            type="button"
+                            onClick={handleSecondaryTestPrint}
+                            disabled={secondaryTesting}
+                            className="text-sm font-semibold py-2 rounded-lg disabled:opacity-50"
+                            style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                          >
+                            {secondaryTesting ? '…' : t('settings.testPrint')}
+                          </button>
+                        )}
+                        {secondaryTestMsg && (
+                          <p className="text-xs text-center" style={{ color: secondaryTestMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
+                            {t(secondaryTestMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
+                          </p>
+                        )}
+                      </div>
                     </>
+                  )}
+
+                  {/* Print stock — staff-facing only, behind the PIN. A
+                      customer mid-purchase must never see "low on paper". */}
+                  {printStock && (
+                    <div
+                      className="flex flex-col gap-1.5 p-3 rounded-lg mt-1"
+                      style={{
+                        background: printStock.low ? 'var(--color-warning-bg)' : 'var(--color-neutral-50)',
+                        border: `1.5px solid ${printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-200)'}`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-600)' }}>
+                          {printStock.low && <AlertTriangle size={14} />} {t('settings.printStock')}
+                        </span>
+                        <span className="text-sm font-black" style={{ color: printStock.low ? 'var(--color-warning)' : 'var(--color-neutral-800)' }}>
+                          {printStock.remaining}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                        <span>{t('settings.stockInitial')}: {printStock.initial}</span>
+                        <span>{t('settings.stockPrinted')}: {printStock.printed}</span>
+                      </div>
+                      {printStock.low && (
+                        <p className="text-xs" style={{ color: 'var(--color-warning)' }}>{t('settings.stockLowHint')}</p>
+                      )}
+                    </div>
                   )}
 
                   {/* ── Receipt printer (thermal, separate device) ── */}
@@ -385,7 +534,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                             {printersLoading ? '…' : printers.length === 0 ? t('settings.noPrinters') : t('settings.selectPrinter')}
                           </option>
                           {printers.map((p) => (
-                            <option key={p.name} value={p.name}>
+                            <option key={p.system_name} value={p.system_name}>
                               {p.name}{p.is_default ? ' (default)' : ''}
                             </option>
                           ))}
@@ -402,6 +551,10 @@ export default function SettingsModal({ onClose, forced = false }) {
                         <RefreshCw size={16} className={printersLoading ? 'animate-spin' : ''} />
                       </button>
                     </div>
+                    {receiptPrinterName && (
+                      <PrinterStatus state={findPrinter(receiptPrinterName)?.state} />
+                    )}
+
                     <button
                       type="button"
                       onClick={handleTestReceiptPrint}
@@ -415,6 +568,26 @@ export default function SettingsModal({ onClose, forced = false }) {
                       <p className="text-xs text-center" style={{ color: receiptTestMsg === 'sent' ? 'var(--color-success)' : 'var(--color-error)' }}>
                         {t(receiptTestMsg === 'sent' ? 'settings.testPrintSent' : 'settings.testPrintFail')}
                       </p>
+                    )}
+
+                    {/* Only meaningful once a receipt printer is paired. */}
+                    {receiptPrinterName && (
+                      <label className="flex items-start gap-2.5 cursor-pointer mt-1">
+                        <input
+                          type="checkbox"
+                          checked={autoPrintReceipt}
+                          onChange={(e) => setAutoPrintReceipt(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 shrink-0"
+                        />
+                        <span className="flex flex-col">
+                          <span className="text-sm font-medium" style={{ color: 'var(--color-neutral-700)' }}>
+                            {t('settings.autoPrintReceipt')}
+                          </span>
+                          <span className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                            {t('settings.autoPrintReceiptHint')}
+                          </span>
+                        </span>
+                      </label>
                     )}
                   </div>
                 </div>
@@ -437,6 +610,40 @@ export default function SettingsModal({ onClose, forced = false }) {
               >
                 {saved ? <>{t('settings.savedBtn')} <Check size={18} strokeWidth={3} /></> : saving ? t('settings.saving') : t('settings.saveBtn')}
               </button>
+
+              {/* Sync — content is cached at boot, so without this an admin
+                  change only lands on the next power cycle. */}
+              {!forced && (
+                <div className="flex flex-col gap-2 pt-3" style={{ borderTop: '1px solid var(--color-neutral-200)' }}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
+                      {t('settings.syncTitle')}
+                    </span>
+                    <span className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-500)' }}>
+                      {t('settings.syncHint')}
+                    </span>
+                  </div>
+
+                  {syncedCount !== null && (
+                    <p
+                      className="text-xs font-semibold flex items-center gap-1.5"
+                      style={{ color: 'var(--color-success)' }}
+                    >
+                      <Check size={14} strokeWidth={3} /> {t('settings.syncDone')}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+                  >
+                    <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                    {syncing ? t('settings.syncing') : t('settings.syncBtn')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -5,9 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
-  Plus, Minus, Pencil, MousePointer, Loader2,
+  Plus, Minus, Pencil, MousePointer, Loader2, Lock, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { readCachedBranding } from '../../hooks/useBranding';
 import { useLang } from '../../i18n/LanguageContext';
 import { useHistory } from '../../hooks/useHistory';
 import StickerPanel from './StickerPanel';
@@ -15,7 +16,12 @@ import TextPanel from './TextPanel';
 import FilterPanel from './FilterPanel';
 import FramePanel from './FramePanel';
 import SlotPhotoPicker from './SlotPhotoPicker';
+import UploadPanel from './UploadPanel';
+import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
+import { useSessionUploads } from '../../hooks/useSessionUploads';
+import { sessionUploadUrl } from '../../api/mockApi';
+import { renderQrToDataUrl } from '../../utils/renderQrToDataUrl';
 import Button from '../common/Button';
 import { useStickers } from '../../hooks/useStickers';
 import { useLayoutFrames } from '../../hooks/useLayoutFrames';
@@ -68,9 +74,40 @@ function fitDimensions(natW, natH, maxW = MAX_CANVAS_W, maxH = MAX_CANVAS_H) {
   return { width: w, height: h };
 }
 
+// A locked element stays *selectable* on purpose — you have to be able to pick
+// it to unlock it, and selecting is also how the lock announces itself. What
+// locking removes is drag, resize, rotate, delete and restacking. Reusing the
+// Transformer with its handles switched off gives the "locked" chrome (a grey
+// dashed box) for free, and it keeps tracking the node like it always did.
+function lockedTransformerProps(locked) {
+  return locked
+    ? { resizeEnabled: false, rotateEnabled: false, enabledAnchors: [], borderStroke: '#6C757D', borderDash: [6, 4] }
+    : {};
+}
+
+// A Transformer is a node ON the stage, so toDataURL() bakes the selection
+// handles into the exported image whenever an element is still selected — the
+// customer's photo then carries blue squares into the cart, the print and the
+// download. Hiding beats deselecting: clearing React state wouldn't have
+// repainted the stage before this synchronous export ran anyway.
+const EXPORT_OPTS = { pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 };
+function exportStage(stage) {
+  if (!stage) return undefined;
+  const transformers = stage.find('Transformer').filter((tr) => tr.isVisible());
+  transformers.forEach((tr) => tr.hide());
+  stage.batchDraw();
+  try {
+    return stage.toDataURL(EXPORT_OPTS);
+  } finally {
+    transformers.forEach((tr) => tr.show());
+    stage.batchDraw();
+  }
+}
+
 function CanvasElement({ element, isSelected, onSelect, onChange }) {
   const shapeRef = useRef(null);
   const transformerRef = useRef(null);
+  const locked = !!element.locked;
 
   useEffect(() => {
     if (isSelected && transformerRef.current && shapeRef.current) {
@@ -85,7 +122,7 @@ function CanvasElement({ element, isSelected, onSelect, onChange }) {
         <Text
           ref={shapeRef}
           {...element.attrs}
-          draggable
+          draggable={!locked}
           onClick={() => onSelect(element.id)}
           onTap={() => onSelect(element.id)}
           onDragEnd={(e) => onChange(element.id, { x: e.target.x(), y: e.target.y() })}
@@ -103,6 +140,7 @@ function CanvasElement({ element, isSelected, onSelect, onChange }) {
             ref={transformerRef}
             enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-right', 'middle-left']}
             boundBoxFunc={(old, next) => (next.width < 20 ? old : next)}
+            {...lockedTransformerProps(locked)}
           />
         )}
       </>
@@ -113,13 +151,92 @@ function CanvasElement({ element, isSelected, onSelect, onChange }) {
     return <StickerShape element={element} isSelected={isSelected} onSelect={onSelect} onChange={onChange} />;
   }
 
+  if (element.type === 'upload') {
+    return <UploadShape element={element} isSelected={isSelected} onSelect={onSelect} onChange={onChange} />;
+  }
+
   return null;
+}
+
+// An Upload Photo placeholder. Before the customer's phone delivers anything
+// it draws its own QR; once `attrs.src` arrives it behaves exactly like a
+// sticker, so the fill is a one-prop change rather than a second code path.
+function UploadShape({ element, isSelected, onSelect, onChange }) {
+  const shapeRef = useRef(null);
+  const transformerRef = useRef(null);
+  const locked = !!element.locked;
+  const { x, y, width, height, rotation = 0, src, qrDataUrl } = element.attrs;
+  const [photo] = useImage(src ?? '', 'anonymous');
+  const [qr] = useImage(qrDataUrl ?? '', 'anonymous');
+
+  useEffect(() => {
+    if (isSelected && transformerRef.current && shapeRef.current) {
+      transformerRef.current.nodes([shapeRef.current]);
+      transformerRef.current.getLayer().batchDraw();
+    }
+  }, [isSelected, photo]);
+
+  const commit = () => {
+    const node = shapeRef.current;
+    onChange(element.id, {
+      x: node.x(), y: node.y(),
+      width: Math.max(40, node.width() * node.scaleX()),
+      height: Math.max(40, node.height() * node.scaleY()),
+      rotation: node.rotation(),
+    });
+    node.scaleX(1);
+    node.scaleY(1);
+  };
+
+  return (
+    <>
+      <Group
+        ref={shapeRef}
+        x={x} y={y} width={width} height={height} rotation={rotation}
+        draggable={!locked}
+        onClick={() => onSelect(element.id)}
+        onTap={() => onSelect(element.id)}
+        onDragEnd={(e) => onChange(element.id, { x: e.target.x(), y: e.target.y() })}
+        onTransformEnd={commit}
+      >
+        {photo ? (
+          <KonvaImage image={photo} width={width} height={height} />
+        ) : (
+          <>
+            {/* Waiting state: a dashed frame with the QR centred in it. */}
+            <Rect
+              width={width} height={height} cornerRadius={12}
+              fill="#ffffff" stroke="#017DC5" strokeWidth={2} dash={[8, 6]}
+            />
+            {qr && (
+              <KonvaImage
+                image={qr}
+                x={(width - Math.min(width, height) * 0.62) / 2}
+                y={(height - Math.min(width, height) * 0.62) / 2}
+                width={Math.min(width, height) * 0.62}
+                height={Math.min(width, height) * 0.62}
+              />
+            )}
+          </>
+        )}
+      </Group>
+      {isSelected && (
+        <Transformer
+          ref={transformerRef}
+          keepRatio={false}
+          boundBoxFunc={(old, next) => (next.width < 40 || next.height < 40 ? old : next)}
+          {...lockedTransformerProps(locked)}
+        />
+      )}
+    </>
+  );
 }
 
 function StickerShape({ element, isSelected, onSelect, onChange }) {
   const shapeRef = useRef(null);
   const transformerRef = useRef(null);
   const [image] = useImage(element.attrs.src, 'anonymous');
+  const locked = !!element.locked;
 
   useEffect(() => {
     if (isSelected && transformerRef.current && shapeRef.current) {
@@ -136,7 +253,7 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
         x={element.attrs.x} y={element.attrs.y}
         width={element.attrs.width} height={element.attrs.height}
         rotation={element.attrs.rotation || 0}
-        draggable
+        draggable={!locked}
         onClick={() => onSelect(element.id)}
         onTap={() => onSelect(element.id)}
         onDragEnd={(e) => onChange(element.id, { x: e.target.x(), y: e.target.y() })}
@@ -158,6 +275,7 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
           ref={transformerRef}
           keepRatio={true}
           boundBoxFunc={(old, next) => (next.width < 20 ? old : next)}
+          {...lockedTransformerProps(locked)}
         />
       )}
     </>
@@ -367,6 +485,7 @@ const SIDEBAR_TOOLS = [
   { id: 'stickers', icon: Smile,             labelKey: 'editor.tabStickers' },
   { id: 'frames',   icon: ImageIcon,         labelKey: 'editor.tabFrame' },
   { id: 'text',     icon: Type,              labelKey: 'editor.tabText' },
+  { id: 'upload',   icon: QrCode,            labelKey: 'editor.tabUpload' },
   { id: 'filters',  icon: SlidersHorizontal, labelKey: 'editor.tabFilters' },
   { id: 'ai',       icon: Sparkles,          labelKey: 'editor.tabAi' },
 ];
@@ -411,7 +530,16 @@ export default function PhotoEditor() {
   const initEdit = state.photoEdits[currentPhoto?.id] ?? {};
   const { state: elements, push: pushHistory, undo, redo, reset: resetHistory, canUndo, canRedo } = useHistory(initEdit.elements ?? []);
   const [selectedId, setSelectedId] = useState(null);
-  const [activePanel, setActivePanel] = useState('stickers');
+  // Admin-configured per outlet (Branding Kiosk modal), boot-cached same as
+  // colours/images — a toggle lands next reboot, not mid-session.
+  const disabledTools = readCachedBranding(state.deviceConfig.outlet?.id)?.disabled_tools ?? [];
+  const visibleSidebarTools = SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id));
+  // 'stickers' is the usual default panel (on load and whenever the editor
+  // resets to a neutral tool), but if an outlet has disabled exactly that
+  // tool, fall back to whatever's first available instead of landing on a
+  // panel with no matching sidebar button.
+  const defaultPanel = disabledTools.includes('stickers') ? (visibleSidebarTools[0]?.id ?? null) : 'stickers';
+  const [activePanel, setActivePanel] = useState(defaultPanel);
   const [filters, setFilters] = useState(initEdit.filters ?? DEFAULT_FILTERS);
   const [frame, setFrame] = useState(initEdit.frame ?? 'none');
   const [canvas, setCanvas] = useState(fitDimensions(null, null));
@@ -521,7 +649,7 @@ export default function PhotoEditor() {
 
     let dataUrl;
     try {
-      dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+      dataUrl = exportStage(stageRef.current);
     } catch (e) {
       console.warn('Canvas export failed (cross-origin frame?):', e);
     }
@@ -538,7 +666,7 @@ export default function PhotoEditor() {
     if (!isLayoutFrame || committingFrame) return;
     let dataUrl;
     try {
-      dataUrl = stageRef.current?.toDataURL({ pixelRatio: 2, mimeType: 'image/jpeg', quality: 0.9 });
+      dataUrl = exportStage(stageRef.current);
     } catch (e) {
       console.warn('Collage export failed (cross-origin?):', e);
     }
@@ -565,7 +693,7 @@ export default function PhotoEditor() {
       setFrame('none');
       setLayoutSlots([]);
       setSelectedId(null);
-      setActivePanel('stickers');
+      setActivePanel(defaultPanel);
       setPhotoIndex(newIndex);
     } catch (err) {
       console.error('Failed to commit collage:', err);
@@ -602,7 +730,7 @@ export default function PhotoEditor() {
     setFilters(saved?.filters ?? DEFAULT_FILTERS);
     setFrame(saved?.frame ?? 'none');
     setSelectedId(null);
-    setActivePanel('stickers');
+    setActivePanel(defaultPanel);
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
     setPhotoIndex(newIndex);
@@ -696,7 +824,11 @@ export default function PhotoEditor() {
     if (e.target === e.target.getStage()) setSelectedId(null);
   }
 
+  // The single chokepoint every geometry change routes through, so guarding
+  // here covers drag, resize and rotate at once — and any future caller that
+  // forgets the element might be locked.
   const handleChange = useCallback((id, newAttrs) => {
+    if (elements.find((el) => el.id === id)?.locked) return;
     const updated = elements.map((el) =>
       el.id === id ? { ...el, attrs: { ...el.attrs, ...newAttrs } } : el
     );
@@ -720,13 +852,73 @@ export default function PhotoEditor() {
     }]);
   }
 
-  function deleteSelected() {
+  // ── Upload Photo placeholders ──────────────────────────────────────────────
+  // Poll only while at least one placeholder is still empty; the hook idles
+  // once this list is empty.
+  // { slotId, qrDataUrl } while the QR modal is open. The QR is deliberately
+  // not an element: the canvas should only ever hold the finished photo.
+  const [pendingUpload, setPendingUpload] = useState(null);
+  const pendingUploadSlots = [
+    // Placeholders from an earlier build of this feature still fill in.
+    ...elements.filter((el) => el.type === 'upload' && !el.attrs.src).map((el) => el.attrs.slotId),
+    ...(pendingUpload ? [pendingUpload.slotId] : []),
+  ];
+  const sessionUploads = useSessionUploads(state.uploadSessionId, pendingUploadSlots);
+
+  // The arriving photo is merged at render time rather than written back into
+  // history: it keeps this out of an effect (no cascading setState), keeps undo
+  // meaning "what the customer did", and lets a re-upload from the phone
+  // replace the image without a second history entry.
+  const renderElements = elements.map((el) => (
+    el.type === 'upload' && !el.attrs.src && sessionUploads[el.attrs.slotId]
+      ? { ...el, attrs: { ...el.attrs, src: sessionUploads[el.attrs.slotId] } }
+      : el
+  ));
+  const awaitingUploadCount = renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length;
+
+  async function startPhoneUpload() {
+    const slotId = `up${Date.now().toString(36)}`;
+    const url = sessionUploadUrl(state.uploadSessionId, slotId);
+    const qrDataUrl = await renderQrToDataUrl(url, 320).catch(() => null);
+    setPendingUpload({ slotId, qrDataUrl });
+  }
+
+  // The photo lands whenever the phone finishes uploading, so this has to be
+  // an effect. Clearing pendingUpload closes the modal and drops the slot out
+  // of the poll list in the same commit.
+  useEffect(() => {
+    if (!pendingUpload) return;
+    const src = sessionUploads[pendingUpload.slotId];
+    if (!src) return;
+    pushHistory([...elements, {
+      id: `upload-${Date.now()}`,
+      type: 'upload',
+      attrs: { slotId: pendingUpload.slotId, qrDataUrl: null, src, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
+    }]);
+    setPendingUpload(null);
+  }, [sessionUploads, pendingUpload, elements, pushHistory]);
+
+  const selectedElement = elements.find((el) => el.id === selectedId) ?? null;
+  const isSelectionLocked = !!selectedElement?.locked;
+
+  function toggleLock() {
     if (!selectedId) return;
+    // Stays selected afterwards — locking something and having it deselect
+    // would make the toggle feel like it did something else.
+    pushHistory(elements.map((el) => (el.id === selectedId ? { ...el, locked: !el.locked } : el)));
+  }
+
+  function deleteSelected() {
+    if (!selectedId || isSelectionLocked) return;
     pushHistory(elements.filter((el) => el.id !== selectedId));
     setSelectedId(null);
   }
 
+  // Restacking is locked too. It isn't in the "move/resize/rotate/delete" list,
+  // but a watermark a customer can send behind the photo is an unlocked
+  // watermark — z-order is the whole point of locking decorations.
   function bringForward() {
+    if (isSelectionLocked) return;
     const idx = elements.findIndex((el) => el.id === selectedId);
     if (idx < elements.length - 1) {
       const arr = [...elements];
@@ -736,6 +928,7 @@ export default function PhotoEditor() {
   }
 
   function sendBackward() {
+    if (isSelectionLocked) return;
     const idx = elements.findIndex((el) => el.id === selectedId);
     if (idx > 0) {
       const arr = [...elements];
@@ -769,10 +962,12 @@ export default function PhotoEditor() {
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-2 sm:gap-4 shrink-0 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
+          <h1 className="text-xl sm:text-2xl font-black shrink-0 on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
             {t('editor.title')}
           </h1>
-          <p className="hidden sm:block text-sm mt-0.5" style={{ color: 'var(--color-neutral-400)' }}>
+          {/* neutral-600, not 400: this sits directly on the outlet's
+              background photo, where a near-white grey vanished entirely. */}
+          <p className="hidden sm:block text-sm mt-0.5 on-bg-text" style={{ color: 'var(--color-neutral-600)' }}>
             {t('editor.subtitle')}
           </p>
         </div>
@@ -836,7 +1031,7 @@ export default function PhotoEditor() {
             boxShadow: 'var(--shadow-sm)',
           }}
         >
-          {SIDEBAR_TOOLS.map(({ id, icon: Icon, labelKey }) => {
+          {visibleSidebarTools.map(({ id, icon: Icon, labelKey }) => {
             const isActive = activePanel === id;
             return (
               <button
@@ -908,11 +1103,24 @@ export default function PhotoEditor() {
             onUndo={undo} onRedo={redo}
             onDelete={deleteSelected}
             onBringForward={bringForward} onSendBackward={sendBackward}
-            hasSelection={!!selectedId}
+            onToggleLock={toggleLock}
+            hasSelection={!!selectedId} isLocked={isSelectionLocked}
           />
 
-          {/* Contextual hint when nothing is selected */}
-          {!selectedId && (
+          {/* Contextual hint — why the controls are dead is more useful than
+              the generic prompt, so the locked case wins when both apply. */}
+          {isSelectionLocked ? (
+            <p
+              className="text-xs font-medium text-center py-1 rounded-lg flex items-center justify-center gap-1.5"
+              style={{
+                color: 'var(--color-warning)',
+                background: 'var(--color-warning-bg)',
+                border: '1px dashed var(--color-warning)',
+              }}
+            >
+              <Lock size={13} /> {t('editor.hintLocked')}
+            </p>
+          ) : !selectedId && (
             <p
               className="text-xs font-medium text-center py-1 rounded-lg"
               style={{
@@ -1001,7 +1209,7 @@ export default function PhotoEditor() {
                   );
                 })}
 
-                {elements.map((el) => (
+                {renderElements.map((el) => (
                   <CanvasElement
                     key={el.id}
                     element={el}
@@ -1240,6 +1448,13 @@ export default function PhotoEditor() {
             {activePanel === 'frames'   && <FramePanel activeFrame={frame} onSelect={setFrame} layoutFrames={layoutFrames} layoutLoading={layoutFramesLoading} />}
             {activePanel === 'stickers' && <StickerPanel onAdd={addSticker} stickers={stickers} loading={stickersLoading} />}
             {activePanel === 'text'     && <TextPanel onAdd={addText} />}
+            {activePanel === 'upload'   && (
+              <UploadPanel
+                onAdd={startPhoneUpload}
+                awaitingCount={awaitingUploadCount}
+                uploadedCount={renderElements.filter((el) => el.type === 'upload' && el.attrs.src).length}
+              />
+            )}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
             {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} faceCount={currentPhotoFaceCount} />}
 
@@ -1305,6 +1520,14 @@ export default function PhotoEditor() {
           slotIndex={activeSlot}
           onPick={handlePickPhoto}
           onClose={() => { setShowSlotPicker(false); setActiveSlot(null); }}
+        />
+      )}
+
+      {/* Phone upload QR — closes itself the moment the photo lands */}
+      {pendingUpload && (
+        <PhoneUploadModal
+          qrDataUrl={pendingUpload.qrDataUrl}
+          onCancel={() => setPendingUpload(null)}
         />
       )}
 

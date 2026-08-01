@@ -29,12 +29,22 @@ export default function AccessMethodChooser({ methods, price, photoCount, onSele
         ))}
       </div>
 
+      {/* A real button, not grey text: on a touch screen a faint centred label
+          reads as a caption, so a customer who changed their mind had nothing
+          that looked pressable. */}
       <button
         onClick={() => navigate('/cart')}
-        className="flex items-center justify-center gap-1.5 py-2 text-sm font-semibold"
-        style={{ color: 'var(--color-neutral-500)' }}
+        className="mx-auto flex items-center justify-center gap-2 rounded-full font-bold active:scale-95 transition-transform"
+        style={{
+          padding: '12px 28px',
+          fontSize: 16,
+          background: '#fff',
+          color: 'var(--color-neutral-700)',
+          border: '2px solid var(--color-neutral-300)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
       >
-        <ArrowLeft size={16} /> {t('checkout.backToCart')}
+        <ArrowLeft size={18} /> {t('checkout.backToCart')}
       </button>
     </div>
   );

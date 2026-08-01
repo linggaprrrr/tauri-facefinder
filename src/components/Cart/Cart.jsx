@@ -6,6 +6,9 @@ import { useLang } from '../../i18n/LanguageContext';
 import { isTauri } from '../../native/print';
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
+import { printAddonStatus } from '../../utils/printAddonStatus';
+import { usePrinterHealth } from '../../hooks/usePrinterHealth';
+import { getPrintStock } from '../../utils/heartbeat';
 import PrintAddonSelector from '../Print/PrintAddonSelector';
 import Button from '../common/Button';
 
@@ -13,7 +16,7 @@ export default function Cart() {
   const { state, dispatch } = useApp();
   const { t } = useLang();
   const navigate = useNavigate();
-  const { selectedPhotos, photoEdits, deviceConfig, printAddon } = state;
+  const { selectedPhotos, photoEdits, deviceConfig, printItems } = state;
   const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
   const [preview, setPreview] = useState(null);       // { src, label } | null
   const [confirmRemove, setConfirmRemove] = useState(null); // photo pending removal | null
@@ -24,16 +27,50 @@ export default function Cart() {
   const outletId = deviceConfig?.outlet?.id;
   const { setting: printSetting, loading: printSettingLoading } = usePrintSetting(outletId);
   const { printTemplates } = usePrintTemplates(outletId);
-  const activeTemplate = printTemplates.find((tpl) => tpl.id === printSetting?.default_template_id) ?? null;
-  const templateVersion = activeTemplate?.currentVersion ?? null;
-  const printPrice = activeTemplate?.price ?? null;
-  const canOfferPrintAddon = isTauri() && deviceConfig?.printEnabled && deviceConfig?.printerName
-    && !printSettingLoading && printSetting?.printing_enabled && !!templateVersion && !!printPrice;
-  const addonChecked = !!printAddon;
-  const addonEstimate = (addonChecked && printAddon.canSubmit) ? printAddon.totalPrice : 0;
 
-  function toggleAddon(checked) {
-    dispatch({ type: 'SET_PRINT_ADDON', payload: checked ? { copies: 1, photoIds: [], totalPrice: 0, canSubmit: false } : null });
+  // Two products: Primary (normal photo layout) and Secondary (photo strip).
+  // Offerability lives in printAddonStatus, so the Settings screen can explain a
+  // missing print option to staff using the very logic that hid it.
+  // Checked at the cart, not at the last heartbeat: this is the moment the
+  // kiosk decides whether to take money for a print.
+  const printerHealth = usePrinterHealth(deviceConfig ?? {});
+  const addonStatus = printAddonStatus({
+    deviceConfig, printSetting, printSettingLoading, printTemplates,
+    printerHealth, printStock: getPrintStock(),
+  });
+
+  // Both products are offerable side by side now — the exclusive Cetak Foto /
+  // Strip Foto toggle existed only because the transaction could hold one
+  // template. An order is a list of lines, so a 4R and a strip are just two of
+  // them, and two prints of different photos are two more.
+  const PRODUCTS = [
+    { printType: 'primary', template: addonStatus.primary, labelKey: 'print.typePrimary' },
+    { printType: 'secondary', template: addonStatus.secondary, labelKey: 'print.typeSecondary' },
+  ].filter((p) => p.template?.currentVersion && p.template?.price);
+
+  const canOfferPrintAddon = isTauri() && addonStatus.ok && PRODUCTS.length > 0;
+  const productOf = (printType) => PRODUCTS.find((p) => p.printType === printType) ?? null;
+  // Only submittable lines are billed: a half-configured line shows its price on
+  // its own row but must not inflate the total the customer is about to pay.
+  const addonEstimate = printItems.reduce((sum, item) => sum + (item.canSubmit ? item.totalPrice : 0), 0);
+
+  function setItems(next) {
+    dispatch({ type: 'SET_PRINT_ITEMS', payload: next });
+  }
+  function addItem(printType) {
+    setItems([...printItems, {
+      // Stable identity for React keys and updates. Two lines can hold the same
+      // template and the same photo — "two copies, printed separately" is a
+      // legitimate order — so nothing about the contents identifies a line.
+      id: crypto.randomUUID(),
+      printType, copies: 1, photoIds: [], sources: {}, totalPrice: 0, canSubmit: false,
+    }]);
+  }
+  function updateItem(id, patch) {
+    setItems(printItems.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+  function removeItem(id) {
+    setItems(printItems.filter((item) => item.id !== id));
   }
 
   function handleRemove(photoId) {
@@ -88,7 +125,7 @@ export default function Cart() {
                     <div className="flex flex-col items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setPreview({ src: photo.url ?? photo.proxyUrl ?? photo.thumbnail, label: sourceLabel })}
+                        onClick={() => setPreview({ src: photo.thumbnail ?? photo.url ?? photo.proxyUrl, label: sourceLabel })}
                         className="relative group rounded-lg overflow-hidden transition-transform active:scale-95"
                         style={{ width: 80, height: 80, padding: 0, border: 'none', cursor: 'pointer' }}
                         aria-label={t('cart.previewAria')}
@@ -172,27 +209,66 @@ export default function Cart() {
               className="rounded-lg overflow-hidden"
               style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
             >
-              <label className="flex items-center justify-between px-4 py-3 cursor-pointer">
-                <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
-                  <Printer size={18} /> {t('checkout.addPrint')}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={addonChecked}
-                  onChange={(e) => toggleAddon(e.target.checked)}
-                  className="w-5 h-5"
-                />
-              </label>
-              {addonChecked && (
-                <div className="px-4 pb-4">
-                  <PrintAddonSelector
-                    photos={selectedPhotos}
-                    templateVersion={templateVersion}
-                    printPrice={printPrice}
-                    onSelectionChange={(sel) => dispatch({ type: 'SET_PRINT_ADDON', payload: sel })}
-                  />
-                </div>
-              )}
+              <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
+                <Printer size={18} /> {t('checkout.addPrint')}
+              </div>
+
+              {printItems.map((item, i) => {
+                const product = productOf(item.printType);
+                if (!product) return null;
+                return (
+                  <div key={item.id} className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
+                    <div className="flex items-center justify-between gap-2 pt-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate" style={{ color: 'var(--color-neutral-800)' }}>
+                          {t('print.lineN', { n: i + 1 })} · {t(product.labelKey)}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                          {product.template.paperSize} · Rp {(product.template.price ?? 0).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        aria-label={t('print.removeLine')}
+                        className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center active:scale-95"
+                        style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <PrintAddonSelector
+                      photos={selectedPhotos}
+                      templateVersion={product.template.currentVersion}
+                      printPrice={product.template.price}
+                      initial={item}
+                      onSelectionChange={(sel) => updateItem(item.id, sel)}
+                    />
+                  </div>
+                );
+              })}
+
+              {/* One button per product, always available: adding a second line
+                  of the SAME product is how a customer prints two different
+                  photos, so this must not disappear once a line exists. */}
+              <div className="flex flex-wrap gap-2 px-4 pb-4 pt-3" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
+                {PRODUCTS.map((product) => (
+                  <button
+                    key={product.printType}
+                    onClick={() => addItem(product.printType)}
+                    className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                    style={{
+                      background: 'var(--color-primary-50)',
+                      color: 'var(--color-primary)',
+                      border: '2px solid var(--color-primary-100)',
+                    }}
+                  >
+                    <span className="block">+ {t(product.labelKey)}</span>
+                    <span className="block text-xs font-normal opacity-80">
+                      {product.template.paperSize} · Rp {(product.template.price ?? 0).toLocaleString('id-ID')}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

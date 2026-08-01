@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import { getPrintTemplates } from '../api/mockApi';
-import { readCache, writeCache } from '../utils/assetCache';
+import { readCache, writeCache, registerMemCache } from '../utils/assetCache';
 
 const memCache = {};
+// Cleared by the Settings sync — a localStorage wipe alone would leave this
+// session still serving the old copy.
+registerMemCache(() => { Object.keys(memCache).forEach((k) => delete memCache[k]); });
 
 function normalize(template) {
   return {
     id: template.id,
     label: template.label,
     paperSize: template.paper_size,
+    // 'primary' (normal photo layout) | 'secondary' (photo strip). The list
+    // returns both types for the outlet in one payload — the kiosk picks by id
+    // from the outlet's print settings, so there's no separate fetch per type.
+    printType: template.print_type ?? 'primary',
     isGlobal: template.is_global,
     isActive: template.is_active,
     price: template.price ?? null,  // per-print price (IDR) — paper size drives cost

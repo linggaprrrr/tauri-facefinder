@@ -166,6 +166,27 @@ h1, h2, h3 {
   letter-spacing: -0.01em;
 }
 
+/* The outlet's background photo, blurred, behind everything.
+   It lives here rather than on .app-bg because a CSS filter applies to the
+   whole element — blurring it there would blur the entire UI with it. Fixed
+   and scaled slightly so the blur cannot bleed a soft edge in at the sides,
+   and it does not drift while a page scrolls.
+   Kept deliberately light (4px): enough to soften detail so text is not
+   fighting wood grain and bookshelves, but the backdrop is still recognisably
+   the operator's own photo. Heavier blur read as an out-of-focus mistake. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--brand-bg-image, none), var(--gradient-hero);
+  background-size: cover, auto;
+  background-position: center;
+  filter: blur(4px) saturate(1.05);
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
 #root {
   width: 100%;
   min-height: 100svh;
@@ -268,9 +289,25 @@ button:focus-visible {
    Applied to the app shell so every screen sits on a lively stage. */
 .app-bg {
   position: relative;
-  background: var(--gradient-hero);
+  /* The brand image and the stock fallback gradient are both drawn by
+     `body::before`, blurred. All that sits here is a light wash to lift text
+     contrast — it must stay translucent, since anything opaque on this element
+     would paint straight over the layer beneath. */
+  background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45));
   overflow: hidden;
 }
+/* Text that sits directly on the branded background rather than inside a card.
+   The scrim guarantees a light surface, but a busy photo still competes with
+   glyph edges, so this adds a short white halo — invisible on the stock
+   gradient, and the difference between readable and not over a wooden wall or
+   a crowd shot. Apply to page headings/subtitles that have no card behind
+   them; anything inside a white surface does not need it. */
+.on-bg-text {
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(255, 255, 255, 0.95);
+}
+
 .app-bg::before,
 .app-bg::after {
   content: "";
@@ -303,52 +340,6 @@ button:focus-visible {
    fixed-positioned children (help widget, modals) keep their own positioning */
 .app-bg > header,
 .app-bg > main { position: relative; z-index: 1; }
-
-@keyframes floatBlob {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(3vw, 2vw) scale(1.08); }
-}
-
-/* Festive surface card — soft, rounded, gently lifted */
-.festive-card {
-  background: #fff;
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-pop);
-  border: 1px solid var(--color-primary-50);
-}
-
-/* Gradient text for hero words */
-.text-gradient-brand {
-  background: var(--gradient-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-/* Colored glow shadow helpers */
-.shadow-glow-primary { box-shadow: var(--shadow-glow-primary); }
-.shadow-glow-accent  { box-shadow: var(--shadow-glow-accent); }
-.shadow-pop          { box-shadow: var(--shadow-pop); }
-
-/* Gentle entrance for screen content */
-.pop-in { animation: popIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes popIn {
-  from { opacity: 0; transform: translateY(16px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* Playful idle bob for hero icons / mascots */
-.bob { animation: bob 3s ease-in-out infinite; }
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-bg::before, .app-bg::after,
-  .pop-in, .bob { animation: none; }
-}
 
 /* ─────────────────────────────────────────────
    Scroll utilities
@@ -456,4 +447,18 @@ button:focus-visible {
   .gallery-masonry {
     grid-template-columns: repeat(8, 1fr);
   }
+}
+
+/* Wrong-PIN feedback. Short and lateral so it reads as "no" without looking
+   like the app broke. Respects reduced-motion like .pop-in / .bob above. */
+.pin-shake { animation: pinShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes pinShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-shake { animation: none; }
 }
