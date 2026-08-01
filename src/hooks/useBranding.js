@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getOutletKioskConfig } from '../api/mockApi';
-import { readCache, writeCache } from '../utils/assetCache';
+import { readCache, writeCache, onAssetSync } from '../utils/assetCache';
 
 // Per-outlet kiosk branding, set in the admin dashboard. Fetched once per boot
 // and cached, so a kiosk that starts with the network down still comes up in
@@ -55,23 +55,38 @@ export function useBranding(outletId) {
     const cached = readCachedBranding(outletId);
     if (cached) applyTheme(cached);
 
-    getOutletKioskConfig(outletId)
-      .then((config) => {
-        if (cancelled) return;
-        writeCache(cacheKey(outletId), config);
-        setBranding(config);
-        applyTheme(config);
-      })
-      .catch(() => {
-        // Offline or the outlet has no branding — the cached (or stock) theme
-        // already on screen is the right thing to keep showing.
-      });
+    function fetchAndApply() {
+      return getOutletKioskConfig(outletId)
+        .then((config) => {
+          if (cancelled) return;
+          writeCache(cacheKey(outletId), config);
+          setBranding(config);
+          applyTheme(config);
+        })
+        .catch(() => {
+          // Offline or the outlet has no branding — the cached (or stock) theme
+          // already on screen is the right thing to keep showing.
+        });
+    }
 
-    return () => { cancelled = true; };
+    fetchAndApply();
+
+    // Branding is applied to the document, not just cached, so a sync that
+    // only cleared caches left the old colours and banner on screen until the
+    // next reboot — which is exactly what the sync button exists to avoid.
+    const offSync = onAssetSync(fetchAndApply);
+
+    return () => { cancelled = true; offSync(); };
   }, [outletId]);
 
   return {
     bannerUrl: branding?.banner_url ?? null,
+    // Where the splash's Start button sits. Defaulted here rather than at each
+    // call site so one place decides the fleet default.
+    bannerCtaPosition: branding?.banner_cta_position ?? 'bottom-center',
+    // Null here on purpose — the component falls back to the translated
+    // default so an outlet that set no label still follows the language toggle.
+    bannerCtaLabel: branding?.banner_cta_label ?? null,
     backgroundUrl: branding?.background_url ?? null,
   };
 }

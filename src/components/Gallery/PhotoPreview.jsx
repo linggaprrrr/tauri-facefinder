@@ -5,7 +5,10 @@ import { useLang } from '../../i18n/LanguageContext';
 
 export default function PhotoPreview({ photo, photos, onClose, onNavigate, selected, onToggleSelect }) {
   const { t } = useLang();
-  const cachedUrl = usePhotoCache(photo.url ?? photo.thumbnail);
+  // Watermarked copy first: this is a full-screen view of a photo the customer
+  // has not paid for, and nothing stops them photographing the screen. The
+  // clean original is only ever needed to produce what they bought.
+  const cachedUrl = usePhotoCache(photo.thumbnail ?? photo.url);
   const currentIndex = photos.findIndex((p) => p.id === photo.id);
 
   const goPrev = useCallback(() => {
@@ -65,7 +68,7 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
 
         {/* Image */}
         <img
-          src={photo.url ?? photo.thumbnail}
+          src={photo.thumbnail ?? photo.url}
           alt="Preview"
           className="block object-contain"
           style={{ maxHeight: '72vh', maxWidth: '80vw' }}

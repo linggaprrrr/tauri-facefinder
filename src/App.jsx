@@ -27,6 +27,8 @@ import { readPendingOrder } from './utils/pendingOrder';
 import { resumePrintQueue } from './utils/printQueue';
 import { startHeartbeat, getPrintStock, subscribePrintStock } from './utils/heartbeat';
 import { isTauri } from './native/print';
+import { clearAssetCache } from './utils/assetCache';
+import BannerSplash from './components/Home/BannerSplash';
 
 const ROUTE_STEP = {
   '/': 0,
@@ -48,7 +50,15 @@ function Layout() {
   const isConfigured = !!(state.deviceConfig.unit && state.deviceConfig.outlet);
   // Applies the outlet's primary colour + background globally; the banner is
   // the welcome screen's to render.
-  const { bannerUrl } = useBranding(state.deviceConfig.outlet?.id);
+  const { bannerUrl, bannerCtaPosition, bannerCtaLabel } = useBranding(state.deviceConfig.outlet?.id);
+
+  // Attract screen. Re-armed every time the kiosk returns to home so each new
+  // customer meets it, and dismissed for the rest of the visit once someone
+  // starts — it is a greeting, not something to walk back into mid-session.
+  const [splashDismissed, setSplashDismissed] = useState(false);
+  useEffect(() => {
+    if (isHome) setSplashDismissed(false);
+  }, [isHome]);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -97,6 +107,19 @@ function Layout() {
   useEffect(() => {
     if (isTauri()) return startHeartbeat(state.deviceConfig);
   }, [state.deviceConfig]);
+
+  // Hourly content refresh, so an outlet that updates stickers or branding in
+  // the morning does not wait for a power cycle. Deliberately skipped unless
+  // the kiosk is idle on the welcome screen: a sync mid-session would refetch
+  // assets under a customer who is part-way through editing, and the whole
+  // point of this is to be invisible. Skipping just defers to the next tick.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const busy = state.photos.length > 0 || state.selectedPhotos.length > 0;
+      if (isHome && !busy) clearAssetCache();
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [isHome, state.photos.length, state.selectedPhotos.length]);
 
   // Media running out is the one fault staff can actually fix on the spot, so
   // surface it without them having to unlock Settings to find out.
@@ -248,19 +271,21 @@ function Layout() {
         </div>
       )}
 
+      {isHome && bannerUrl && !splashDismissed && !forced && !showSettings && (
+        <BannerSplash
+          bannerUrl={bannerUrl}
+          ctaPosition={bannerCtaPosition}
+          ctaLabel={bannerCtaLabel}
+          primaryColor={getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim()}
+          onStart={() => setSplashDismissed(true)}
+          onClose={() => setSplashDismissed(true)}
+        />
+      )}
+
       {/* Page content */}
       <main key={location.pathname} className="flex-1 p-3 sm:p-6 overflow-auto no-scrollbar pop-in">
         {/* Outlet banner — welcome screen only, so it greets rather than
             follows the customer through checkout. */}
-        {isHome && bannerUrl && (
-          <img
-            src={bannerUrl}
-            alt=""
-            className="w-full max-w-4xl mx-auto mb-4 rounded-2xl object-cover"
-            style={{ maxHeight: 180 }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        )}
         <Routes>
           <Route path="/" element={<FaceScan />} />
           <Route path="/gallery" element={<Gallery />} />

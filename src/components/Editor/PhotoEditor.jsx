@@ -943,10 +943,12 @@ export default function PhotoEditor() {
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-2 sm:gap-4 shrink-0 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black shrink-0" style={{ color: 'var(--color-neutral-900)' }}>
+          <h1 className="text-xl sm:text-2xl font-black shrink-0 on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
             {t('editor.title')}
           </h1>
-          <p className="hidden sm:block text-sm mt-0.5" style={{ color: 'var(--color-neutral-400)' }}>
+          {/* neutral-600, not 400: this sits directly on the outlet's
+              background photo, where a near-white grey vanished entirely. */}
+          <p className="hidden sm:block text-sm mt-0.5 on-bg-text" style={{ color: 'var(--color-neutral-600)' }}>
             {t('editor.subtitle')}
           </p>
         </div>

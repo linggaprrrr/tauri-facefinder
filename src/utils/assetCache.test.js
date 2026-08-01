@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { clearAssetCache, writeCache, readCache } from './assetCache';
+import { clearAssetCache, writeCache, readCache, onAssetSync } from './assetCache';
 
 beforeEach(() => { globalThis.localStorage = (() => {
   let s = {};
@@ -28,5 +28,28 @@ describe('clearAssetCache', () => {
     expect(localStorage.getItem('ff_kiosk_id')).toBe('kiosk-123');
     expect(localStorage.getItem('lang')).toBe('id');
     expect(localStorage.getItem('ff_pin_offline')).toBe('{"digest":"x"}');
+  });
+
+  it('notifies sync listeners after the cache is already gone', () => {
+    // Branding is applied to the document at boot, so clearing its cache alone
+    // leaves the old colours on screen — the listener is what makes Sync
+    // actually change anything. It must fire *after* the wipe, or a listener
+    // that re-reads would just find the stale entry and re-apply it.
+    writeCache('branding_o1', { primary_color: '#old' });
+    let seenDuringCallback = 'not-called';
+    const off = onAssetSync(() => { seenDuringCallback = readCache('branding_o1'); });
+
+    clearAssetCache();
+
+    expect(seenDuringCallback).toBe(null);
+    off();
+    // Unsubscribed listeners stay unsubscribed — a remounted hook must not
+    // stack a second fetch on every future sync.
+    let calledAgain = false;
+    onAssetSync(() => { calledAgain = true; });
+    seenDuringCallback = 'reset';
+    clearAssetCache();
+    expect(calledAgain).toBe(true);
+    expect(seenDuringCallback).toBe('reset');
   });
 });

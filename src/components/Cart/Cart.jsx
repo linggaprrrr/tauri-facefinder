@@ -113,7 +113,7 @@ export default function Cart() {
                     <div className="flex flex-col items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setPreview({ src: photo.url ?? photo.proxyUrl ?? photo.thumbnail, label: sourceLabel })}
+                        onClick={() => setPreview({ src: photo.thumbnail ?? photo.url ?? photo.proxyUrl, label: sourceLabel })}
                         className="relative group rounded-lg overflow-hidden transition-transform active:scale-95"
                         style={{ width: 80, height: 80, padding: 0, border: 'none', cursor: 'pointer' }}
                         aria-label={t('cart.previewAria')}

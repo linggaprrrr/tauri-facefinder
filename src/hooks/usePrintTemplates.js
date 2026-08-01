@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getPrintTemplates } from '../api/mockApi';
-import { readCache, writeCache } from '../utils/assetCache';
+import { readCache, writeCache, registerMemCache } from '../utils/assetCache';
 
 const memCache = {};
+// Cleared by the Settings sync — a localStorage wipe alone would leave this
+// session still serving the old copy.
+registerMemCache(() => { Object.keys(memCache).forEach((k) => delete memCache[k]); });
 
 function normalize(template) {
   return {

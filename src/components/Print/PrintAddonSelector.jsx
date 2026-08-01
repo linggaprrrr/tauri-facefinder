@@ -27,37 +27,32 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
   const totalPrice = copies * (printPrice ?? 0);
   const canSubmit = copies > 0 && slotsFilled && photoIds.length > 0;
 
-  function emit(next) {
-    const merged = { copies, photoIds, ...next };
-    onSelectionChange?.({
-      copies: merged.copies,
-      photoIds: merged.photoIds,
-      totalPrice: merged.copies * (printPrice ?? 0),
-      canSubmit: merged.copies > 0 && merged.photoIds.length > 0 && (!isCollage || slotsFilled),
-    });
-  }
-
-  // Report the initial selection once mounted — copies/photoId already have
-  // sane defaults (1 copy; the lone cart photo if there's only one), so the
-  // parent shouldn't have to wait for the customer to touch the stepper.
-  useEffect(() => { emit({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reported from the derived values, not hand-assembled at each call site.
+  // The previous version passed a patch into emit() and merged it with the
+  // `photoIds` captured in that render's closure — so selecting a photo emitted
+  // the list from *before* the selection, leaving canSubmit false. The row
+  // showed its price while the cart total ignored it, because the total only
+  // counts an add-on the selector says is submittable.
+  //
+  // Driving it from an effect means the parent always sees what is actually on
+  // screen, and no future call site can reintroduce the same staleness.
+  useEffect(() => {
+    onSelectionChange?.({ copies, photoIds, totalPrice, canSubmit });
+    // photoIds is rebuilt every render, so it is compared by value here.
+  }, [copies, photoIds.join(','), totalPrice, canSubmit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function adjustCopies(delta) {
     const next = Math.max(1, Math.min(20, copies + delta));
     setCopies(next);
-    emit({ copies: next });
   }
   function assignSlot(photo) {
     const next = [...slotAssignments];
     next[activeSlot] = photo;
     setSlotAssignments(next);
     setActiveSlot(null);
-    emit({ photoIds: next.map((p) => p?.photo_id).filter(Boolean) });
   }
   function pickPhoto(id) {
     setPhotoId(id);
-    const photo = photos.find((p) => p.id === id);
-    emit({ photoIds: photo ? [photo.photo_id] : [] });
   }
 
   return (

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getOutletAccessMethods } from '../api/mockApi';
-import { readCache, writeCache } from '../utils/assetCache';
+import { readCache, writeCache, registerMemCache } from '../utils/assetCache';
 import { ACCESS_METHODS } from '../access/registry';
 import { isTauri } from '../native/print';
 
 const memCache = {};
+// Cleared by the Settings sync — a localStorage wipe alone would leave this
+// session still serving the old copy.
+registerMemCache(() => { Object.keys(memCache).forEach((k) => delete memCache[k]); });
 const QRIS_ONLY = [{ method_key: 'qris', enabled: true, sort_order: 0, is_default: true }];
 
 // A 'scanner' HID device can't be feature-detected the way a camera can (it

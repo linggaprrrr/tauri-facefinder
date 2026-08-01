@@ -128,6 +128,9 @@ export function sessionUploadUrl(sessionId, slotId) {
 export async function getOutletKioskConfig(outletId) {
   const res = await fetch(`${API_BASE}/outlets/${outletId}/kiosk-config`, {
     headers: { 'api-key': KIOSK_API_KEY },
+    // Settings' sync re-fetches this to apply branding without a reboot; a
+    // WebView-cached 200 would silently make that button do nothing.
+    cache: 'no-store',
   });
   if (!res.ok) throw new ApiError('server', `API error ${res.status}`, res.status);
   return res.json();
