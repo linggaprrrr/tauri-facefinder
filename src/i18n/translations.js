@@ -229,6 +229,7 @@ export const translations = {
   'download.autoResetLabel': { id: 'Kembali otomatis dalam', en: 'Returning automatically in' },
   // Diagnostics for "kenapa tombol cetak tidak muncul di checkout" — six
   // conditions used to collapse into one silent boolean.
+  'settings.printStalled':                   { id: 'Antrean cetak macet: {n} job menunggu, tertua {mins} menit. Biasanya print spooler Windows perlu di-restart — hubungi petugas teknis.', en: 'Print queue stalled: {n} job(s) waiting, oldest {mins} min. The Windows print spooler usually needs restarting — contact technical staff.' },
   'settings.printReady':                     { id: 'Cetak foto ditawarkan ke pelanggan di kios ini.', en: 'Photo prints are being offered to customers on this kiosk.' },
   'settings.printBlocked.devicePrintOff':    { id: 'Cetak tidak ditawarkan: sakelar Cetak di layar ini masih mati.', en: 'Prints not offered: the Printing switch on this screen is off.' },
   'settings.printBlocked.noPrinter':         { id: 'Cetak tidak ditawarkan: printer foto belum dipilih di layar ini.', en: 'Prints not offered: no photo printer selected on this screen.' },

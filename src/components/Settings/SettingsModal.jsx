@@ -11,6 +11,7 @@ import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
 import { printAddonStatus } from '../../utils/printAddonStatus';
 import { usePrinterHealth } from '../../hooks/usePrinterHealth';
+import { getOldestQueuedAgeMs, getQueuedCount } from '../../utils/printQueue';
 import PinPad from './PinPad';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
@@ -36,6 +37,12 @@ export default function SettingsModal({ onClose, forced = false }) {
   const { setting: livePrintSetting, loading: livePrintSettingLoading } = usePrintSetting(savedOutletId);
   const { printTemplates: liveTemplates } = usePrintTemplates(savedOutletId);
   const livePrinterHealth = usePrinterHealth(state.deviceConfig ?? {});
+  // Read once on open — same rationale as printStock above. A job older than
+  // this has stopped being "printing" and started being "stuck"; on Windows the
+  // usual cause is a wedged spooler, which leaves the printer looking online.
+  const STALL_MS = 10 * 60 * 1000;
+  const queueAgeMs = getOldestQueuedAgeMs();
+  const queueStalled = queueAgeMs != null && queueAgeMs >= STALL_MS;
   const addonStatus = printAddonStatus({
     deviceConfig: state.deviceConfig,
     printSetting: livePrintSetting,
@@ -383,6 +390,21 @@ export default function SettingsModal({ onClose, forced = false }) {
 
                       {printerName && (
                         <PrinterStatus state={findPrinter(printerName)?.state} />
+                      )}
+
+                      {queueStalled && (
+                        <div
+                          className="rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs font-medium"
+                          style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
+                        >
+                          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                          <span>
+                            {t('settings.printStalled', {
+                              n: getQueuedCount(),
+                              mins: Math.floor(queueAgeMs / 60000),
+                            })}
+                          </span>
+                        </div>
                       )}
 
                       {/* Why customers are (or aren't) being offered prints.

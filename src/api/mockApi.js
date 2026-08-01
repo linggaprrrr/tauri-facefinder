@@ -439,6 +439,7 @@ export async function sendKioskHeartbeat({
   kioskId, outletId, printerName, printerStatus,
   secondaryPrinterName, secondaryPrinterStatus,
   receiptPrinterName, receiptPrinterStatus, appVersion,
+  printQueueAgeMs, printQueueCount,
 }) {
   const res = await fetch(`${API_BASE}/kiosk-printers/heartbeat`, {
     method: 'PATCH',
@@ -453,6 +454,9 @@ export async function sendKioskHeartbeat({
       receipt_printer_name: receiptPrinterName ?? null,
       receipt_printer_status: receiptPrinterStatus ?? null,
       app_version: appVersion,
+      // Null when the queue is empty — "no stall known", never "stalled".
+      print_queue_age_ms: printQueueAgeMs ?? null,
+      print_queue_count: printQueueCount ?? null,
     }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);

@@ -91,3 +91,41 @@ describe('printQueue', () => {
 // ponytail: no retry-timing test — BACKOFF_MS starts at 5s, so exercising the
 // retry ladder would add 65s of wall-clock to catch a path neither regression
 // lived in. Drive the backoff from a constant and fake timers if it breaks.
+
+// A wedged spooler is indistinguishable from an idle kiosk unless the queue
+// reports how long its oldest job has been waiting — the whole basis of stall
+// detection, so it gets a guard.
+describe('stall detection', () => {
+  it('reports no age when nothing is queued', async () => {
+    const { getOldestQueuedAgeMs } = await import('./printQueue');
+    expect(getOldestQueuedAgeMs()).toBe(null);
+  });
+
+  it('ages from the OLDEST queued job, not the newest', async () => {
+    const { getOldestQueuedAgeMs, getQueuedCount } = await import('./printQueue');
+    // Never resolves: the job stays queued, which is exactly the wedged case.
+    printImage.mockImplementation(() => new Promise(() => {}));
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    enqueuePrint(job('old'));
+    Date.now.mockReturnValue(now + 60_000);
+    enqueuePrint(job('new'));
+    await flush();
+
+    expect(getQueuedCount()).toBe(2);
+    // 60s from the first job, not 0s from the second.
+    expect(getOldestQueuedAgeMs()).toBe(60_000);
+    Date.now.mockRestore();
+  });
+
+  it('treats a job mirrored without queuedAt as fresh, not infinitely old', async () => {
+    const { getOldestQueuedAgeMs } = await import('./printQueue');
+    // What an older build left in localStorage — an upgrade must not fire a
+    // false stall alert on it.
+    localStorage.setItem('ff_print_queue', JSON.stringify([
+      { jobId: 'legacy', printerName: 'DS-RX1', dataUrl: 'x', copies: 1, attempt: 0 },
+    ]));
+    __resetQueueForTest();
+    expect(getOldestQueuedAgeMs()).toBeLessThan(1000);
+  });
+});

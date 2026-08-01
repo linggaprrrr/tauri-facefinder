@@ -105,9 +105,29 @@ async function processQueue() {
 export function enqueuePrint({ jobId, printerName, dataUrl, copies }) {
   const q = hydrate();
   if (q.some((j) => j.jobId === jobId)) return; // already queued
-  q.push({ jobId, printerName, dataUrl, copies, attempt: 0 });
+  // queuedAt is what makes a wedged spooler visible. Without it a job stuck
+  // forever and an idle kiosk look identical from outside — which is how a
+  // whole day's printing is lost with nobody noticing until a customer
+  // complains. Recorded here, not at print time, because the wait we care
+  // about starts the moment the customer has paid.
+  q.push({ jobId, printerName, dataUrl, copies, attempt: 0, queuedAt: Date.now() });
   persist();
   processQueue();
+}
+
+// Age of the oldest job still waiting, in ms, or null when nothing is queued.
+// Reported by the heartbeat so the fleet view can tell "idle" from "stuck".
+export function getOldestQueuedAgeMs() {
+  const q = hydrate();
+  if (q.length === 0) return null;
+  // Jobs mirrored by an older build have no queuedAt; treat them as just-queued
+  // rather than as infinitely old, so an upgrade can't fire a false stall alert.
+  const oldest = Math.min(...q.map((j) => j.queuedAt ?? Date.now()));
+  return Math.max(0, Date.now() - oldest);
+}
+
+export function getQueuedCount() {
+  return hydrate().length;
 }
 
 // Resume anything left over from a crash/restart, once, on app boot.

@@ -4,6 +4,7 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { listPrinters } from '../native/print';
 import { sendKioskHeartbeat } from '../api/mockApi';
+import { getOldestQueuedAgeMs, getQueuedCount } from './printQueue';
 import { getKioskId } from './kioskId';
 
 const INTERVAL_MS = 5 * 60 * 1000;
@@ -65,11 +66,6 @@ async function sendHeartbeat(deviceConfig) {
   const { printerName } = deviceConfig;
 
   const printers = await listPrinters();
-  // A queue that exists but is paused or offline is not "online" — reporting
-  // it as such is how a kiosk sits there looking healthy in the fleet view
-  // while every print silently fails. UNKNOWN is left as online on purpose:
-  // it is what the crate returns when it simply cannot tell, and a false
-  // alarm every 5 minutes is how staff learn to ignore the indicator.
   const statusOf = (n) => printerStatusIn(printers, n);
 
   const printerStatus = statusOf(printerName);
@@ -89,6 +85,10 @@ async function sendHeartbeat(deviceConfig) {
     receiptPrinterName: receiptPrinterName || null,
     receiptPrinterStatus: receiptPrinterName ? statusOf(receiptPrinterName) : null,
     appVersion: await resolveAppVersion(),
+    // A wedged spooler leaves printer_status reading "online" while nothing
+    // prints; queue age is the only signal that separates stuck from idle.
+    printQueueAgeMs: getOldestQueuedAgeMs(),
+    printQueueCount: getQueuedCount(),
   }).catch(() => null);
 
   if (res?.stock) {
