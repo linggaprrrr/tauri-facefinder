@@ -10,6 +10,7 @@ import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../n
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
 import { printAddonStatus } from '../../utils/printAddonStatus';
+import { usePrinterHealth } from '../../hooks/usePrinterHealth';
 import PinPad from './PinPad';
 
 // forced=true: no close button, no backdrop dismiss, skip auth step (first-run setup)
@@ -34,11 +35,14 @@ export default function SettingsModal({ onClose, forced = false }) {
   const savedOutletId = state.deviceConfig.outlet?.id;
   const { setting: livePrintSetting, loading: livePrintSettingLoading } = usePrintSetting(savedOutletId);
   const { printTemplates: liveTemplates } = usePrintTemplates(savedOutletId);
+  const livePrinterHealth = usePrinterHealth(state.deviceConfig ?? {});
   const addonStatus = printAddonStatus({
     deviceConfig: state.deviceConfig,
     printSetting: livePrintSetting,
     printSettingLoading: livePrintSettingLoading,
     printTemplates: liveTemplates,
+    printerHealth: livePrinterHealth,
+    printStock,
   });
 
   // Printing (kiosk/.exe only — native silent print)

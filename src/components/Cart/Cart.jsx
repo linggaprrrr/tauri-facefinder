@@ -7,6 +7,8 @@ import { isTauri } from '../../native/print';
 import { usePrintSetting } from '../../hooks/usePrintSetting';
 import { usePrintTemplates } from '../../hooks/usePrintTemplates';
 import { printAddonStatus } from '../../utils/printAddonStatus';
+import { usePrinterHealth } from '../../hooks/usePrinterHealth';
+import { getPrintStock } from '../../utils/heartbeat';
 import PrintAddonSelector from '../Print/PrintAddonSelector';
 import Button from '../common/Button';
 
@@ -29,7 +31,13 @@ export default function Cart() {
   // Two products: Primary (normal photo layout) and Secondary (photo strip).
   // Offerability lives in printAddonStatus, so the Settings screen can explain a
   // missing print option to staff using the very logic that hid it.
-  const addonStatus = printAddonStatus({ deviceConfig, printSetting, printSettingLoading, printTemplates });
+  // Checked at the cart, not at the last heartbeat: this is the moment the
+  // kiosk decides whether to take money for a print.
+  const printerHealth = usePrinterHealth(deviceConfig ?? {});
+  const addonStatus = printAddonStatus({
+    deviceConfig, printSetting, printSettingLoading, printTemplates,
+    printerHealth, printStock: getPrintStock(),
+  });
 
   // Both products are offerable side by side now — the exclusive Cetak Foto /
   // Strip Foto toggle existed only because the transaction could hold one

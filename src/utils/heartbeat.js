@@ -37,6 +37,25 @@ export function subscribePrintStock(fn) {
   return () => stockListeners.delete(fn);
 }
 
+// A queue that exists but is paused or offline is not "online" — reporting it
+// as such is how a kiosk sits there looking healthy in the fleet view while
+// every print silently fails. UNKNOWN is left as online on purpose: it is what
+// the crate returns when it simply cannot tell, and a false alarm every 5
+// minutes is how staff learn to ignore the indicator.
+//
+// Exported because the Cart's "can we sell a print" gate must mean exactly the
+// same thing by "healthy" as the fleet view does. Two definitions of healthy is
+// how a kiosk ends up taking money for a print it can see it cannot produce.
+export function printerStatusIn(printers, name) {
+  if (!name) return 'offline';
+  // Match system_name first: that is what Settings stores and what the OS
+  // actually calls the queue. The display-name fallback keeps configs written
+  // by older builds reporting correctly instead of flipping to "offline".
+  const p = printers.find((x) => x.system_name === name) ?? printers.find((x) => x.name === name);
+  if (!p) return 'offline';
+  return ['PAUSED', 'OFFLINE'].includes(String(p.state).toUpperCase()) ? 'error' : 'online';
+}
+
 async function sendHeartbeat(deviceConfig) {
   if (!deviceConfig?.outlet) return;
   // Beat even with no photo printer configured. Bailing here meant a kiosk
@@ -46,23 +65,12 @@ async function sendHeartbeat(deviceConfig) {
   const { printerName } = deviceConfig;
 
   const printers = await listPrinters();
-  // Match system_name first: that is what Settings now stores and what the OS
-  // actually calls the queue. The display-name fallback keeps configs written
-  // by older builds reporting correctly instead of flipping to "offline".
-  const find = (n) => (
-    n ? printers.find((p) => p.system_name === n) ?? printers.find((p) => p.name === n) : undefined
-  );
-
   // A queue that exists but is paused or offline is not "online" — reporting
   // it as such is how a kiosk sits there looking healthy in the fleet view
   // while every print silently fails. UNKNOWN is left as online on purpose:
   // it is what the crate returns when it simply cannot tell, and a false
   // alarm every 5 minutes is how staff learn to ignore the indicator.
-  const statusOf = (n) => {
-    const p = find(n);
-    if (!p) return 'offline';
-    return ['PAUSED', 'OFFLINE'].includes(String(p.state).toUpperCase()) ? 'error' : 'online';
-  };
+  const statusOf = (n) => printerStatusIn(printers, n);
 
   const printerStatus = statusOf(printerName);
 
