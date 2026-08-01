@@ -8,6 +8,22 @@ import { useLang } from '../../i18n/LanguageContext';
 
 const STATUS = { IDLE: 'idle', CHECKING: 'checking', UP_TO_DATE: 'up_to_date', AVAILABLE: 'available', INSTALLING: 'installing', ERROR: 'error' };
 
+// A production build has no console and no log file (the Rust side only wires
+// up tauri_plugin_log under cfg!(debug_assertions)), so this banner is the
+// ONLY place a failed check or install is ever visible — and the updater
+// plugin sometimes rejects with a bare string rather than an Error, which
+// made e?.message silently empty and left staff staring at generic text with
+// no way to tell "no internet" from "signature mismatch" from "server down".
+function describeError(e, fallback) {
+  if (typeof e === 'string' && e) return e;
+  if (e?.message) return e.message;
+  try {
+    const s = JSON.stringify(e);
+    if (s && s !== '{}') return s;
+  } catch { /* circular or unserializable — fall through */ }
+  return fallback;
+}
+
 export default function AboutModal({ onClose }) {
   const { t } = useLang();
   const [appVersion, setAppVersion] = useState('—');
@@ -35,7 +51,7 @@ export default function AboutModal({ onClose }) {
         setStatus(STATUS.UP_TO_DATE);
       }
     } catch (e) {
-      setErrorMsg(e?.message ?? t('about.errCheck'));
+      setErrorMsg(describeError(e, t('about.errCheck')));
       setStatus(STATUS.ERROR);
     }
   }
@@ -47,7 +63,7 @@ export default function AboutModal({ onClose }) {
       await updateInfo.update.downloadAndInstall();
       await relaunch();
     } catch (e) {
-      setErrorMsg(e?.message ?? t('about.errInstall'));
+      setErrorMsg(describeError(e, t('about.errInstall')));
       setStatus(STATUS.ERROR);
     }
   }
