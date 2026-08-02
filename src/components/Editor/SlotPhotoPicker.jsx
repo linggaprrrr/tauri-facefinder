@@ -1,8 +1,8 @@
-import { X, QrCode } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 import { useApp } from '../../store/AppContext';
 
-export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, onPick, onUploadFromPhone, onClose }) {
+export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, onPick, onClose }) {
   const { t } = useLang();
   const { state } = useApp();
   // Both printable versions of every photo. An edit doesn't replace the
@@ -40,15 +40,6 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
         </div>
 
         <div className="p-4 overflow-y-auto no-scrollbar">
-          {onUploadFromPhone && (
-            <button
-              onClick={onUploadFromPhone}
-              className="w-full mb-4 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
-            >
-              <QrCode size={16} /> {t('picker.uploadFromPhone')}
-            </button>
-          )}
           <div className="grid grid-cols-3 gap-3">
             {variants.map(({ photo, source }) => {
               const isUsed = assignedPhotoIds.includes(photo.id);

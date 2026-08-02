@@ -716,8 +716,11 @@ export default function PhotoEditor() {
     setShowSlotPicker(true);
   }
 
-  function handlePickPhoto(photo) {
-    updateLayoutSlot(activeSlot, { photoId: photo.id, offsetX: undefined, offsetY: undefined, scale: undefined });
+  function handlePickPhoto({ photo, source }) {
+    // 'edited' previews the saved canvas render; 'original' clears any
+    // override so the slot falls back to the plain selectedPhotos lookup.
+    const srcOverride = source === 'edited' ? (state.photoEdits[photo.id]?.dataUrl ?? null) : null;
+    updateLayoutSlot(activeSlot, { photoId: photo.id, srcOverride, offsetX: undefined, offsetY: undefined, scale: undefined });
     setShowSlotPicker(false);
     setActiveSlot(null);
   }
@@ -879,18 +882,16 @@ export default function PhotoEditor() {
   const awaitingUploadCount =
     renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length + (committingUpload ? 1 : 0);
 
-  // layoutSlotIdx targets a frame slot instead of dropping a floating sticker
-  // onto the free canvas — same QR/poll plumbing, different landing spot.
-  async function startPhoneUpload(layoutSlotIdx = null) {
+  async function startPhoneUpload() {
     const slotId = `up${Date.now().toString(36)}`;
     const url = sessionUploadUrl(state.uploadSessionId, slotId);
     const qrDataUrl = await renderQrToDataUrl(url, 320).catch(() => null);
-    setPendingUpload({ slotId, qrDataUrl, layoutSlotIdx });
+    setPendingUpload({ slotId, qrDataUrl });
   }
 
-  // Outside a frame, the phone photo becomes its own new photo in the
-  // filmstrip — editable and printable on its own — rather than a decorative
-  // overlay on whatever the customer happened to have open. Reuses the same
+  // A phone upload always becomes its own new photo in the filmstrip —
+  // editable, printable, and pickable into any frame slot from there — rather
+  // than landing directly in whatever slot or canvas was open. Reuses the same
   // composite-commit endpoint a frame collage uses to get a real backend
   // photo_id, since checkout can't resolve a line item without one.
   async function commitUploadAsNewPhoto(src) {
@@ -923,13 +924,8 @@ export default function PhotoEditor() {
     if (!pendingUpload) return;
     const src = sessionUploads[pendingUpload.slotId];
     if (!src) return;
-    if (pendingUpload.layoutSlotIdx != null) {
-      updateLayoutSlot(pendingUpload.layoutSlotIdx, { photoId: null, uploadSrc: src, offsetX: undefined, offsetY: undefined, scale: undefined });
-      setPendingUpload(null);
-    } else {
-      setPendingUpload(null);
-      commitUploadAsNewPhoto(src);
-    }
+    setPendingUpload(null);
+    commitUploadAsNewPhoto(src);
   }, [sessionUploads, pendingUpload, elements, pushHistory]);
 
   const selectedElement = elements.find((el) => el.id === selectedId) ?? null;
@@ -1216,7 +1212,7 @@ export default function PhotoEditor() {
 
                 {isLayoutFrame && frameSlots.map((slot, i) => {
                   const slotData = layoutSlots[i];
-                  if (!slotData?.photoId && !slotData?.uploadSrc) {
+                  if (!slotData?.photoId) {
                     const px = toSlotPx(slot, activeCanvas.width, activeCanvas.height);
                     return (
                       <Rect
@@ -1229,8 +1225,8 @@ export default function PhotoEditor() {
                       />
                     );
                   }
-                  const photo = slotData.uploadSrc
-                    ? { url: slotData.uploadSrc, proxyUrl: slotData.uploadSrc }
+                  const photo = slotData.srcOverride
+                    ? { url: slotData.srcOverride, proxyUrl: slotData.srcOverride }
                     : selectedPhotos.find((p) => p.id === slotData.photoId);
                   return (
                     <SlotPhotoLayer
@@ -1285,11 +1281,11 @@ export default function PhotoEditor() {
             {isLayoutFrame && !slotsLoading && frameSlots.map((slot, i) => {
               const px = toSlotPx(slot, activeCanvas.width, activeCanvas.height);
               const slotData = layoutSlots[i];
-              const filled = !!slotData?.photoId || !!slotData?.uploadSrc;
+              const filled = !!slotData?.photoId;
 
               function zoomSlot(factor) {
-                const photo = slotData?.uploadSrc
-                  ? { url: slotData.uploadSrc, proxyUrl: slotData.uploadSrc }
+                const photo = slotData?.srcOverride
+                  ? { url: slotData.srcOverride, proxyUrl: slotData.srcOverride }
                   : selectedPhotos.find((p) => p.id === slotData?.photoId);
                 if (!photo) return;
                 const img = new window.Image();
@@ -1356,7 +1352,7 @@ export default function PhotoEditor() {
 
           {/* ── Collage commit bar — turns the frame into a NEW output ── */}
           {isLayoutFrame && (() => {
-            const filled = layoutSlots.filter((s) => s?.photoId || s?.uploadSrc).length;
+            const filled = layoutSlots.filter((s) => s?.photoId).length;
             const ready = frameSlots.length > 0 && filled === frameSlots.length; // all slots required
             return (
               <div
@@ -1557,7 +1553,6 @@ export default function PhotoEditor() {
           assignedPhotoIds={layoutSlots.filter(Boolean).map((s) => s.photoId)}
           slotIndex={activeSlot}
           onPick={handlePickPhoto}
-          onUploadFromPhone={() => { setShowSlotPicker(false); startPhoneUpload(activeSlot); }}
           onClose={() => { setShowSlotPicker(false); setActiveSlot(null); }}
         />
       )}
