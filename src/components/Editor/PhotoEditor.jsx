@@ -876,11 +876,13 @@ export default function PhotoEditor() {
   ));
   const awaitingUploadCount = renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length;
 
-  async function startPhoneUpload() {
+  // layoutSlotIdx targets a frame slot instead of dropping a floating sticker
+  // onto the free canvas — same QR/poll plumbing, different landing spot.
+  async function startPhoneUpload(layoutSlotIdx = null) {
     const slotId = `up${Date.now().toString(36)}`;
     const url = sessionUploadUrl(state.uploadSessionId, slotId);
     const qrDataUrl = await renderQrToDataUrl(url, 320).catch(() => null);
-    setPendingUpload({ slotId, qrDataUrl });
+    setPendingUpload({ slotId, qrDataUrl, layoutSlotIdx });
   }
 
   // The photo lands whenever the phone finishes uploading, so this has to be
@@ -890,11 +892,15 @@ export default function PhotoEditor() {
     if (!pendingUpload) return;
     const src = sessionUploads[pendingUpload.slotId];
     if (!src) return;
-    pushHistory([...elements, {
-      id: `upload-${Date.now()}`,
-      type: 'upload',
-      attrs: { slotId: pendingUpload.slotId, qrDataUrl: null, src, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
-    }]);
+    if (pendingUpload.layoutSlotIdx != null) {
+      updateLayoutSlot(pendingUpload.layoutSlotIdx, { photoId: null, uploadSrc: src, offsetX: undefined, offsetY: undefined, scale: undefined });
+    } else {
+      pushHistory([...elements, {
+        id: `upload-${Date.now()}`,
+        type: 'upload',
+        attrs: { slotId: pendingUpload.slotId, qrDataUrl: null, src, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
+      }]);
+    }
     setPendingUpload(null);
   }, [sessionUploads, pendingUpload, elements, pushHistory]);
 
@@ -1182,7 +1188,7 @@ export default function PhotoEditor() {
 
                 {isLayoutFrame && frameSlots.map((slot, i) => {
                   const slotData = layoutSlots[i];
-                  if (!slotData?.photoId) {
+                  if (!slotData?.photoId && !slotData?.uploadSrc) {
                     const px = toSlotPx(slot, activeCanvas.width, activeCanvas.height);
                     return (
                       <Rect
@@ -1195,7 +1201,9 @@ export default function PhotoEditor() {
                       />
                     );
                   }
-                  const photo = selectedPhotos.find((p) => p.id === slotData.photoId);
+                  const photo = slotData.uploadSrc
+                    ? { url: slotData.uploadSrc, proxyUrl: slotData.uploadSrc }
+                    : selectedPhotos.find((p) => p.id === slotData.photoId);
                   return (
                     <SlotPhotoLayer
                       key={i}
@@ -1249,10 +1257,12 @@ export default function PhotoEditor() {
             {isLayoutFrame && !slotsLoading && frameSlots.map((slot, i) => {
               const px = toSlotPx(slot, activeCanvas.width, activeCanvas.height);
               const slotData = layoutSlots[i];
-              const filled = !!slotData?.photoId;
+              const filled = !!slotData?.photoId || !!slotData?.uploadSrc;
 
               function zoomSlot(factor) {
-                const photo = selectedPhotos.find((p) => p.id === slotData?.photoId);
+                const photo = slotData?.uploadSrc
+                  ? { url: slotData.uploadSrc, proxyUrl: slotData.uploadSrc }
+                  : selectedPhotos.find((p) => p.id === slotData?.photoId);
                 if (!photo) return;
                 const img = new window.Image();
                 img.onload = () => {
@@ -1318,7 +1328,7 @@ export default function PhotoEditor() {
 
           {/* ── Collage commit bar — turns the frame into a NEW output ── */}
           {isLayoutFrame && (() => {
-            const filled = layoutSlots.filter((s) => s?.photoId).length;
+            const filled = layoutSlots.filter((s) => s?.photoId || s?.uploadSrc).length;
             const ready = frameSlots.length > 0 && filled === frameSlots.length; // all slots required
             return (
               <div
@@ -1519,6 +1529,7 @@ export default function PhotoEditor() {
           assignedPhotoIds={layoutSlots.filter(Boolean).map((s) => s.photoId)}
           slotIndex={activeSlot}
           onPick={handlePickPhoto}
+          onUploadFromPhone={() => { setShowSlotPicker(false); startPhoneUpload(activeSlot); }}
           onClose={() => { setShowSlotPicker(false); setActiveSlot(null); }}
         />
       )}

@@ -457,6 +457,7 @@ export const translations = {
   // ── Slot photo picker ───────────────────────────────────────────────────────
   'picker.title': { id: 'Pilih Foto untuk Slot {n}', en: 'Choose a Photo for Slot {n}' },
   'picker.used':  { id: 'Dipakai', en: 'In use' },
+  'picker.uploadFromPhone': { id: 'Ambil Foto dari HP', en: 'Upload from Phone' },
 
   // ── Text panel ──────────────────────────────────────────────────────────────
   'text.title':       { id: 'Tambah Teks', en: 'Add Text' },
