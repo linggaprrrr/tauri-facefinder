@@ -858,6 +858,8 @@ export default function PhotoEditor() {
   // { slotId, qrDataUrl } while the QR modal is open. The QR is deliberately
   // not an element: the canvas should only ever hold the finished photo.
   const [pendingUpload, setPendingUpload] = useState(null);
+  const [committingUpload, setCommittingUpload] = useState(false);
+  const [uploadedToListCount, setUploadedToListCount] = useState(0);
   const pendingUploadSlots = [
     // Placeholders from an earlier build of this feature still fill in.
     ...elements.filter((el) => el.type === 'upload' && !el.attrs.src).map((el) => el.attrs.slotId),
@@ -874,7 +876,8 @@ export default function PhotoEditor() {
       ? { ...el, attrs: { ...el.attrs, src: sessionUploads[el.attrs.slotId] } }
       : el
   ));
-  const awaitingUploadCount = renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length;
+  const awaitingUploadCount =
+    renderElements.filter((el) => el.type === 'upload' && !el.attrs.src).length + (committingUpload ? 1 : 0);
 
   // layoutSlotIdx targets a frame slot instead of dropping a floating sticker
   // onto the free canvas — same QR/poll plumbing, different landing spot.
@@ -883,6 +886,34 @@ export default function PhotoEditor() {
     const url = sessionUploadUrl(state.uploadSessionId, slotId);
     const qrDataUrl = await renderQrToDataUrl(url, 320).catch(() => null);
     setPendingUpload({ slotId, qrDataUrl, layoutSlotIdx });
+  }
+
+  // Outside a frame, the phone photo becomes its own new photo in the
+  // filmstrip — editable and printable on its own — rather than a decorative
+  // overlay on whatever the customer happened to have open. Reuses the same
+  // composite-commit endpoint a frame collage uses to get a real backend
+  // photo_id, since checkout can't resolve a line item without one.
+  async function commitUploadAsNewPhoto(src) {
+    setCommittingUpload(true);
+    try {
+      const blob = await fetch(src).then((r) => r.blob());
+      const imageBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const result = await createCompositePhoto({ outletId, sourcePhotoId: null, imageBase64, templateId: null, stickerIds: null });
+      const newIndex = selectedPhotos.length;
+      dispatch({ type: 'ADD_COMPOSITE_PHOTO', payload: { url: result.image_url, photoId: result.photo_id, filename: 'Foto Sendiri' } });
+      setUploadedToListCount((n) => n + 1);
+      setPhotoIndex(newIndex);
+    } catch (err) {
+      console.error('Failed to add phone upload as a new photo:', err);
+      window.alert(t('frame.commitError'));
+    } finally {
+      setCommittingUpload(false);
+    }
   }
 
   // The photo lands whenever the phone finishes uploading, so this has to be
@@ -894,14 +925,11 @@ export default function PhotoEditor() {
     if (!src) return;
     if (pendingUpload.layoutSlotIdx != null) {
       updateLayoutSlot(pendingUpload.layoutSlotIdx, { photoId: null, uploadSrc: src, offsetX: undefined, offsetY: undefined, scale: undefined });
+      setPendingUpload(null);
     } else {
-      pushHistory([...elements, {
-        id: `upload-${Date.now()}`,
-        type: 'upload',
-        attrs: { slotId: pendingUpload.slotId, qrDataUrl: null, src, x: 90, y: 90, width: 220, height: 220, rotation: 0 },
-      }]);
+      setPendingUpload(null);
+      commitUploadAsNewPhoto(src);
     }
-    setPendingUpload(null);
   }, [sessionUploads, pendingUpload, elements, pushHistory]);
 
   const selectedElement = elements.find((el) => el.id === selectedId) ?? null;
@@ -1462,7 +1490,7 @@ export default function PhotoEditor() {
               <UploadPanel
                 onAdd={startPhoneUpload}
                 awaitingCount={awaitingUploadCount}
-                uploadedCount={renderElements.filter((el) => el.type === 'upload' && el.attrs.src).length}
+                uploadedCount={renderElements.filter((el) => el.type === 'upload' && el.attrs.src).length + uploadedToListCount}
               />
             )}
             {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
