@@ -9,7 +9,9 @@ import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 import FaceOverlay from './FaceOverlay';
 
-const VIDEO_CONSTRAINTS = { width: 640, height: 480, facingMode: 'user' };
+// ponytail: `ideal`, and no facingMode — a USB webcam has no front/back and
+// exact 640x480 makes it OverconstrainedError instead of just picking a size.
+const VIDEO_CONSTRAINTS = { width: { ideal: 640 }, height: { ideal: 480 } };
 
 export default function FaceScan() {
   const { webcamRef, capture } = useCamera();
@@ -19,11 +21,15 @@ export default function FaceScan() {
   const [status, setStatus] = useState('idle'); // idle | scanning | error
   const [errorKey, setErrorKey] = useState('scan.error');
   const [cameraReady, setCameraReady] = useState(false);
+  // Raw getUserMedia error name (NotAllowedError / NotReadableError / …). The
+  // translated line alone can't tell "permission" from "another app has the cam".
+  const [errorDetail, setErrorDetail] = useState('');
 
   const handleCapture = useCallback(async () => {
     const image = capture();
     if (!image) {
       // Webcam hasn't produced a frame yet (no camera, permission denied, or not ready).
+      setErrorDetail('');
       setErrorKey('scan.cameraError');
       setStatus('error');
       return;
@@ -80,8 +86,10 @@ export default function FaceScan() {
             videoConstraints={VIDEO_CONSTRAINTS}
             className="block w-full h-full object-cover"
             onUserMedia={() => setCameraReady(true)}
-            onUserMediaError={() => {
+            onUserMediaError={(err) => {
+              console.error('getUserMedia failed:', err);
               setCameraReady(false);
+              setErrorDetail(err?.name || String(err));
               setErrorKey('scan.cameraError');
               setStatus('error');
             }}
@@ -100,6 +108,7 @@ export default function FaceScan() {
           }}
         >
           {t(errorKey)}
+          {errorDetail && <span className="block text-xs font-normal opacity-70">{errorDetail}</span>}
         </p>
       )}
 
