@@ -12,12 +12,7 @@ const FILTER_PRESETS = [
 
 export default function FilterPanel({ filters, onChange }) {
   const { t } = useLang();
-  const panelStyle = {
-    background: '#fff',
-    boxShadow: 'var(--shadow-md)',
-    border: '1px solid var(--color-neutral-100)',
-  };
-  const labelStyle = { color: 'var(--color-neutral-500)', fontSize: '0.75rem', fontWeight: 600 };
+  const labelStyle = { color: 'var(--color-neutral-600)', fontSize: '0.75rem', fontWeight: 600 };
 
   function applyPreset(preset) {
     onChange((prev) => ({ ...prev, list: preset.filters }));
@@ -29,9 +24,7 @@ export default function FilterPanel({ filters, onChange }) {
   }
 
   return (
-    <div className="rounded-2xl p-4 flex flex-col gap-4" style={panelStyle}>
-      <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>{t('filter.title')}</h3>
-
+    <div className="flex flex-col gap-4">
       {/* Preset grid */}
       <div className="grid grid-cols-2 gap-2">
         {FILTER_PRESETS.map((p) => (

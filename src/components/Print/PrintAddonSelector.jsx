@@ -4,6 +4,12 @@ import { useLang } from '../../i18n/LanguageContext';
 import { useApp } from '../../store/AppContext';
 import SlotPhotoPicker from '../Editor/SlotPhotoPicker';
 
+// Slot thumbnails are a fixed size rather than a fraction of the column: the
+// cart column is wide on a kiosk, and a proportional slot turned one print line
+// into a full screen of scrolling. maxHeight catches tall/portrait slot ratios.
+const SLOT_W = 88;
+const SLOT_MAX_H = 132;
+
 // Checkout-time print add-on picker — deliberately simple: one shared copies
 // count for the whole add-on (matches the backend's single
 // TransactionPrintAddon row: one template version, one photo_ids list, one
@@ -103,17 +109,27 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
     <div className="flex flex-col gap-3">
       {isCollage ? (
         <>
-          <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>{t('print.collageHint')}</p>
-          <div className="grid grid-cols-2 gap-2">
+          {/* Only while something is still missing — repeated on every line, an
+              always-on instruction is just noise once the slots are filled. */}
+          {!slotsFilled && (
+            <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{t('print.collageHint')}</p>
+          )}
+          {/* Fixed-width thumbnails in a wrapping row, NOT a stretching grid.
+              As `grid-cols-2` each slot grew to half the cart column, so a
+              single-slot template rendered a preview taller than the viewport
+              and two print lines became an endless scroll. */}
+          <div className="flex flex-wrap gap-2">
             {templateVersion.slots.map((slot, i) => {
               const assigned = slotAssignments[i];
               return (
                 <button
                   key={slot.id ?? i}
                   onClick={() => setActiveSlot(i)}
-                  className="relative rounded-xl overflow-hidden"
+                  className="relative rounded-xl overflow-hidden shrink-0 cursor-pointer transition-all active:scale-95"
                   style={{
+                    width: SLOT_W,
                     aspectRatio: (slot.w ?? 1) / (slot.h ?? 1),
+                    maxHeight: SLOT_MAX_H,
                     border: assigned ? '2px solid var(--color-primary)' : '2px dashed var(--color-neutral-300)',
                   }}
                 >
@@ -128,7 +144,7 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
                       </span>
                     </>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-1" style={{ color: 'var(--color-neutral-400)' }}>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1" style={{ color: 'var(--color-neutral-600)' }}>
                       <ImagePlus size={20} />
                       <span className="text-xs font-medium">{t('print.slotN', { n: i + 1 })}</span>
                     </div>
@@ -169,23 +185,50 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
       ) : null}
 
       {!canSubmit && (
-        <p className="text-xs" style={{ color: 'var(--color-warning, #d97706)' }}>
+        <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
           {isCollage ? t('print.fillAllSlots') : t('print.choosePhotoHint')}
         </p>
       )}
 
-      <div className="flex items-center justify-between p-2 rounded-xl" style={{ border: '1.5px solid var(--color-neutral-200)' }}>
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-700)' }}>{t('print.copies')}</span>
-        <div className="flex items-center gap-2">
-          <button onClick={() => adjustCopies(-1)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--color-neutral-100)' }}><Minus size={14} /></button>
-          <span className="w-5 text-center font-bold text-sm">{copies}</span>
-          <button onClick={() => adjustCopies(1)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}><Plus size={14} /></button>
+      {/* Copies and money on one row. They were two stacked blocks, which cost a
+          whole extra row per print line for six words and a number. */}
+      <div
+        className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-xl"
+        style={{ border: '1.5px solid var(--color-neutral-200)' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold truncate" style={{ color: 'var(--color-neutral-700)' }}>
+            {t('print.copies')}
+          </span>
+          {/* 36px, up from 28 — these are the only controls on this row a
+              finger has to hit accurately. */}
+          <button
+            onClick={() => adjustCopies(-1)}
+            aria-label={t('print.copiesLess')}
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-transform"
+            style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
+          >
+            <Minus size={16} />
+          </button>
+          <span className="w-6 text-center font-black tabular-nums">{copies}</span>
+          <button
+            onClick={() => adjustCopies(1)}
+            aria-label={t('print.copiesMore')}
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-transform"
+            style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+          >
+            <Plus size={16} />
+          </button>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <span style={{ color: 'var(--color-neutral-500)' }}>{t('print.perPrint')}: Rp {(printPrice ?? 0).toLocaleString('id-ID')}</span>
-        <span className="font-bold" style={{ color: 'var(--color-primary)' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
+        <div className="text-right shrink-0 leading-tight">
+          <span className="block text-[11px]" style={{ color: 'var(--color-neutral-600)' }}>
+            {t('print.perPrint')}: Rp {(printPrice ?? 0).toLocaleString('id-ID')}
+          </span>
+          <span className="block font-black" style={{ color: 'var(--color-primary)' }}>
+            Rp {totalPrice.toLocaleString('id-ID')}
+          </span>
+        </div>
       </div>
 
       {isCollage && activeSlot !== null && (

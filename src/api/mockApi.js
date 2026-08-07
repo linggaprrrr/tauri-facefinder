@@ -1,6 +1,6 @@
 import { getKioskId } from '../utils/kioskId';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8001';
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const KIOSK_API_KEY = import.meta.env.VITE_KIOSK_API_KEY ?? '';
 
 // Typed API error so callers can tell a dead link ('network'/'timeout') apart

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { getVersion, getName } from '@tauri-apps/api/app';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import { useLang } from '../../i18n/LanguageContext';
+import Modal from '../common/Modal';
+import Button from '../common/Button';
 
 const STATUS = { IDLE: 'idle', CHECKING: 'checking', UP_TO_DATE: 'up_to_date', AVAILABLE: 'available', INSTALLING: 'installing', ERROR: 'error' };
 
@@ -72,29 +74,9 @@ export default function AboutModal({ onClose }) {
   const installing = status === STATUS.INSTALLING;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.55)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-xl" style={{ background: '#fff' }}>
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4"
-          style={{ background: 'var(--color-primary)', color: '#fff' }}
-        >
-          <span className="font-bold text-xl">{t('about.title')}</span>
-          <button
-            onClick={onClose}
-            className="text-white opacity-70 hover:opacity-100 leading-none"
-            aria-label={t('common.close')}
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-6 flex flex-col gap-5">
+    <Modal title={t('about.title')} onClose={onClose} size="sm">
+      {/* Body */}
+      <div className="px-6 py-6 flex flex-col gap-5">
           {/* App identity */}
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 flex items-center justify-center shrink-0">
@@ -104,7 +86,7 @@ export default function AboutModal({ onClose }) {
               <p className="font-black text-2xl leading-tight" style={{ color: 'var(--color-primary)' }}>
                 {appName}
               </p>
-              <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>by Ownize</p>
+              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>by Ownize</p>
             </div>
           </div>
 
@@ -121,7 +103,7 @@ export default function AboutModal({ onClose }) {
           {status === STATUS.UP_TO_DATE && (
             <div
               className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium"
-              style={{ background: 'var(--color-success-50, #f0fdf4)', color: '#16a34a' }}
+              style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
             >
               <Check size={16} strokeWidth={2.5} />
               {t('about.upToDate')}
@@ -131,25 +113,22 @@ export default function AboutModal({ onClose }) {
           {status === STATUS.AVAILABLE && updateInfo && (
             <div
               className="flex flex-col gap-3 px-4 py-3 rounded-xl text-sm"
-              style={{ background: 'var(--color-primary-50, #eff6ff)', color: 'var(--color-primary)' }}
+              style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
             >
               <p className="font-semibold">{t('about.available', { version: updateInfo.version })}</p>
               {updateInfo.notes && (
                 <p className="text-xs opacity-80 whitespace-pre-line">{updateInfo.notes}</p>
               )}
-              <button
-                onClick={handleInstall}
-                className="btn-primary py-2 rounded-lg font-semibold text-sm"
-              >
+              <Button onClick={handleInstall} size="md" className="w-full">
                 {t('about.installRestart')}
-              </button>
+              </Button>
             </div>
           )}
 
           {status === STATUS.INSTALLING && (
             <div
               className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
-              style={{ background: 'var(--color-primary-50, #eff6ff)', color: 'var(--color-primary)' }}
+              style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
             >
               <Spinner /> {t('about.installing')}
             </div>
@@ -158,34 +137,30 @@ export default function AboutModal({ onClose }) {
           {status === STATUS.ERROR && (
             <div
               className="px-4 py-3 rounded-xl text-sm"
-              style={{ background: 'var(--color-error-50, #fef2f2)', color: 'var(--color-error, #dc2626)' }}
+              style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
             >
               {errorMsg}
             </div>
           )}
 
           {/* Check for updates button */}
-          <button
+          <Button
+            variant="ghost"
             onClick={handleCheckUpdate}
             disabled={checking || installing}
-            className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-            style={{
-              background: 'var(--color-neutral-100)',
-              color: 'var(--color-neutral-700)',
-            }}
+            className="w-full"
           >
             {checking ? <><Spinner /> {t('about.checking')}</> : t('about.checkUpdate')}
-          </button>
-        </div>
+          </Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
 function InfoRow({ label, value }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span style={{ color: 'var(--color-neutral-500)' }}>{label}</span>
+      <span style={{ color: 'var(--color-neutral-600)' }}>{label}</span>
       <span className="font-semibold" style={{ color: 'var(--color-neutral-800)' }}>{value}</span>
     </div>
   );

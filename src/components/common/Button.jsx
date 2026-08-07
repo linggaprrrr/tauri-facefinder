@@ -21,6 +21,11 @@ export default function Button({
   disabled,
   className = '',
   type = 'button',
+  // Everything else lands on the <button>. Without this, call sites that need
+  // aria-label, aria-expanded, title or form attributes had to drop the
+  // component and hand-roll a raw <button> — which is how several of the
+  // one-off button styles in this codebase started.
+  ...rest
 }) {
   const base = [
     'inline-flex items-center justify-center gap-2',
@@ -35,6 +40,7 @@ export default function Button({
       className={`${base} btn-${variant} ${className}`}
       onClick={onClick}
       disabled={disabled}
+      {...rest}
     >
       {children}
     </button>

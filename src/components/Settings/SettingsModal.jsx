@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
 import { getPrintStock } from '../../utils/heartbeat';
 import { getUnits, getOutletsByUnit } from '../../api/mockApi';
 import { clearAssetCache } from '../../utils/assetCache';
 import PrinterStatus from './PrinterStatus';
+import Modal from '../common/Modal';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri, listPrinters, printImage, makeTestImageDataUrl } from '../../native/print';
@@ -196,39 +197,26 @@ export default function SettingsModal({ onClose, forced = false }) {
   const canSave = selectedUnit && selectedOutlet && !saving;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.55)' }}
-      onClick={(e) => { if (!forced && e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl overflow-hidden shadow-xl"
-        style={{ background: '#fff' }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4"
-          style={{ background: 'var(--color-primary)', color: '#fff' }}
-        >
-          <div>
-            <span className="font-bold text-xl block">
-              {forced ? t('settings.firstSetup') : t('settings.title')}
+    /* dismissable={!forced} is the whole first-run guarantee in one prop: it
+       drops the close button, and — because Modal swallows the native dialog
+       `cancel` event — also blocks Escape and the backdrop. The old overlay
+       only guarded the backdrop click, so Escape walked straight out of
+       first-run setup into an unconfigured kiosk. */
+    <Modal
+      onClose={onClose}
+      size="md"
+      dismissable={!forced}
+      title={
+        <>
+          {forced ? t('settings.firstSetup') : t('settings.title')}
+          {state.deviceConfig.outlet?.name && (
+            <span className="block text-xs font-medium opacity-80">
+              {state.deviceConfig.outlet.name}
             </span>
-            {state.deviceConfig.outlet?.name && (
-              <span className="text-xs opacity-80">{state.deviceConfig.outlet.name}</span>
-            )}
-          </div>
-          {!forced && (
-            <button
-              onClick={onClose}
-              className="text-white opacity-70 hover:opacity-100 leading-none"
-              aria-label={t('common.close')}
-            >
-              <X size={24} />
-            </button>
           )}
-        </div>
-
+        </>
+      }
+    >
         {forced && (
           <div
             className="px-6 pt-4 text-sm"
@@ -238,7 +226,7 @@ export default function SettingsModal({ onClose, forced = false }) {
           </div>
         )}
 
-        <div className="px-6 py-6 overflow-y-auto" style={{ maxHeight: '65vh' }}>
+        <div className="px-6 py-6">
           {/* ── Step 1: Auth ── */}
           {step === 'auth' && (
             <PinPad
@@ -262,7 +250,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                   {t('settings.unit')}
                 </label>
                 {loadingUnits ? (
-                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>{t('settings.loadingUnits')}</div>
+                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-600)' }}>{t('settings.loadingUnits')}</div>
                 ) : (
                   <select
                     value={selectedUnit?.id ?? ''}
@@ -280,7 +268,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                   </select>
                 )}
                 {selectedUnit && (
-                  <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>{selectedUnit.location}</p>
+                  <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{selectedUnit.location}</p>
                 )}
               </div>
 
@@ -290,7 +278,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                   {t('settings.outlet')}
                 </label>
                 {loadingOutlets ? (
-                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-400)' }}>{t('settings.loadingOutlets')}</div>
+                  <div className="text-sm py-2" style={{ color: 'var(--color-neutral-600)' }}>{t('settings.loadingOutlets')}</div>
                 ) : (
                   <select
                     value={selectedOutlet?.id ?? ''}
@@ -357,7 +345,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                     <>
                       <div className="flex items-end gap-2">
                         <div className="flex-1 flex flex-col gap-1.5">
-                          <label className="text-xs font-medium" style={{ color: 'var(--color-neutral-500)' }}>
+                          <label className="text-xs font-medium" style={{ color: 'var(--color-neutral-600)' }}>
                             {t('settings.printer')}
                           </label>
                           <select
@@ -450,7 +438,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                           which is how every existing single-printer outlet
                           already works. */}
                       <div className="flex flex-col gap-1.5 mt-1">
-                        <label className="text-xs font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+                        <label className="text-xs font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
                           {t('settings.secondaryPrinter')}
                         </label>
                         <select
@@ -507,7 +495,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                           {printStock.remaining}
                         </span>
                       </div>
-                      <div className="flex justify-between text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                      <div className="flex justify-between text-xs" style={{ color: 'var(--color-neutral-600)' }}>
                         <span>{t('settings.stockInitial')}: {printStock.initial}</span>
                         <span>{t('settings.stockPrinted')}: {printStock.printed}</span>
                       </div>
@@ -583,7 +571,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                           <span className="text-sm font-medium" style={{ color: 'var(--color-neutral-700)' }}>
                             {t('settings.autoPrintReceipt')}
                           </span>
-                          <span className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+                          <span className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>
                             {t('settings.autoPrintReceiptHint')}
                           </span>
                         </span>
@@ -619,7 +607,7 @@ export default function SettingsModal({ onClose, forced = false }) {
                     <span className="font-semibold text-sm" style={{ color: 'var(--color-neutral-700)' }}>
                       {t('settings.syncTitle')}
                     </span>
-                    <span className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-500)' }}>
+                    <span className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-600)' }}>
                       {t('settings.syncHint')}
                     </span>
                   </div>
@@ -647,7 +635,6 @@ export default function SettingsModal({ onClose, forced = false }) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,6 +1,6 @@
-import { X } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 import { useApp } from '../../store/AppContext';
+import Modal from '../common/Modal';
 
 export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, onPick, onClose }) {
   const { t } = useLang();
@@ -16,29 +16,7 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
       : [{ photo, source: 'original' }]
   ));
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.6)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="rounded-2xl overflow-hidden shadow-2xl flex flex-col mx-4"
-        style={{ background: '#fff', width: 'min(420px, calc(100vw - 32px))', maxHeight: '80vh' }}
-      >
-        <div
-          className="flex items-center justify-between px-5 py-4 shrink-0"
-          style={{ background: '#7c3aed', color: '#fff' }}
-        >
-          <span className="font-bold text-base">{t('picker.title', { n: slotIndex + 1 })}</span>
-          <button
-            onClick={onClose}
-            className="text-white opacity-70 hover:opacity-100 leading-none"
-            aria-label={t('common.close')}
-          >
-            <X size={24} />
-          </button>
-        </div>
-
+    <Modal title={t('picker.title', { n: slotIndex + 1 })} onClose={onClose} size="md">
         <div className="p-4 overflow-y-auto no-scrollbar">
           <div className="grid grid-cols-3 gap-3">
             {variants.map(({ photo, source }) => {
@@ -82,7 +60,6 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
             })}
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, X, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../../store/AppContext';
 import { useLang } from '../../../i18n/LanguageContext';
 import PinPad from '../../Settings/PinPad';
 import { grantAccess } from '../../../api/mockApi';
 import LoadingSpinner from '../../common/LoadingSpinner';
 import Button from '../../common/Button';
+import Modal from '../../common/Modal';
 
 const REASONS = ['complimentary', 'manual_approval', 'staff_access', 'other'];
 
@@ -52,13 +53,11 @@ export default function StaffGrantModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-      <div className="flex flex-col w-full max-w-sm rounded-3xl overflow-hidden" style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ background: 'var(--color-neutral-800)', color: '#fff' }}>
-          <span className="font-bold text-base flex items-center gap-2"><ShieldCheck size={18} /> {t('staff.title')}</span>
-          <button onClick={onClose} aria-label={t('common.close')} className="opacity-80 hover:opacity-100"><X size={20} /></button>
-        </div>
-
+    <Modal
+      title={<span className="flex items-center gap-2"><ShieldCheck size={18} /> {t('staff.title')}</span>}
+      onClose={onClose}
+      size="sm"
+    >
         <div className="p-5 flex flex-col gap-4">
           {step === 'auth' && (
             <PinPad
@@ -91,7 +90,7 @@ export default function StaffGrantModal({ onClose }) {
                   placeholder={t('staff.notePlaceholder')}
                 />
               </div>
-              <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
+              <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>
                 {t('staff.photoCount', { count: selectedPhotos.length })}
               </p>
               <Button onClick={handleGrant} disabled={selectedPhotos.length === 0} className="w-full">{t('staff.grant')}</Button>
@@ -112,7 +111,6 @@ export default function StaffGrantModal({ onClose }) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

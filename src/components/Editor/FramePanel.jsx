@@ -28,10 +28,10 @@ export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], l
         {t('frame.title')}
       </h3>
       {layoutLoading && (
-        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('frame.loading')}</p>
+        <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{t('frame.loading')}</p>
       )}
       {!layoutLoading && layoutFrames.length === 0 && (
-        <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{t('frame.empty')}</p>
+        <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{t('frame.empty')}</p>
       )}
       <div className="grid grid-cols-2 gap-2">
         {/* None option — always first */}

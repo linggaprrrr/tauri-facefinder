@@ -131,7 +131,7 @@ export default function AiResultModal({ originalUrl, resultUrl, label, onUse, on
             <button
               onClick={onClose}
               className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors"
-              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }}
+              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
             >
               <X size={18} />
             </button>

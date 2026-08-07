@@ -66,9 +66,12 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
           </span>
         )}
 
-        {/* Image */}
+        {/* Image. Uses the cached blob when usePhotoCache has one — it was
+            being computed and then ignored here, so every preview re-fetched a
+            photo the grid had already downloaded. Falls back to the URL while
+            the cache entry is still resolving. */}
         <img
-          src={photo.thumbnail ?? photo.url}
+          src={cachedUrl ?? photo.thumbnail ?? photo.url}
           alt="Preview"
           className="block object-contain"
           style={{ maxHeight: '72vh', maxWidth: '80vw' }}

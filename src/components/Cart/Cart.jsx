@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ShoppingCart, Check, X, Maximize2, Printer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShoppingCart, Check, X, Plus, Minus, Printer, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri } from '../../native/print';
@@ -10,7 +10,25 @@ import { printAddonStatus } from '../../utils/printAddonStatus';
 import { usePrinterHealth } from '../../hooks/usePrinterHealth';
 import { getPrintStock } from '../../utils/heartbeat';
 import PrintAddonSelector from '../Print/PrintAddonSelector';
+import PrintFormatArt from '../Print/PrintFormatArt';
 import Button from '../common/Button';
+import IconButton from '../common/IconButton';
+import Modal from '../common/Modal';
+import EmptyState from '../common/EmptyState';
+
+function SummaryRow({ label, value, muted }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <span style={{ color: 'var(--color-neutral-600)' }}>{label}</span>
+      <span
+        className={muted ? 'font-medium' : 'font-bold'}
+        style={{ color: muted ? 'var(--color-neutral-600)' : 'var(--color-neutral-800)' }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export default function Cart() {
   const { state, dispatch } = useApp();
@@ -18,7 +36,6 @@ export default function Cart() {
   const navigate = useNavigate();
   const { selectedPhotos, photoEdits, deviceConfig, printItems } = state;
   const total = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
-  const [preview, setPreview] = useState(null);       // { src, label } | null
   const [confirmRemove, setConfirmRemove] = useState(null); // photo pending removal | null
 
   // Print add-on — decided here so the total shown is the real total before
@@ -49,22 +66,77 @@ export default function Cart() {
   ].filter((p) => p.template?.currentVersion && p.template?.price);
 
   const canOfferPrintAddon = isTauri() && addonStatus.ok && PRODUCTS.length > 0;
-  const productOf = (printType) => PRODUCTS.find((p) => p.printType === printType) ?? null;
   // Only submittable lines are billed: a half-configured line shows its price on
   // its own row but must not inflate the total the customer is about to pay.
   const addonEstimate = printItems.reduce((sum, item) => sum + (item.canSubmit ? item.totalPrice : 0), 0);
 
+  // Summary counts, all derived from what is actually in the order. Rows render
+  // only when non-zero — a breakdown padded with zeroes reads as boilerplate
+  // and stops being checked.
+  const aiCount        = selectedPhotos.filter((p) => p.isAiGenerated).length;
+  const compositeCount = selectedPhotos.filter((p) => p.isComposite).length;
+  const plainCount     = selectedPhotos.length - aiCount - compositeCount;
+  const printCopies    = printItems.reduce((n, it) => n + (it.canSubmit ? (it.copies ?? 0) : 0), 0);
+
   function setItems(next) {
     dispatch({ type: 'SET_PRINT_ITEMS', payload: next });
   }
-  function addItem(printType) {
+  // `photo` is optional. Added from a photo's own row it seeds that photo, so a
+  // single-slot print is finished the moment it is created and the customer
+  // never has to re-pick the picture they were already looking at. A collage
+  // gets its first slot filled and still asks for the rest.
+  //
+  // Seeded in the shape PrintAddonSelector restores from: photoIds carries
+  // `photo_id` (not the photo_face `id`), and `sources` is keyed by that same
+  // photo_id — so a collage line still restores correctly when the selector
+  // does mount for it.
+  function addItem(printType, photo) {
+    const product = PRODUCTS.find((p) => p.printType === printType);
+    const price = product?.template?.price ?? 0;
+    const slotCount = product?.template?.currentVersion?.slots?.length || 1;
+
+    const seeded = photo
+      ? {
+          photoIds: [photo.photo_id],
+          sources: { [photo.photo_id]: photoEdits[photo.id]?.dataUrl ? 'edited' : 'original' },
+        }
+      : { photoIds: [], sources: {} };
+
+    // A single-slot print seeded from a photo row is finished the moment it is
+    // created, so it has to be billable immediately — nothing else will run to
+    // make it so. A collage has other slots left to fill and stays incomplete
+    // until PrintAddonSelector reports otherwise.
+    const complete = seeded.photoIds.length >= slotCount;
+
     setItems([...printItems, {
       // Stable identity for React keys and updates. Two lines can hold the same
       // template and the same photo — "two copies, printed separately" is a
       // legitimate order — so nothing about the contents identifies a line.
       id: crypto.randomUUID(),
-      printType, copies: 1, photoIds: [], sources: {}, totalPrice: 0, canSubmit: false,
+      printType, copies: 1, ...seeded,
+      totalPrice: complete ? price : 0,
+      canSubmit: complete,
     }]);
+  }
+
+  // Lines whose template has more than one slot. Those cannot be completed from
+  // a photo row — seeding fills slot 0 and the rest still need picking — so they
+  // are the only reason the print section below still exists.
+  const collageLines = printItems
+    .map((item) => ({ item, product: PRODUCTS.find((p) => p.printType === item.printType) }))
+    .filter(({ product }) => (product?.template?.currentVersion?.slots?.length || 1) > 1);
+
+  // Cart owns this arithmetic for inline prints. PrintAddonSelector emits
+  // totalPrice/canSubmit from an effect, but a single-slot print added from a
+  // photo row never mounts that component, so nothing else would recompute them
+  // and the cart total would ignore every quantity change.
+  function setLineCopies(line, next, price, slotCount) {
+    const copies = Math.max(1, Math.min(20, next));
+    updateItem(line.id, {
+      copies,
+      totalPrice: copies * price,
+      canSubmit: (line.photoIds?.length ?? 0) >= slotCount,
+    });
   }
   function updateItem(id, patch) {
     setItems(printItems.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -79,9 +151,9 @@ export default function Cart() {
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 max-w-2xl mx-auto w-full py-4 sm:py-6">
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full py-4 sm:py-6">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl sm:text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
+        <h1 className="text-h1 font-black on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
           {t('cart.title')}
         </h1>
         <Button variant="ghost" onClick={() => navigate('/editor')}>
@@ -90,17 +162,22 @@ export default function Cart() {
       </div>
 
       {selectedPhotos.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center gap-4 py-20 rounded-lg"
-          style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-400)' }}
-        >
-          <ShoppingCart size={64} strokeWidth={1.5} />
-          <p className="text-xl font-semibold">{t('cart.empty')}</p>
-          <Button onClick={() => navigate('/gallery')}>{t('cart.browse')}</Button>
+        <div className="flex justify-center py-10">
+          <EmptyState
+            icon={ShoppingCart}
+            title={t('cart.empty')}
+            action={<Button size="lg" className="mt-2" onClick={() => navigate('/gallery')}>{t('cart.browse')}</Button>}
+          />
         </div>
       ) : (
-        <>
-          <div className="flex flex-col gap-3">
+        /* Two columns: the order on the left, what it costs on the right.
+           The summary was previously a band at the bottom of a single column,
+           so on a long order the total — and the pay button — sat below the
+           fold while the customer was still deciding. */
+        <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] items-start">
+
+          {/* ── Left: order lines ── */}
+          <div className="flex flex-col gap-3 min-w-0">
             {selectedPhotos.map((photo) => {
               const editedDataUrl = photoEdits[photo.id]?.dataUrl;
               const isFree = (photo.price ?? 0) === 0;
@@ -110,55 +187,23 @@ export default function Cart() {
                   ? t('cart.framePhoto')
                   : t('cart.original');
               return (
-                <div
-                  key={photo.id}
-                  className="flex items-start gap-4 p-4 rounded-lg"
-                  style={{
-                    background: '#fff',
-                    border: '1.5px solid var(--color-neutral-200)',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
-                >
-                  {/* Thumbnails: original + edited side by side — tap to enlarge */}
+                <div key={photo.id} className="card flex items-start gap-4 p-4">
+                  {/* Thumbnails: original + edited side by side */}
                   <div className="flex gap-2 shrink-0">
                     {/* Original */}
                     <div className="flex flex-col items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setPreview({ src: photo.thumbnail ?? photo.url ?? photo.proxyUrl, label: sourceLabel })}
-                        className="relative group rounded-lg overflow-hidden transition-transform active:scale-95"
-                        style={{ width: 80, height: 80, padding: 0, border: 'none', cursor: 'pointer' }}
-                        aria-label={t('cart.previewAria')}
-                      >
+                      <div className="rounded-lg overflow-hidden" style={{ width: 80, height: 80 }}>
                         <img src={photo.thumbnail} alt={sourceLabel} className="w-full h-full object-cover" />
-                        <span
-                          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          style={{ background: 'rgba(0,0,0,0.35)', color: '#fff' }}
-                        >
-                          <Maximize2 size={20} />
-                        </span>
-                      </button>
-                      <span className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>{sourceLabel}</span>
+                      </div>
+                      <span className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{sourceLabel}</span>
                     </div>
 
                     {/* Edited result — only if user made edits */}
                     {editedDataUrl && (
                       <div className="flex flex-col items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setPreview({ src: editedDataUrl, label: t('cart.edited') })}
-                          className="relative group rounded-lg overflow-hidden transition-transform active:scale-95"
-                          style={{ width: 80, height: 80, padding: 0, border: 'none', cursor: 'pointer' }}
-                          aria-label={t('cart.previewAria')}
-                        >
+                        <div className="rounded-lg overflow-hidden" style={{ width: 80, height: 80 }}>
                           <img src={editedDataUrl} alt={t('cart.edited')} className="w-full h-full object-cover" />
-                          <span
-                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ background: 'rgba(0,0,0,0.35)', color: '#fff' }}
-                          >
-                            <Maximize2 size={20} />
-                          </span>
-                        </button>
+                        </div>
                         <span className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>{t('cart.edited')}</span>
                       </div>
                     )}
@@ -166,13 +211,10 @@ export default function Cart() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p
-                      className="font-semibold truncate"
-                      style={{ color: 'var(--color-neutral-800)' }}
-                    >
+                    <p className="font-semibold truncate" style={{ color: 'var(--color-neutral-800)' }}>
                       {photo.filename}
                     </p>
-                    <p className="font-black text-lg" style={{ color: isFree ? 'var(--color-success, #16a34a)' : 'var(--color-primary)' }}>
+                    <p className="font-black text-lg" style={{ color: isFree ? 'var(--color-success)' : 'var(--color-primary)' }}>
                       {isFree ? t('cart.free') : `Rp ${photo.price.toLocaleString('id-ID')}`}
                     </p>
                     {editedDataUrl && (
@@ -187,54 +229,158 @@ export default function Cart() {
                     )}
                   </div>
 
-                  {/* Remove */}
-                  <button
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-base transition-all active:scale-90 shrink-0"
-                    style={{
-                      background: 'var(--color-error-bg)',
-                      color: 'var(--color-error)',
-                    }}
+                  {/* The whole print flow lives on the photo's own row: add,
+                      set quantity, remove. There is no separate section to
+                      scroll to, and no step where the customer re-picks the
+                      picture already in front of them.
+
+                      One line per (photo, product): a second copy is a
+                      quantity, not a second line, which is why the add button
+                      turns into a stepper once it exists. */}
+                  {canOfferPrintAddon && (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 self-center">
+                      {PRODUCTS.map((product) => {
+                        const slotCount = product.template.currentVersion?.slots?.length || 1;
+                        const price = product.template.price ?? 0;
+                        const line = printItems.find(
+                          (it) => it.printType === product.printType && it.photoIds?.[0] === photo.photo_id
+                        );
+
+                        if (!line) {
+                          return (
+                            <button
+                              key={product.printType}
+                              onClick={() => addItem(product.printType, photo)}
+                              className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl cursor-pointer transition-all active:scale-95"
+                              style={{
+                                background: '#fff',
+                                border: '1.5px solid var(--color-primary-100)',
+                                boxShadow: 'var(--shadow-sm)',
+                              }}
+                            >
+                              <PrintFormatArt slots={slotCount} className="w-8 h-8 shrink-0" />
+                              <span className="text-left leading-tight">
+                                <span className="block text-xs font-bold" style={{ color: 'var(--color-neutral-900)' }}>
+                                  {t(product.labelKey)}
+                                </span>
+                                <span className="block text-[11px] font-semibold" style={{ color: 'var(--color-primary)' }}>
+                                  Rp {price.toLocaleString('id-ID')}
+                                </span>
+                              </span>
+                              <span
+                                className="flex items-center justify-center rounded-full shrink-0"
+                                style={{ width: 26, height: 26, background: 'var(--color-primary)', color: '#fff' }}
+                              >
+                                <Plus size={15} strokeWidth={3} />
+                              </span>
+                            </button>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={product.printType}
+                            className="inline-flex items-center gap-2 pl-2 pr-1 py-1 rounded-xl"
+                            style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary)' }}
+                          >
+                            <PrintFormatArt slots={slotCount} className="w-8 h-8 shrink-0" />
+                            <span className="text-left leading-tight">
+                              <span className="block text-xs font-bold" style={{ color: 'var(--color-neutral-900)' }}>
+                                {t(product.labelKey)}
+                              </span>
+                              <span className="block text-[11px] font-black" style={{ color: 'var(--color-primary)' }}>
+                                Rp {(line.copies * price).toLocaleString('id-ID')}
+                              </span>
+                            </span>
+
+                            <span className="flex items-center gap-0.5">
+                              <button
+                                onClick={() => setLineCopies(line, line.copies - 1, price, slotCount)}
+                                disabled={line.copies <= 1}
+                                aria-label={t('print.copies')}
+                                className="w-8 h-8 rounded-lg inline-flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed active:scale-90 transition-all"
+                                style={{ background: '#fff', color: 'var(--color-primary)' }}
+                              >
+                                <Minus size={15} strokeWidth={3} />
+                              </button>
+                              <span
+                                className="text-sm font-black tabular-nums text-center"
+                                style={{ minWidth: 20, color: 'var(--color-neutral-900)' }}
+                              >
+                                {line.copies}
+                              </span>
+                              <button
+                                onClick={() => setLineCopies(line, line.copies + 1, price, slotCount)}
+                                aria-label={t('print.copies')}
+                                className="w-8 h-8 rounded-lg inline-flex items-center justify-center cursor-pointer active:scale-90 transition-all"
+                                style={{ background: 'var(--color-primary)', color: '#fff' }}
+                              >
+                                <Plus size={15} strokeWidth={3} />
+                              </button>
+                            </span>
+
+                            <IconButton
+                              icon={X}
+                              label={t('print.removeLine')}
+                              variant="danger"
+                              size="sm"
+                              onClick={() => removeItem(line.id)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <IconButton
+                    icon={X}
+                    label={t('cart.removeAria')}
+                    variant="danger"
+                    size="sm"
                     onClick={() => setConfirmRemove(photo)}
-                    aria-label={t('cart.removeAria')}
-                  >
-                    <X size={18} />
-                  </button>
+                  />
                 </div>
               );
             })}
-          </div>
 
-          {canOfferPrintAddon && (
-            <div
-              className="rounded-lg overflow-hidden"
-              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
-            >
-              <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
-                <Printer size={18} /> {t('checkout.addPrint')}
-              </div>
+            {/* Collage prints only. A single-slot print is created, counted
+                and removed entirely from its photo's row above, so it needs
+                nothing here — but a template with several slots still has
+                empty ones to fill, and PrintAddonSelector is the only thing
+                that can fill them. Rendering this unconditionally is what put
+                a whole second section under a cart that did not need one. */}
+            {collageLines.length > 0 && (
+              <div className="card overflow-hidden">
+                <div className="flex items-start gap-3 px-4 py-4">
+                  <span
+                    className="flex items-center justify-center rounded-xl shrink-0"
+                    style={{ width: 42, height: 42, background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                  >
+                    <Printer size={22} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-h3 font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
+                      {t('checkout.addPrint')}
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
+                      {t('print.collageHint')}
+                    </p>
+                  </div>
+                </div>
 
-              {printItems.map((item, i) => {
-                const product = productOf(item.printType);
-                if (!product) return null;
-                return (
-                  <div key={item.id} className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
-                    <div className="flex items-center justify-between gap-2 pt-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate" style={{ color: 'var(--color-neutral-800)' }}>
-                          {t('print.lineN', { n: i + 1 })} · {t(product.labelKey)}
-                        </p>
-                        <p className="text-xs" style={{ color: 'var(--color-neutral-500)' }}>
-                          {product.template.paperSize} · Rp {(product.template.price ?? 0).toLocaleString('id-ID')}
-                        </p>
-                      </div>
-                      <button
+                {collageLines.map(({ item, product }) => (
+                  <div key={item.id} className="px-4 py-4" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <p className="font-bold" style={{ color: 'var(--color-neutral-900)' }}>
+                        {t(product.labelKey)}
+                      </p>
+                      <IconButton
+                        icon={X}
+                        label={t('print.removeLine')}
+                        variant="danger"
+                        size="sm"
                         onClick={() => removeItem(item.id)}
-                        aria-label={t('print.removeLine')}
-                        className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center active:scale-95"
-                        style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
-                      >
-                        <X size={16} />
-                      </button>
+                      />
                     </div>
                     <PrintAddonSelector
                       photos={selectedPhotos}
@@ -244,134 +390,76 @@ export default function Cart() {
                       onSelectionChange={(sel) => updateItem(item.id, sel)}
                     />
                   </div>
-                );
-              })}
-
-              {/* One button per product, always available: adding a second line
-                  of the SAME product is how a customer prints two different
-                  photos, so this must not disappear once a line exists. */}
-              <div className="flex flex-wrap gap-2 px-4 pb-4 pt-3" style={{ borderTop: '1px solid var(--color-neutral-100)' }}>
-                {PRODUCTS.map((product) => (
-                  <button
-                    key={product.printType}
-                    onClick={() => addItem(product.printType)}
-                    className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                    style={{
-                      background: 'var(--color-primary-50)',
-                      color: 'var(--color-primary)',
-                      border: '2px solid var(--color-primary-100)',
-                    }}
-                  >
-                    <span className="block">+ {t(product.labelKey)}</span>
-                    <span className="block text-xs font-normal opacity-80">
-                      {product.template.paperSize} · Rp {(product.template.price ?? 0).toLocaleString('id-ID')}
-                    </span>
-                  </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Price summary */}
-          <div
-            className="p-5 rounded-lg flex items-center justify-between"
-            style={{
-              background: 'var(--color-primary-50)',
-              border: '2px solid var(--color-primary-100)',
-            }}
-          >
-            <div>
-              <p style={{ color: 'var(--color-neutral-600)' }}>
-                {t('cart.photoCount', { count: selectedPhotos.length })}
-              </p>
-              <p className="text-2xl font-black" style={{ color: 'var(--color-primary)' }}>
-                Rp {(total + addonEstimate).toLocaleString('id-ID')}
-              </p>
+          {/* ── Right: sticky order summary ── */}
+          <aside className="card p-5 flex flex-col gap-3 w-full lg:sticky lg:top-4">
+            <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
+              <ShoppingCart size={20} /> {t('cart.summaryTitle')}
+            </h2>
+
+            <div className="flex flex-col gap-1.5">
+              <SummaryRow label={t('cart.rowItems')} value={selectedPhotos.length} />
+              {plainCount > 0     && <SummaryRow muted label={t('cart.rowPhotos')} value={plainCount} />}
+              {aiCount > 0        && <SummaryRow muted label={t('cart.rowAi')} value={aiCount} />}
+              {compositeCount > 0 && <SummaryRow muted label={t('cart.rowFrame')} value={compositeCount} />}
+              {printCopies > 0    && <SummaryRow label={t('cart.rowPrints')} value={printCopies} />}
             </div>
-            <Button size="lg" onClick={() => navigate('/checkout')}>
+
+            <div style={{ borderTop: '1px dashed var(--color-neutral-200)' }} />
+
+            <div className="flex flex-col gap-1.5">
+              <SummaryRow label={t('cart.subtotalPhotos')} value={`Rp ${total.toLocaleString('id-ID')}`} />
+              {addonEstimate > 0 && (
+                <SummaryRow label={t('cart.subtotalPrints')} value={`Rp ${addonEstimate.toLocaleString('id-ID')}`} />
+              )}
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--color-neutral-200)' }} />
+
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>{t('common.total')}</span>
+              <span className="text-h3 font-black" style={{ color: 'var(--color-primary)' }}>
+                Rp {(total + addonEstimate).toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <Button size="lg" className="w-full" onClick={() => navigate('/checkout')}>
               {t('cart.payNow')} <ArrowRight size={20} />
             </Button>
-          </div>
-        </>
+
+            <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
+              <ShieldCheck size={14} className="shrink-0 mt-0.5" /> {t('cart.secureNote')}
+            </p>
+          </aside>
+        </div>
       )}
 
       {/* Remove confirmation */}
       {confirmRemove && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-          onClick={() => setConfirmRemove(null)}
-        >
-          <div
-            className="w-full rounded-2xl p-6 flex flex-col gap-4"
-            style={{ background: '#fff', maxWidth: 380, boxShadow: '0 24px 64px rgba(0,0,0,0.3)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: 'var(--color-error-bg)', color: 'var(--color-error)' }}
-              >
-                <X size={22} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="font-black text-lg leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
-                  {t('cart.removeTitle')}
-                </h2>
-                <p className="text-sm truncate" style={{ color: 'var(--color-neutral-500)' }}>
-                  {confirmRemove.filename}
-                </p>
-              </div>
-            </div>
+        <Modal title={t('cart.removeTitle')} onClose={() => setConfirmRemove(null)} size="sm">
+          <div className="px-6 py-5 flex flex-col gap-4">
+            <p className="text-sm truncate font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
+              {confirmRemove.filename}
+            </p>
             <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
               {t('cart.removeConfirm')}
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setConfirmRemove(null)}
-                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
-              >
+              <Button variant="ghost" className="flex-1" onClick={() => setConfirmRemove(null)}>
                 {t('cart.removeCancel')}
-              </button>
-              <button
-                onClick={() => handleRemove(confirmRemove.id)}
-                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-2"
-                style={{ background: 'var(--color-error)', color: '#fff' }}
-              >
+              </Button>
+              <Button variant="danger" className="flex-1" onClick={() => handleRemove(confirmRemove.id)}>
                 <X size={16} /> {t('cart.removeConfirmBtn')}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Lightbox preview */}
-      {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}
-          onClick={() => setPreview(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setPreview(null)}
-            aria-label={t('cart.close')}
-            className="absolute top-5 right-5 w-11 h-11 flex items-center justify-center rounded-full"
-            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}
-          >
-            <X size={22} />
-          </button>
-          <div className="flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={preview.src}
-              alt={preview.label}
-              style={{ maxWidth: 'min(92vw, 900px)', maxHeight: '82vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
-            />
-            <span className="text-sm font-semibold" style={{ color: '#fff' }}>{preview.label}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

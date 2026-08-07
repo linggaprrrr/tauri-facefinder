@@ -14,17 +14,20 @@ export default function StepIndicator({ current }) {
 
         return (
           <div key={key} className="flex items-center">
-            {/* Step circle */}
-            <div className="flex items-center gap-1.5">
+            {/* Step circle. Sized for a kiosk read at arm's length — this is
+                the only thing on screen telling a customer how far through the
+                flow they are, and it was set smaller than the body text. */}
+            <div className="flex items-center gap-2">
               <div
-                className="flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold transition-all duration-200"
+                className="flex items-center justify-center rounded-full font-black transition-all duration-200"
                 style={{
+                  width: 44, height: 44, fontSize: 19,
                   background: isActive
                     ? 'var(--gradient-primary)'
                     : isDone
                     ? 'var(--gradient-accent)'
                     : 'var(--color-neutral-200)',
-                  color: isActive || isDone ? '#fff' : 'var(--color-neutral-500)',
+                  color: isActive || isDone ? '#fff' : 'var(--color-neutral-600)',
                   boxShadow: isActive
                     ? 'var(--shadow-glow-primary)'
                     : isDone
@@ -33,14 +36,21 @@ export default function StepIndicator({ current }) {
                   transform: isActive ? 'scale(1.12)' : 'scale(1)',
                 }}
               >
-                {isDone ? <Check size={16} strokeWidth={3} /> : index + 1}
+                {isDone ? <Check size={22} strokeWidth={3.5} /> : index + 1}
               </div>
               <span
-                className="text-sm font-semibold hidden md:inline"
+                className="hidden md:inline transition-all"
                 style={{
+                  // The current step outweighs the rest: heavier, darker, and a
+                  // step larger, so "where am I" is answered by weight rather
+                  // than by reading all five labels.
+                  fontSize: isActive ? 18 : 16,
+                  fontWeight: isActive ? 900 : 600,
                   color: isActive
                     ? 'var(--color-primary)'
-                    : 'var(--color-neutral-400)',
+                    : isDone
+                    ? 'var(--color-neutral-700)'
+                    : 'var(--color-neutral-600)',
                 }}
               >
                 {label}
@@ -50,7 +60,7 @@ export default function StepIndicator({ current }) {
             {/* Connector line */}
             {index < STEP_KEYS.length - 1 && (
               <div
-                className="w-7 h-1 mx-2 rounded-full transition-all duration-300"
+                className="w-8 h-1.5 mx-2.5 rounded-full transition-all duration-300"
                 style={{
                   background: isDone
                     ? 'var(--gradient-accent)'

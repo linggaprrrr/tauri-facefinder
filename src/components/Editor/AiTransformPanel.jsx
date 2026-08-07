@@ -8,15 +8,10 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
   const [selected, setSelected] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null); // template shown in preview modal
 
-  const panelStyle = {
-    background: '#fff',
-    boxShadow: 'var(--shadow-md)',
-    border: '1px solid var(--color-neutral-100)',
-  };
 
   if (loading) {
     return (
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
           <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>
@@ -34,14 +29,14 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
 
   if (!templates.length) {
     return (
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
           <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>
             {t('ai.title')}
           </h3>
         </div>
-        <p className="text-xs text-center py-6" style={{ color: 'var(--color-neutral-400)' }}>
+        <p className="text-xs text-center py-6" style={{ color: 'var(--color-neutral-600)' }}>
           {t('ai.noTemplates')}
         </p>
       </div>
@@ -67,7 +62,7 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
 
   return (
     <>
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={panelStyle}>
+      <div className="flex flex-col gap-3">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
@@ -120,18 +115,18 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
 
         {/* Face count warning — inline, non-blocking */}
         {faceWarning && (
-          <p className="text-xs leading-snug" style={{ color: '#d97706' }}>
+          <p className="text-xs leading-snug" style={{ color: 'var(--color-warning)' }}>
             ⚠ Kami mendeteksi {faceCount} orang di foto ini. Template ini dirancang untuk {selectedTpl.max_persons} orang. Tetap bisa digunakan, hasilnya mungkin kurang optimal.
           </p>
         )}
 
         {/* Hint */}
         {currentIsAi ? (
-          <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-600)' }}>
             {t('ai.aiPhotoHint')}
           </p>
         ) : !aiTransformUsed && (
-          <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-400)' }}>
+          <p className="text-xs leading-snug" style={{ color: 'var(--color-neutral-600)' }}>
             {t('ai.generateNote')}
           </p>
         )}

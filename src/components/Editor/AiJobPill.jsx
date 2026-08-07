@@ -54,8 +54,8 @@ export default function AiJobPill({ job, onView, onRetry, onDismiss }) {
   return (
     <div style={wrap}>
       <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl" style={{ background: '#fff', border: '1px solid #fca5a5', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-        <AlertTriangle size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
-        <span className="text-xs leading-snug" style={{ color: '#991b1b', maxWidth: 240 }}>
+        <AlertTriangle size={18} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
+        <span className="text-xs leading-snug" style={{ color: 'var(--color-error)', maxWidth: 240 }}>
           {job.errorMsg || t('ai.failed')}
         </span>
         {job.canRetry ? (
@@ -71,7 +71,7 @@ export default function AiJobPill({ job, onView, onRetry, onDismiss }) {
               onClick={onDismiss}
               aria-label={t('ai.dismiss')}
               className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }}
+              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
             >
               <X size={15} />
             </button>

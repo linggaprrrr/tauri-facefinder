@@ -77,21 +77,20 @@
   --color-info:         #0369A1;
   --color-info-bg:      #E0F2FE;
 
-  /* ── Typography Scale ── */
-  --font-size-display:  3rem;      /* 48px — kiosk hero / main title */
-  --font-size-h1:       2.25rem;   /* 36px — page title */
-  --font-size-h2:       1.75rem;   /* 28px — section heading */
-  --font-size-h3:       1.375rem;  /* 22px — card title */
-  --font-size-body-lg:  1.125rem;  /* 18px — important body */
-  --font-size-body:     1rem;      /* 16px — default */
-  --font-size-sm:       0.875rem;  /* 14px — caption / helper */
-  --font-size-xs:       0.75rem;   /* 12px — labels / badges */
-
-  --font-weight-regular: 400;
-  --font-weight-medium:  500;
-  --font-weight-semibold: 600;
-  --font-weight-bold:    700;
-  --font-weight-black:   900;
+  /* ── Typography Scale ──
+     Tailwind v4 only generates utilities from the `--text-*` namespace, so the
+     scale has to live there to exist at all — the old `--font-size-*` names
+     compiled to nothing at all and every heading fell back to an ad-hoc
+     Tailwind size.
+     Only the heading steps get names here: the bottom of the scale already
+     matches Tailwind's own (body 1rem = text-base, body-lg 1.125rem = text-lg,
+     sm = text-sm, xs = text-xs), and the weights already resolve to
+     500/600/700/900 via font-medium/semibold/bold/black. Restating those would
+     add tokens without adding a system. */
+  --text-display: 3rem;      /* 48px — kiosk hero / main title */
+  --text-h1:      2.25rem;   /* 36px — page title */
+  --text-h2:      1.75rem;   /* 28px — section heading */
+  --text-h3:      1.375rem;  /* 22px — card title */
 
   /* ── Spacing (8pt grid) ── */
   --spacing-1:  0.25rem;   /* 4px */
@@ -115,6 +114,14 @@
   --radius-lg:   1rem;     /* 16px — cards */
   --radius-xl:   1.5rem;   /* 24px — panels */
   --radius-2xl:  2rem;     /* 32px — modals */
+  /* Was inheriting Tailwind's 1.5rem default, which collided exactly with
+     --radius-xl and left `rounded-3xl` *smaller* than rounded-2xl. All twelve
+     of its call sites are large hero surfaces — the camera frame, QR panels,
+     result panels — so they were rendering the same corner as a 36px chip.
+     Set here as the top of a monotonic 8px ramp: 8 · 12 · 16 · 24 · 32 · 40.
+     Only rounded-3xl moves; xl and 2xl keep their values and their 70-odd
+     call sites are untouched. */
+  --radius-3xl:  2.5rem;   /* 40px — hero surfaces (camera frame, QR panels) */
   --radius-full: 9999px;   /* pill */
 
   /* ── Shadows ── */
@@ -275,8 +282,14 @@ body::before {
   color: #fff;
 }
 
-/* Focus ring — same for all variants (accessibility) */
-button:focus-visible {
+/* Focus ring — every focusable control, not just buttons. Text inputs and
+   selects arrived with the gallery search/sort and would otherwise have shown
+   only the UA default, which several of them suppress via their own styling. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 3px;
 }
@@ -306,6 +319,88 @@ button:focus-visible {
   text-shadow:
     0 0 6px rgba(255, 255, 255, 0.9),
     0 1px 2px rgba(255, 255, 255, 0.95);
+}
+
+/* The brand wordmark, gradient-filled. background-clip:text needs a
+   transparent fill, so this cannot be expressed as a colour utility.
+   The solid colour is declared first and only overridden where the clip is
+   actually supported: on a WebView that lacks it, `color: transparent` alone
+   would render the header wordmark invisible, which is a support call rather
+   than a degraded gradient. */
+.text-gradient-brand {
+  color: var(--color-primary);
+}
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .text-gradient-brand {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Card surface for content that sits directly on the outlet's background photo
+   (gallery empty state). Opaque white on purpose — the job is to guarantee a
+   light surface for text, which a translucent panel over a busy photo would
+   not, for the same reason `.app-bg`'s scrim exists. */
+.festive-card {
+  background: #fff;
+  border: 1.5px solid var(--color-primary-100);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-pop);
+}
+
+/* Sticker grid tile. A CSS class rather than the pair of onMouseEnter /
+   onMouseLeave handlers this used to carry — that was two JS listeners and a
+   direct style write per tile, on a grid that can run to a few hundred. */
+.sticker-tile {
+  background: var(--color-neutral-50);
+  transition: background 120ms ease;
+}
+.sticker-tile:hover {
+  background: var(--color-accent-50);
+}
+
+/* The ordinary content surface — panels, list rows, summary boxes.
+   A class rather than a <Card> component for the same reason .btn-* is a class:
+   a wrapper whose entire job is to set four properties would cost an import in
+   every file that happens to contain a panel. */
+.card {
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Native <dialog>, stripped to a transparent positioning box ──
+   The panel inside carries the visual treatment; this element only centres it
+   and paints the backdrop. See components/common/Modal.jsx. */
+dialog.modal {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+/* Scoped to [open] on purpose: an unscoped `display: flex` here would beat the
+   UA stylesheet's `display: none` for a closed dialog and leave every modal in
+   the app permanently on screen. */
+dialog.modal[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+dialog.modal::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+/* Chrome already blocks background scrolling behind a modal dialog and Safari
+   does not. One line makes it uniform, and avoids a JS scroll-lock that nested
+   modals would have to co-ordinate a counter over. */
+body:has(dialog[open]) {
+  overflow: hidden;
 }
 
 .app-bg::before,
@@ -346,13 +441,6 @@ button:focus-visible {
 ───────────────────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-.gallery-masonry {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
 
 .face-scan-box {
   position: absolute;
@@ -425,28 +513,27 @@ button:focus-visible {
   }
 }
 
-@media (min-width: 640px) {
-  .gallery-masonry {
-    grid-template-columns: repeat(3, 1fr);
-  }
+/* Route enter. Opacity only, deliberately: `<main>` carries this, and an
+   animated transform on it would make main a containing block for any
+   fixed-position descendant for the duration — modals opened by a route
+   component would be positioned against main instead of the viewport. Fading
+   is also all a kiosk step change needs; sliding content reads as latency. */
+.pop-in { animation: popIn 0.24s ease-out both; }
+@keyframes popIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-@media (min-width: 1024px) {
-  .gallery-masonry {
-    grid-template-columns: repeat(4, 1fr);
-  }
+/* Idle float for empty-state icons — signals "nothing here yet, and that's
+   fine" rather than "something failed". */
+.bob { animation: bob 3s ease-in-out infinite; }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }
 
-@media (min-width: 1280px) {
-  .gallery-masonry {
-    grid-template-columns: repeat(5, 1fr);
-  }
-}
-
-@media (min-width: 1536px) {
-  .gallery-masonry {
-    grid-template-columns: repeat(8, 1fr);
-  }
+@media (prefers-reduced-motion: reduce) {
+  .pop-in, .bob { animation: none; }
 }
 
 /* Wrong-PIN feedback. Short and lateral so it reads as "no" without looking

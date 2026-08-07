@@ -11,7 +11,7 @@ export default function AccessMethodChooser({ methods, price, photoCount, onSele
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-md sm:max-w-3xl mx-auto py-8">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-neutral-400)' }}>
+      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-neutral-600)' }}>
         <span>{t('access.yourPhotos', { count: photoCount })}</span>
         <span className="text-sm normal-case font-black tracking-normal" style={{ color: 'var(--color-neutral-800)' }}>
           Rp {price.toLocaleString('id-ID')}
@@ -20,7 +20,7 @@ export default function AccessMethodChooser({ methods, price, photoCount, onSele
 
       <div className="text-center">
         <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>{t('access.title')}</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-500)' }}>{t('access.subtitle')}</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-600)' }}>{t('access.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

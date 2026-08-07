@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLang } from '../../i18n/LanguageContext';
 
 const OVERLAY_MIN_SIZE = 12;
 
@@ -64,135 +65,141 @@ function normalizeBoundingBox(rawBox, dimensions) {
   };
 }
 
-const FALLBACK_RATIO = 1;
-
-export default function PhotoCard({
-  photo,
-  aspectRatio,
-  selected,
-  selectionOrder,
-  onPreview,
-  onRatioChange,
-  onToggle,
-}) {
+/**
+ * A single search result.
+ *
+ * Tapping the card opens the preview, which is where the photo can actually be
+ * judged and then chosen — the preview carries its own Select button and
+ * prev/next, so it is the full picking flow rather than a detour from it. The
+ * circle badge stays as a direct toggle for anyone who already knows they want
+ * the photo and does not need to look closer.
+ *
+ * The two controls are siblings, not nested (nesting buttons is invalid HTML),
+ * which is what makes the grid keyboard-reachable and gives each the global
+ * focus ring for free.
+ */
+export default function PhotoCard({ photo, selected, selectionOrder, onPreview, onToggle }) {
+  const { t } = useLang();
   const [loaded, setLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  const resolvedAspectRatio = aspectRatio || FALLBACK_RATIO;
 
   const boundingBoxStyle = useMemo(
     () => normalizeBoundingBox(photo.bounding_box, imageDimensions),
     [photo.bounding_box, imageDimensions]
   );
 
+  const name = photo.filename || photo.outlet_name || '';
+
   return (
     <div
-      className="relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-200"
+      className="relative rounded-xl overflow-hidden transition-all duration-200"
       style={{
         boxShadow: selected
           ? '0 0 0 3px var(--color-primary), 0 4px 20px rgba(1,125,197,0.25)'
           : 'var(--shadow-sm)',
         transform: selected ? 'translateY(-2px)' : 'none',
-        aspectRatio: `${resolvedAspectRatio}`,
+        // Fixed ratio, so rows line up and the grid reads as a grid. Photos are
+        // mixed portrait and landscape; object-cover absorbs the difference.
+        aspectRatio: '4 / 3',
         background: 'var(--color-neutral-100)',
-        width: '100%',
-        maxWidth: '22rem',
-        maxHeight: '42rem',
       }}
-      onClick={() => onPreview(photo)}
     >
-      {/* Skeleton while loading */}
-      {!loaded && (
-        <div
-          className="absolute inset-0 animate-pulse"
-          style={{ background: 'var(--color-neutral-200)' }}
-        />
-      )}
-
-      <img
-        src={photo.thumbnail}
-        alt="Photo"
-        className="absolute inset-0 block h-full w-full object-cover"
-        onLoad={(e) => {
-          const { naturalWidth, naturalHeight } = e.currentTarget;
-          if (naturalWidth && naturalHeight) {
-            setImageDimensions({ width: naturalWidth, height: naturalHeight });
-            onRatioChange?.(photo.id, naturalWidth / naturalHeight);
-          }
-          setLoaded(true);
-        }}
-      />
-
-      {/* Blue overlay tint when selected */}
-      {selected && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: 'rgba(1,125,197,0.1)' }}
-        />
-      )}
-
-      {boundingBoxStyle && (
-        <div className="face-scan-box" style={boundingBoxStyle} aria-hidden="true">
-          <div className="face-scan-corners" />
-          <div className="scan-mask" />
-        </div>
-      )}
-
-      {/* Best / label badge — top left */}
-      {photo.label && (
-        <span
-          className="absolute top-2 left-2 text-xs font-bold px-2.5 py-1 rounded-full"
-          style={{ background: 'var(--color-accent)', color: 'var(--color-neutral-900)' }}
-        >
-          {photo.label}
-        </span>
-      )}
-
-      {/* Selection number badge — top right, 44px ghost tap zone */}
       <button
-        className="absolute top-1.5 right-1.5 flex items-center justify-center transition-all active:scale-90"
-        style={{
-          width: 44,
-          height: 44,
-          background: 'transparent',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-        }}
-        onClick={(e) => { e.stopPropagation(); onToggle(photo); }}
+        type="button"
+        onClick={() => onPreview(photo)}
+        aria-label={t('gallery.previewAria', { name })}
+        className="absolute inset-0 block w-full h-full cursor-pointer select-none"
+      >
+        {/* Skeleton while loading */}
+        {!loaded && (
+          <div
+            className="absolute inset-0 animate-pulse"
+            style={{ background: 'var(--color-neutral-200)' }}
+          />
+        )}
+
+        <img
+          src={photo.thumbnail}
+          alt=""
+          className="absolute inset-0 block h-full w-full object-cover"
+          onLoad={(e) => {
+            const { naturalWidth, naturalHeight } = e.currentTarget;
+            if (naturalWidth && naturalHeight) {
+              setImageDimensions({ width: naturalWidth, height: naturalHeight });
+            }
+            setLoaded(true);
+          }}
+        />
+
+        {/* Blue overlay tint when selected */}
+        {selected && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'rgba(1,125,197,0.1)' }}
+          />
+        )}
+
+        {boundingBoxStyle && (
+          <div className="face-scan-box" style={boundingBoxStyle} aria-hidden="true">
+            <div className="face-scan-corners" />
+            <div className="scan-mask" />
+          </div>
+        )}
+
+        {/* Best / label badge — offset to clear the selection control */}
+        {photo.label && (
+          <span
+            className="absolute top-2 left-11 text-xs font-bold px-2.5 py-1 rounded-full"
+            style={{ background: 'var(--color-accent)', color: 'var(--color-neutral-900)' }}
+          >
+            {photo.label}
+          </span>
+        )}
+
+        {/* Bottom gradient bar — filename + price */}
+        <div
+          className="absolute bottom-0 inset-x-0 flex items-center justify-between gap-2 p-2.5"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)' }}
+        >
+          <span
+            className="text-xs font-semibold truncate text-left"
+            style={{ color: 'rgba(255,255,255,0.85)' }}
+          >
+            {name}
+          </span>
+          <span className="text-sm font-bold shrink-0" style={{ color: '#fff' }}>
+            Rp {photo.price.toLocaleString('id-ID')}
+          </span>
+        </div>
+      </button>
+
+      {/* Direct select toggle. The visible circle is 26px but the button is a
+          44px target — the old version's 28px badge was the single hardest
+          thing to hit on this screen. */}
+      <button
+        type="button"
+        onClick={() => onToggle(photo)}
         aria-pressed={selected}
-        aria-label={selected ? 'Hapus dari pilihan' : 'Pilih foto'}
+        aria-label={t(selected ? 'gallery.deselectAria' : 'gallery.selectAria', { name })}
+        className="absolute top-0 left-0 z-10 flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
+        style={{ width: 44, height: 44, background: 'transparent', border: 'none', padding: 0 }}
       >
         <span
-          className="flex items-center justify-center rounded-full font-black text-sm transition-all"
+          className="flex items-center justify-center rounded-full font-black transition-all"
           style={{
-            width: 28,
-            height: 28,
+            width: 26,
+            height: 26,
+            fontSize: 13,
             background: selected ? 'var(--color-primary)' : 'rgba(255,255,255,0.82)',
-            color: selected ? '#fff' : 'var(--color-neutral-400)',
-            border: selected ? 'none' : '1.5px solid rgba(0,0,0,0.15)',
+            color: '#fff',
+            border: selected ? 'none' : '1.5px solid rgba(0,0,0,0.18)',
             backdropFilter: 'blur(4px)',
             boxShadow: selected ? '0 2px 10px rgba(1,125,197,0.4)' : '0 1px 4px rgba(0,0,0,0.15)',
-            fontSize: selected ? 13 : 0,
           }}
         >
           {selected ? selectionOrder : ''}
         </span>
       </button>
-
-      {/* Bottom gradient bar — outlet + price */}
-      <div
-        className="absolute bottom-0 inset-x-0 flex items-end justify-between p-2.5"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)' }}
-      >
-        {photo.outlet_name && (
-          <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            {photo.outlet_name}
-          </span>
-        )}
-        <span className="text-sm font-bold ml-auto" style={{ color: '#fff' }}>
-          Rp {photo.price.toLocaleString('id-ID')}
-        </span>
-      </div>
     </div>
   );
 }

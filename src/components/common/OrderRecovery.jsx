@@ -48,14 +48,14 @@ export default function OrderRecovery({ order, onClose }) {
         style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-400)' }}>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-600)' }}>
             {t('recovery.title')}
           </span>
           <button
             onClick={dismiss}
             aria-label={t('common.close')}
             className="w-8 h-8 flex items-center justify-center rounded-lg"
-            style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }}
+            style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
           >
             <X size={16} />
           </button>
@@ -65,7 +65,7 @@ export default function OrderRecovery({ order, onClose }) {
           <div className="flex flex-col items-center gap-3 py-6">
             <span className="w-8 h-8 rounded-full border-4 animate-spin"
               style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
-            <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('recovery.checking')}</p>
+            <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('recovery.checking')}</p>
           </div>
         )}
 
@@ -75,11 +75,11 @@ export default function OrderRecovery({ order, onClose }) {
               <CheckCircle2 size={22} />
               <p className="text-lg font-black">{t('recovery.paidTitle')}</p>
             </div>
-            <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('recovery.paidDesc')}</p>
+            <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('recovery.paidDesc')}</p>
             <div className="p-3 rounded-2xl" style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}>
               <QRCodeSVG value={pickupUrl} size={180} level="H" fgColor="#013F65" />
             </div>
-            <p className="font-mono text-xs break-all" style={{ color: 'var(--color-neutral-400)' }}>
+            <p className="font-mono text-xs break-all" style={{ color: 'var(--color-neutral-600)' }}>
               {t('recovery.code')}: {order.trxCode}
             </p>
             <Button onClick={finish} className="w-full">{t('recovery.done')}</Button>
@@ -92,7 +92,7 @@ export default function OrderRecovery({ order, onClose }) {
               <Clock size={22} />
               <p className="text-lg font-black">{t('recovery.pendingTitle')}</p>
             </div>
-            <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('recovery.pendingDesc')}</p>
+            <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('recovery.pendingDesc')}</p>
             <div className="flex gap-2 w-full">
               <Button variant="ghost" onClick={dismiss} className="flex-1">{t('recovery.dismiss')}</Button>
               <Button onClick={check} className="flex-1">{t('recovery.recheck')}</Button>
@@ -102,11 +102,11 @@ export default function OrderRecovery({ order, onClose }) {
 
         {view === 'gone' && (
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2" style={{ color: 'var(--color-neutral-500)' }}>
+            <div className="flex items-center gap-2" style={{ color: 'var(--color-neutral-600)' }}>
               <AlertTriangle size={22} />
               <p className="text-lg font-black">{t('recovery.goneTitle')}</p>
             </div>
-            <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('recovery.goneDesc')}</p>
+            <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('recovery.goneDesc')}</p>
             <Button onClick={finish} className="w-full">{t('recovery.done')}</Button>
           </div>
         )}

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
-  Plus, Minus, Pencil, MousePointer, Loader2, Lock, QrCode,
+  Plus, Minus, Pencil, MousePointer, Loader2, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { readCachedBranding } from '../../hooks/useBranding';
@@ -19,10 +19,14 @@ import SlotPhotoPicker from './SlotPhotoPicker';
 import UploadPanel from './UploadPanel';
 import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
+import ElementToolbar from './ElementToolbar';
 import { useSessionUploads } from '../../hooks/useSessionUploads';
 import { sessionUploadUrl } from '../../api/mockApi';
 import { renderQrToDataUrl } from '../../utils/renderQrToDataUrl';
 import Button from '../common/Button';
+import Toast from '../common/Toast';
+import IconButton from '../common/IconButton';
+import Modal from '../common/Modal';
 import { useStickers } from '../../hooks/useStickers';
 import { useLayoutFrames } from '../../hooks/useLayoutFrames';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -35,6 +39,11 @@ import { aiTransform, createCompositePhoto, ApiError } from '../../api/mockApi';
 // Desktop ceilings. On mobile these are overridden by the viewport (see component).
 const MAX_CANVAS_W = 780;
 const MAX_CANVAS_H = 520;
+
+// Touchscreen view zoom. The floor is 1 because the canvas is already fitted to
+// the frame — zooming out past that would only add empty space around the photo.
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
 const DEFAULT_FILTERS = { list: [], brightness: 0, contrast: 0 };
 
 const zoomBtnStyle = {
@@ -95,14 +104,40 @@ function exportStage(stage) {
   if (!stage) return undefined;
   const transformers = stage.find('Transformer').filter((tr) => tr.isVisible());
   transformers.forEach((tr) => tr.hide());
+
+  // Pinch zoom is a VIEW transform — the customer zoomed in to look closer, not
+  // to crop or enlarge what they bought. toDataURL() reads the stage's current
+  // transform, so leaving it applied would ship a zoomed, off-centre crop to the
+  // cart, the print and the download. Reset to 1:1 for the capture, restore
+  // after, in the same hide/show pattern the Transformer above already uses.
+  const view = { x: stage.x(), y: stage.y(), scale: stage.scaleX() };
+  stage.position({ x: 0, y: 0 });
+  stage.scale({ x: 1, y: 1 });
   stage.batchDraw();
   try {
     return stage.toDataURL(EXPORT_OPTS);
   } finally {
     transformers.forEach((tr) => tr.show());
+    stage.position({ x: view.x, y: view.y });
+    stage.scale({ x: view.scale, y: view.scale });
     stage.batchDraw();
   }
 }
+
+// Which elements may be mirrored. Text is out because mirrored text is simply
+// unreadable, and an upload placeholder that has not received its photo yet is
+// still drawing a QR code — mirroring that makes it unscannable, which is a
+// broken feature rather than an odd-looking one.
+const canFlip = (el) => el?.type === 'sticker' || (el?.type === 'upload' && !!el.attrs?.src);
+
+// A flip is a resting scaleX of -1. offsetX moves the node's origin to its far
+// edge so the mirrored copy lands exactly back on the original box instead of
+// beside it — expressed in unscaled local units, which is why it tracks
+// attrs.width rather than anything the Transformer is doing mid-gesture.
+const flipProps = (flipped, width) => ({
+  scaleX: flipped ? -1 : 1,
+  offsetX: flipped ? width : 0,
+});
 
 function CanvasElement({ element, isSelected, onSelect, onChange }) {
   const shapeRef = useRef(null);
@@ -168,6 +203,8 @@ function UploadShape({ element, isSelected, onSelect, onChange }) {
   const { x, y, width, height, rotation = 0, src, qrDataUrl } = element.attrs;
   const [photo] = useImage(src ?? '', 'anonymous');
   const [qr] = useImage(qrDataUrl ?? '', 'anonymous');
+  // Never while the QR is showing — a mirrored QR code will not scan.
+  const flipX = !!element.attrs.flipX && !!src;
 
   useEffect(() => {
     if (isSelected && transformerRef.current && shapeRef.current) {
@@ -180,11 +217,12 @@ function UploadShape({ element, isSelected, onSelect, onChange }) {
     const node = shapeRef.current;
     onChange(element.id, {
       x: node.x(), y: node.y(),
-      width: Math.max(40, node.width() * node.scaleX()),
-      height: Math.max(40, node.height() * node.scaleY()),
+      // abs() for the same reason as the sticker: a flipped node rests at -1.
+      width: Math.max(40, Math.abs(node.width() * node.scaleX())),
+      height: Math.max(40, Math.abs(node.height() * node.scaleY())),
       rotation: node.rotation(),
     });
-    node.scaleX(1);
+    node.scaleX(flipX ? -1 : 1);
     node.scaleY(1);
   };
 
@@ -193,6 +231,7 @@ function UploadShape({ element, isSelected, onSelect, onChange }) {
       <Group
         ref={shapeRef}
         x={x} y={y} width={width} height={height} rotation={rotation}
+        {...flipProps(flipX, width)}
         draggable={!locked}
         onClick={() => onSelect(element.id)}
         onTap={() => onSelect(element.id)}
@@ -237,6 +276,7 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
   const transformerRef = useRef(null);
   const [image] = useImage(element.attrs.src, 'anonymous');
   const locked = !!element.locked;
+  const flipX = !!element.attrs.flipX;
 
   useEffect(() => {
     if (isSelected && transformerRef.current && shapeRef.current) {
@@ -253,6 +293,7 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
         x={element.attrs.x} y={element.attrs.y}
         width={element.attrs.width} height={element.attrs.height}
         rotation={element.attrs.rotation || 0}
+        {...flipProps(flipX, element.attrs.width)}
         draggable={!locked}
         onClick={() => onSelect(element.id)}
         onTap={() => onSelect(element.id)}
@@ -261,12 +302,15 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
           const node = shapeRef.current;
           onChange(element.id, {
             x: node.x(), y: node.y(),
-            width: Math.max(20, node.width() * node.scaleX()),
-            height: Math.max(20, node.height() * node.scaleY()),
+            // abs(): a flipped node rests at scaleX -1, and Konva also reports a
+            // negative scale when an anchor is dragged past the opposite edge.
+            // Without this the sticker collapses to the 20px floor either way.
+            width: Math.max(20, Math.abs(node.width() * node.scaleX())),
+            height: Math.max(20, Math.abs(node.height() * node.scaleY())),
             rotation: node.rotation(),
-            scaleX: 1, scaleY: 1,
           });
-          node.scaleX(1);
+          // Restore the resting scale, which for a flipped sticker is the flip.
+          node.scaleX(flipX ? -1 : 1);
           node.scaleY(1);
         }}
       />
@@ -554,6 +598,10 @@ export default function PhotoEditor() {
   const [aiResultOpen, setAiResultOpen] = useState(false);
   const [showDoneWarning, setShowDoneWarning] = useState(false);
   const [committingFrame, setCommittingFrame] = useState(false); // collage → new output upload
+  const [toast, setToast] = useState(null);
+  // View-only zoom/pan for the touchscreen — see zoomAround() below.
+  const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
+  const pinchRef = useRef(null);
 
   // When navigating back to the editor with a completed AI job, re-open the result modal.
   useEffect(() => {
@@ -697,7 +745,7 @@ export default function PhotoEditor() {
       setPhotoIndex(newIndex);
     } catch (err) {
       console.error('Failed to commit collage:', err);
-      window.alert(t('frame.commitError'));
+      setToast(t('frame.commitError'));
     } finally {
       setCommittingFrame(false);
     }
@@ -734,6 +782,9 @@ export default function PhotoEditor() {
     setFrame(saved?.frame ?? 'none');
     setSelectedId(null);
     setActivePanel(defaultPanel);
+    // A new photo starts fitted. Carrying the previous photo's zoom over would
+    // open the next one already cropped into a corner.
+    setView({ scale: 1, x: 0, y: 0 });
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
     setPhotoIndex(newIndex);
@@ -911,7 +962,7 @@ export default function PhotoEditor() {
       setPhotoIndex(newIndex);
     } catch (err) {
       console.error('Failed to add phone upload as a new photo:', err);
-      window.alert(t('frame.commitError'));
+      setToast(t('frame.commitError'));
     } finally {
       setCommittingUpload(false);
     }
@@ -931,6 +982,13 @@ export default function PhotoEditor() {
   const selectedElement = elements.find((el) => el.id === selectedId) ?? null;
   const isSelectionLocked = !!selectedElement?.locked;
 
+  // A text element names itself; the others get their type. Falls back to the
+  // sticker label so an element type added later still renders something.
+  const selectedLabel = !selectedElement ? ''
+    : selectedElement.type === 'text'
+      ? (selectedElement.attrs?.text?.trim() || t('editor.elText'))
+      : t(selectedElement.type === 'upload' ? 'editor.elUpload' : 'editor.elSticker');
+
   function toggleLock() {
     if (!selectedId) return;
     // Stays selected afterwards — locking something and having it deselect
@@ -942,6 +1000,39 @@ export default function PhotoEditor() {
     if (!selectedId || isSelectionLocked) return;
     pushHistory(elements.filter((el) => el.id !== selectedId));
     setSelectedId(null);
+  }
+
+  function flipSelected() {
+    if (!selectedElement || isSelectionLocked || !canFlip(selectedElement)) return;
+    pushHistory(elements.map((el) => (
+      el.id === selectedId
+        ? { ...el, attrs: { ...el.attrs, flipX: !el.attrs.flipX } }
+        : el
+    )));
+  }
+
+  function duplicateSelected() {
+    if (!selectedElement || isSelectionLocked) return;
+    // An 'upload' element is a placeholder bound to one phone-upload session;
+    // a second copy would race the first for the same arriving photo, so the
+    // one element type that must not be duplicated is excluded here.
+    if (selectedElement.type === 'upload') return;
+    const copy = {
+      ...selectedElement,
+      // randomUUID rather than the `${type}-${Date.now()}` used at the other
+      // creation sites: a double-tap duplicates within the same millisecond
+      // and would mint a duplicate React key.
+      id: crypto.randomUUID(),
+      attrs: {
+        ...selectedElement.attrs,
+        // Offset so the copy is visibly a copy instead of hiding exactly
+        // behind the original.
+        x: (selectedElement.attrs?.x ?? 0) + 24,
+        y: (selectedElement.attrs?.y ?? 0) + 24,
+      },
+    };
+    pushHistory([...elements, copy]);
+    setSelectedId(copy.id);
   }
 
   // Restacking is locked too. It isn't in the "move/resize/rotate/delete" list,
@@ -967,6 +1058,69 @@ export default function PhotoEditor() {
     }
   }
 
+  /* ── View zoom (touchscreen) ──────────────────────────────────────────────
+     A view transform on the Stage, never on the artwork. Konva's own pointer
+     maths accounts for a stage transform, so dragging a sticker still lands
+     where the finger is — which a CSS transform on the wrapper would break.
+     exportStage() resets this before capture, so none of it reaches the file. */
+
+  // Zoom about a focal point, keeping whatever is under the fingers pinned,
+  // then clamp so the artwork can never be pulled off its own frame.
+  function zoomAround(nextScale, focal) {
+    setView((v) => {
+      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
+      const worldX = (focal.x - v.x) / v.scale;
+      const worldY = (focal.y - v.y) / v.scale;
+      const minX = activeCanvas.width  - activeCanvas.width  * scale;
+      const minY = activeCanvas.height - activeCanvas.height * scale;
+      return {
+        scale,
+        x: Math.min(0, Math.max(minX, focal.x - worldX * scale)),
+        y: Math.min(0, Math.max(minY, focal.y - worldY * scale)),
+      };
+    });
+  }
+
+  const canvasCentre = () => ({ x: activeCanvas.width / 2, y: activeCanvas.height / 2 });
+  const resetView = () => setView({ scale: 1, x: 0, y: 0 });
+
+  function handleStageTouchMove(e) {
+    const touches = e.evt.touches;
+    if (touches.length !== 2) return;
+    e.evt.preventDefault();  // otherwise the page itself pinch-zooms underneath
+    const [a, b] = touches;
+    const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    const rect = e.target.getStage().container().getBoundingClientRect();
+    const focal = {
+      x: (a.clientX + b.clientX) / 2 - rect.left,
+      y: (a.clientY + b.clientY) / 2 - rect.top,
+    };
+    // The first move of a gesture only establishes the baseline. Applying a
+    // ratio against a stale distance is what makes pinch jump on frame one.
+    if (pinchRef.current) zoomAround(view.scale * (dist / pinchRef.current.dist), focal);
+    pinchRef.current = { dist };
+  }
+
+  function handleStageWheel(e) {
+    e.evt.preventDefault();
+    const stage = e.target.getStage();
+    zoomAround(
+      view.scale * (e.evt.deltaY < 0 ? 1.08 : 1 / 1.08),
+      stage.getPointerPosition() ?? canvasCentre()
+    );
+  }
+
+  // Pan bounds, recomputed per drag rather than stored: the zoom level can
+  // change between drags and a stale bound would let the photo drift off-frame.
+  function clampPan(pos) {
+    const minX = activeCanvas.width  - activeCanvas.width  * view.scale;
+    const minY = activeCanvas.height - activeCanvas.height * view.scale;
+    return {
+      x: Math.min(0, Math.max(minX, pos.x)),
+      y: Math.min(0, Math.max(minY, pos.y)),
+    };
+  }
+
   // Toggle sidebar tool — clicking active tool collapses panel
   function handleSidebarTool(id) {
     setActivePanel((prev) => (prev === id ? null : id));
@@ -975,7 +1129,7 @@ export default function PhotoEditor() {
   if (!currentPhoto) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p style={{ color: 'var(--color-neutral-500)' }}>
+        <p style={{ color: 'var(--color-neutral-600)' }}>
           {t('editor.noPhotos')}{' '}
           <button onClick={() => navigate('/gallery')} style={{ color: 'var(--color-primary)' }}>{t('editor.goBack')}</button>
         </p>
@@ -1047,7 +1201,7 @@ export default function PhotoEditor() {
         className="flex-1 min-h-0 no-scrollbar"
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '64px 1fr 248px',
+          gridTemplateColumns: isMobile ? '1fr' : '96px 1fr 320px',
           gap: 12,
           overflowY: isMobile ? 'auto' : 'visible',
         }}
@@ -1069,29 +1223,36 @@ export default function PhotoEditor() {
                 onClick={() => handleSidebarTool(id)}
                 aria-label={t(labelKey)}
                 aria-pressed={isActive}
-                className="relative flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
+                className="flex flex-col items-center justify-center gap-1.5 rounded-2xl transition-all active:scale-95 shrink-0"
                 style={{
-                  width: 52, height: 52,
-                  background: isActive ? 'var(--color-accent-light, #fff7ed)' : 'transparent',
-                  color: isActive ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
+                  width: 80, paddingTop: 8, paddingBottom: 8,
+                  background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                 }}
               >
-                {/* Active left-edge indicator */}
-                {isActive && (
-                  <span
-                    className="absolute"
-                    style={{
-                      left: -7, top: '50%', transform: 'translateY(-50%)',
-                      width: 3, height: 22,
-                      background: 'var(--color-accent)',
-                      borderRadius: 2,
-                    }}
-                  />
-                )}
-                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
-                <span style={{ fontSize: 9, fontWeight: isActive ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+                {/* The filled tile IS the active indicator — it replaces a 3px
+                    edge sliver that was easy to miss at arm's length. */}
+                <span
+                  className="flex items-center justify-center rounded-2xl transition-all"
+                  style={{
+                    width: 48, height: 48,
+                    background: isActive ? 'var(--gradient-primary)' : 'var(--color-neutral-100)',
+                    color: isActive ? '#fff' : 'var(--color-neutral-700)',
+                    boxShadow: isActive ? 'var(--shadow-glow-primary)' : 'none',
+                  }}
+                >
+                  <Icon size={24} strokeWidth={isActive ? 2.4 : 1.9} />
+                </span>
+                <span
+                  className="text-center"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isActive ? 800 : 600,
+                    lineHeight: 1.15,
+                    color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-600)',
+                  }}
+                >
                   {t(labelKey)}
                 </span>
               </button>
@@ -1112,7 +1273,7 @@ export default function PhotoEditor() {
             style={{
               width: 52, height: 52,
               background: !activePanel ? 'var(--color-primary-50)' : 'transparent',
-              color: !activePanel ? 'var(--color-primary)' : 'var(--color-neutral-400)',
+              color: !activePanel ? 'var(--color-primary)' : 'var(--color-neutral-600)',
               border: 'none',
               cursor: 'pointer',
             }}
@@ -1127,41 +1288,6 @@ export default function PhotoEditor() {
         {/* ── Center: toolbar + canvas + filmstrip ── */}
         <div className="flex flex-col gap-3 min-w-0">
 
-          {/* Toolbar */}
-          <EditorToolbar
-            canUndo={canUndo} canRedo={canRedo}
-            onUndo={undo} onRedo={redo}
-            onDelete={deleteSelected}
-            onBringForward={bringForward} onSendBackward={sendBackward}
-            onToggleLock={toggleLock}
-            hasSelection={!!selectedId} isLocked={isSelectionLocked}
-          />
-
-          {/* Contextual hint — why the controls are dead is more useful than
-              the generic prompt, so the locked case wins when both apply. */}
-          {isSelectionLocked ? (
-            <p
-              className="text-xs font-medium text-center py-1 rounded-lg flex items-center justify-center gap-1.5"
-              style={{
-                color: 'var(--color-warning)',
-                background: 'var(--color-warning-bg)',
-                border: '1px dashed var(--color-warning)',
-              }}
-            >
-              <Lock size={13} /> {t('editor.hintLocked')}
-            </p>
-          ) : !selectedId && (
-            <p
-              className="text-xs font-medium text-center py-1 rounded-lg"
-              style={{
-                color: 'var(--color-neutral-400)',
-                background: 'var(--color-neutral-50)',
-                border: '1px dashed var(--color-neutral-200)',
-              }}
-            >
-              💡 {t('editor.hintSelectEl')}
-            </p>
-          )}
 
           {/* Canvas */}
           <div
@@ -1174,6 +1300,11 @@ export default function PhotoEditor() {
               alignSelf: 'center',
               transition: 'width 0.2s ease, height 0.2s ease',
               borderRadius: 8,
+              // Hand every touch to Konva. Without this the browser claims the
+              // two-finger gesture and zooms the whole page instead of the
+              // canvas — preventDefault alone loses that race on a passive
+              // listener.
+              touchAction: 'none',
             }}
           >
             {isLoading && !isLayoutFrame && (
@@ -1185,7 +1316,7 @@ export default function PhotoEditor() {
                   className="w-10 h-10 rounded-full border-4 animate-spin"
                   style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }}
                 />
-                <span className="text-xs font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
                   {t('editor.loadingPhoto')}
                 </span>
               </div>
@@ -1195,8 +1326,24 @@ export default function PhotoEditor() {
               width={activeCanvas.width}
               height={activeCanvas.height}
               ref={stageRef}
+              scaleX={view.scale}
+              scaleY={view.scale}
+              x={view.x}
+              y={view.y}
+              // Pan only once there is something to pan to; a draggable stage at
+              // 1:1 would let the customer shove the photo out of its frame.
+              draggable={view.scale > 1}
+              dragBoundFunc={clampPan}
+              onDragEnd={(e) => {
+                const node = e.target;
+                if (node === node.getStage()) setView((v) => ({ ...v, x: node.x(), y: node.y() }));
+              }}
               onMouseDown={handleStageClick}
-              onTouchStart={handleStageClick}
+              // A second finger starts a pinch, not a selection.
+              onTouchStart={(e) => { if ((e.evt.touches?.length ?? 1) < 2) handleStageClick(e); }}
+              onTouchMove={handleStageTouchMove}
+              onTouchEnd={() => { pinchRef.current = null; }}
+              onWheel={handleStageWheel}
               onContextMenu={(e) => e.evt.preventDefault()}
             >
               <Layer>
@@ -1359,7 +1506,7 @@ export default function PhotoEditor() {
                 className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl shrink-0"
                 style={{ background: '#fff', border: '1.5px solid var(--color-primary-200)', boxShadow: 'var(--shadow-sm)' }}
               >
-                <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-500)' }}>
+                <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-600)' }}>
                   {t('frame.slotsFilled', { filled, total: frameSlots.length })}
                 </span>
                 <button
@@ -1376,68 +1523,138 @@ export default function PhotoEditor() {
             );
           })()}
 
-          {/* ── Filmstrip: horizontal photo queue below canvas ── */}
-          <div
-            className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 shrink-0 rounded-xl"
-            style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
-          >
-            {selectedPhotos.map((p, i) => {
-              const isActive = i === photoIndex;
-              const isSaved = !!photoEdits[p.id]?.dataUrl && !isActive;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => navigateTo(i)}
-                  className="flex flex-col items-center gap-1 shrink-0 transition-all active:scale-95"
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
-                  aria-label={t('common.photoN', { n: i + 1 })}
-                  aria-current={isActive ? 'true' : undefined}
-                >
-                  <div
-                    className="rounded-lg overflow-hidden"
-                    style={{
-                      width: 52, height: 39,
-                      border: isActive
-                        ? '2.5px solid var(--color-primary)'
-                        : isSaved
-                          ? '2px solid var(--color-success, #22c55e)'
-                          : '2px solid var(--color-neutral-200)',
-                      boxShadow: isActive ? '0 0 0 1px var(--color-primary)' : 'none',
-                      transition: 'border-color 0.15s',
-                      flexShrink: 0,
-                    }}
+          {/* Document-scope toolbar. Sits under the canvas as a centred pill
+              rather than a full-width bar above it — with only two controls in
+              it, the bar was mostly empty and pushed the photo down the page. */}
+          <EditorToolbar
+            canUndo={canUndo} canRedo={canRedo}
+            onUndo={undo} onRedo={redo}
+            zoom={view.scale}
+            onZoomIn={() => zoomAround(view.scale * 1.25, canvasCentre())}
+            onZoomOut={() => zoomAround(view.scale / 1.25, canvasCentre())}
+            onZoomReset={resetView}
+            canZoomIn={view.scale < MAX_ZOOM}
+            canZoomOut={view.scale > MIN_ZOOM}
+          />
+
+          {/* ── Filmstrip: horizontal photo queue below canvas ──
+              Arrows flank the strip because horizontal scrolling is the one
+              gesture a kiosk touchscreen makes awkward — there is no trackpad
+              and the strip can run past the edge. navigateTo() bounds-checks
+              on its own; disabling them is affordance, not enforcement. */}
+          <div className="flex items-center gap-2 shrink-0">
+            <IconButton
+              icon={ChevronLeft}
+              label={t('editor.prevPhoto')}
+              variant="subtle"
+              size="sm"
+              disabled={photoIndex === 0}
+              onClick={() => navigateTo(photoIndex - 1)}
+            />
+
+            <div
+              className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 rounded-xl flex-1 min-w-0"
+              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+            >
+              {selectedPhotos.map((p, i) => {
+                const isActive = i === photoIndex;
+                const isSaved = !!photoEdits[p.id]?.dataUrl && !isActive;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => navigateTo(i)}
+                    className="flex flex-col items-center gap-1 shrink-0 transition-all active:scale-95"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+                    aria-label={t('common.photoN', { n: i + 1 })}
+                    aria-current={isActive ? 'true' : undefined}
                   >
-                    <img
-                      src={p.thumbnail}
-                      alt=""
-                      className="block w-full h-full object-cover"
-                    />
-                  </div>
-                  <span
-                    className="text-xs font-bold"
-                    style={{
-                      color: isActive
-                        ? 'var(--color-primary)'
+                    <div
+                      className="relative rounded-lg overflow-hidden"
+                      style={{
+                        width: 52, height: 39,
+                        border: isActive
+                          ? '2.5px solid var(--color-primary)'
+                          : isSaved
+                            ? '2px solid var(--color-success)'
+                            : '2px solid var(--color-neutral-200)',
+                        boxShadow: isActive ? '0 0 0 1px var(--color-primary)' : 'none',
+                        transition: 'border-color 0.15s',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <img
+                        src={p.thumbnail}
+                        alt=""
+                        className="block w-full h-full object-cover"
+                      />
+                      {/* Position stays visible even while the label below is
+                          showing "editing" or "saved" instead of the number. */}
+                      <span
+                        className="absolute top-0 left-0 flex items-center justify-center font-black"
+                        style={{
+                          minWidth: 15, height: 15, fontSize: 9,
+                          padding: '0 3px',
+                          borderBottomRightRadius: 6,
+                          background: isActive ? 'var(--color-primary)' : 'rgba(0,0,0,0.55)',
+                          color: '#fff',
+                        }}
+                      >
+                        {i + 1}
+                      </span>
+                    </div>
+                    <span
+                      className="text-xs font-bold"
+                      style={{
+                        color: isActive
+                          ? 'var(--color-primary)'
+                          : isSaved
+                            ? 'var(--color-success)'
+                            : 'var(--color-neutral-600)',
+                      }}
+                    >
+                      {isActive
+                        ? t('editor.editingNow')
                         : isSaved
-                          ? 'var(--color-success, #22c55e)'
-                          : 'var(--color-neutral-400)',
-                    }}
-                  >
-                    {isActive
-                      ? t('editor.editingNow')
-                      : isSaved
-                        ? `✓ ${t('editor.savedTag')}`
-                        : t('common.photoN', { n: i + 1 })}
-                  </span>
-                </button>
-              );
-            })}
+                          ? `✓ ${t('editor.savedTag')}`
+                          : t('common.photoN', { n: i + 1 })}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* Add more photos. Edits live in AppContext keyed by photo id,
+                  so leaving for the gallery and coming back keeps them. */}
+              <button
+                onClick={() => { exportAndSave(); navigate('/gallery'); }}
+                className="flex flex-col items-center justify-center gap-1 shrink-0 transition-all active:scale-95 rounded-lg"
+                style={{
+                  width: 60, minHeight: 39, padding: '2px 4px',
+                  background: 'transparent',
+                  border: '1.5px dashed var(--color-primary-200)',
+                  color: 'var(--color-primary)',
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={16} />
+                <span className="text-xs font-bold leading-none">{t('editor.addPhoto')}</span>
+              </button>
+            </div>
+
+            <IconButton
+              icon={ChevronRight}
+              label={t('editor.nextPhoto')}
+              variant="subtle"
+              size="sm"
+              disabled={photoIndex >= selectedPhotos.length - 1}
+              onClick={() => navigateTo(photoIndex + 1)}
+            />
           </div>
         </div>
 
-        {/* ── Right: active panel content (full-width below canvas on mobile) ── */}
+        {/* ── Right: active panel, with the element controls docked beneath ── */}
+        <div className="flex flex-col gap-3 min-h-0">
         <div
-          className="flex flex-col min-h-0 sm:min-h-0 min-h-[280px] rounded-xl overflow-hidden shrink-0"
+          className="flex flex-col flex-1 min-h-0 sm:min-h-0 min-h-[280px] rounded-xl overflow-hidden"
           style={{
             background: '#fff',
             border: '1.5px solid var(--color-neutral-200)',
@@ -1454,24 +1671,24 @@ export default function PhotoEditor() {
                 <span
                   className="flex items-center justify-center rounded-lg shrink-0"
                   style={{
-                    width: 34, height: 34,
-                    background: 'var(--color-accent-light, #fff7ed)',
+                    width: 42, height: 42,
+                    background: 'var(--color-accent-50)',
                     color: 'var(--color-neutral-800)',
                   }}
                 >
-                  <activeTool.icon size={18} strokeWidth={2} />
+                  <activeTool.icon size={22} strokeWidth={2} />
                 </span>
                 <div>
-                  <p className="text-sm font-bold" style={{ color: 'var(--color-neutral-900)' }}>
+                  <p className="text-h3 font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
                     {t(activeTool.labelKey)}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--color-neutral-400)' }}>
+                  <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
                     {t('editor.tabHint', { default: 'Ketuk untuk menambahkan' })}
                   </p>
                 </div>
               </>
             ) : (
-              <p className="text-sm font-semibold" style={{ color: 'var(--color-neutral-400)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
                 {t('editor.selectTool')}
               </p>
             )}
@@ -1506,6 +1723,35 @@ export default function PhotoEditor() {
             )}
           </div>
         </div>
+
+          {/* Element-scope controls, docked under the panel. Kept in the same
+              column as the tools rather than over the canvas, so the photo
+              never shifts down when something is selected. */}
+          {selectedElement ? (
+            <ElementToolbar
+              label={selectedLabel}
+              isLocked={isSelectionLocked}
+              onDuplicate={duplicateSelected}
+              onFlip={flipSelected}
+              canFlip={canFlip(selectedElement)}
+              onBringForward={bringForward}
+              onSendBackward={sendBackward}
+              onToggleLock={toggleLock}
+              onDelete={deleteSelected}
+            />
+          ) : (
+            <p
+              className="text-sm font-medium text-center py-2.5 px-3 rounded-xl shrink-0"
+              style={{
+                color: 'var(--color-neutral-600)',
+                background: 'var(--color-neutral-50)',
+                border: '1px dashed var(--color-neutral-200)',
+              }}
+            >
+              💡 {t('editor.hintSelectEl')}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* ── Progress footer ── */}
@@ -1530,19 +1776,19 @@ export default function PhotoEditor() {
                   background: i === photoIndex
                     ? 'var(--color-primary)'
                     : photoEdits[selectedPhotos[i]?.id]?.dataUrl
-                      ? 'var(--color-success, #22c55e)'
+                      ? 'var(--color-success)'
                       : 'var(--color-neutral-200)',
                   borderRadius: 4,
                 }}
               />
             ))}
           </div>
-          <span className="text-xs font-medium ml-1" style={{ color: 'var(--color-neutral-400)' }}>
+          <span className="text-xs font-medium ml-1" style={{ color: 'var(--color-neutral-600)' }}>
             {t('editor.progressLabel', { current: photoIndex + 1, total: selectedPhotos.length })}
           </span>
         </div>
 
-        <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-400)' }}>
+        <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-600)' }}>
           {t('editor.autoSave')}
         </span>
       </div>
@@ -1564,6 +1810,11 @@ export default function PhotoEditor() {
           onCancel={() => setPendingUpload(null)}
         />
       )}
+
+      {/* Commit failures. Was window.alert(), which froze the Konva stage
+          behind it and drew an OS dialog this app cannot style. */}
+      <Toast message={toast} onDismiss={() => setToast(null)} />
+
 
       {/* Result reveal — opens automatically when the background job finishes */}
       {aiResultOpen && aiJob?.status === 'ready' && (
@@ -1587,42 +1838,32 @@ export default function PhotoEditor() {
         />
       )}
 
-      {/* Confirmation overlay — shown when customer clicks Done while AI is still processing */}
+      {/* Confirmation — shown when the customer taps Done while AI is still
+          processing. Dismissable: closing it is the same as "wait", which is
+          the safe outcome, so Escape and the backdrop both mean cancel. */}
       {showDoneWarning && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        <Modal
+          title={t('ai.pendingWarningTitle')}
+          onClose={() => setShowDoneWarning(false)}
+          size="sm"
         >
-          <div
-            className="rounded-3xl p-7 flex flex-col gap-5 w-full"
-            style={{ background: '#fff', maxWidth: 400, boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}
-          >
-            <div className="flex flex-col gap-1.5">
-              <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
-                <Loader2 size={15} className="animate-spin" /> {t('ai.pendingWarningTitle')}
-              </div>
+          <div className="px-6 py-5 flex flex-col gap-5">
+            <div className="flex items-start gap-2">
+              <Loader2 size={16} className="animate-spin shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }} />
               <p className="text-base font-semibold leading-snug" style={{ color: 'var(--color-neutral-900)' }}>
                 {t('ai.pendingWarning')}
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              <button
-                onClick={confirmDone}
-                className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-700)' }}
-              >
+              <Button variant="ghost" onClick={confirmDone}>
                 {t('ai.pendingWarningConfirm')}
-              </button>
-              <button
-                onClick={() => setShowDoneWarning(false)}
-                className="py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                style={{ background: 'var(--color-primary)', color: '#fff' }}
-              >
+              </Button>
+              <Button onClick={() => setShowDoneWarning(false)}>
                 {t('ai.pendingWarningCancel')}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

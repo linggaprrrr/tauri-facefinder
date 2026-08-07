@@ -53,7 +53,7 @@ export default function Checkout() {
       <div className="flex flex-col items-center gap-2 max-w-sm mx-auto py-16 text-center">
         <p className="text-lg font-black" style={{ color: 'var(--color-neutral-900)' }}>{t('access.emptyTitle')}</p>
         {state.deviceConfig.helpNumber && (
-          <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
             {t('access.emptyHelp', { phone: state.deviceConfig.helpNumber })}
           </p>
         )}

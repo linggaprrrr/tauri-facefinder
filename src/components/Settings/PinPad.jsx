@@ -107,7 +107,7 @@ export default function PinPad({ outletId, onSuccess }) {
 
       <div className="h-5 flex items-center">
         {status === 'checking' && (
-          <LoaderCircle size={18} className="animate-spin" style={{ color: 'var(--color-neutral-400)' }} />
+          <LoaderCircle size={18} className="animate-spin" style={{ color: 'var(--color-neutral-600)' }} />
         )}
         {status === 'wrong' && (
           <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{t('settings.pinWrong')}</p>
@@ -139,7 +139,7 @@ export default function PinPad({ outletId, onSuccess }) {
               height: 60,
               fontSize: 24,
               background: key === 'del' ? 'transparent' : 'var(--color-neutral-100)',
-              color: key === 'del' ? 'var(--color-neutral-500)' : 'var(--color-neutral-800)',
+              color: key === 'del' ? 'var(--color-neutral-600)' : 'var(--color-neutral-800)',
             }}
           >
             {key === 'del' ? <Delete size={24} /> : key}

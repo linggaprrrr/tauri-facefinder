@@ -15,7 +15,7 @@ export default function LanguageSwitcher() {
       className="flex items-center gap-1 p-1 rounded-xl"
       style={{ background: 'var(--color-neutral-100)' }}
     >
-      <Languages size={16} style={{ color: 'var(--color-neutral-400)', marginLeft: 2 }} />
+      <Languages size={16} style={{ color: 'var(--color-neutral-600)', marginLeft: 2 }} />
       {LANGS.map(({ code, label }) => {
         const active = lang === code;
         return (
@@ -26,7 +26,7 @@ export default function LanguageSwitcher() {
             className="px-2.5 py-1 rounded-lg text-sm font-bold transition-colors"
             style={{
               background: active ? 'var(--color-primary)' : 'transparent',
-              color: active ? '#fff' : 'var(--color-neutral-500)',
+              color: active ? '#fff' : 'var(--color-neutral-600)',
             }}
           >
             {label}

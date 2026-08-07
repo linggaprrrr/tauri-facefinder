@@ -36,21 +36,21 @@ export default class ErrorBoundary extends Component {
         style={{
           position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, textAlign: 'center',
-          background: 'var(--color-primary-50, #eef6fc)',
+          background: 'var(--color-primary-50)',
         }}
       >
         <div style={{ fontSize: 48 }}>🙏</div>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: 'var(--color-neutral-900, #111)' }}>
+        <h1 style={{ fontWeight: 800, fontSize: 22, color: 'var(--color-neutral-900)' }}>
           Mohon maaf, terjadi gangguan
         </h1>
-        <p style={{ color: 'var(--color-neutral-500, #666)', maxWidth: 360 }}>
+        <p style={{ color: 'var(--color-neutral-600)', maxWidth: 360 }}>
           Aplikasi akan dimulai ulang otomatis. / The app will restart automatically.
         </p>
         <button
           onClick={() => window.location.reload()}
           style={{
             marginTop: 8, padding: '12px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
-            fontWeight: 700, fontSize: 16, color: '#fff', background: 'var(--color-primary, #017dc5)',
+            fontWeight: 700, fontSize: 16, color: '#fff', background: 'var(--color-primary)',
           }}
         >
           Mulai Ulang / Restart

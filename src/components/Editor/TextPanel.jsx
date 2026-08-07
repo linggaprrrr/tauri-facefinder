@@ -61,7 +61,7 @@ export default function TextPanel({ onAdd }) {
 
   const fontStyle = italic && bold ? 'italic bold' : bold ? 'bold' : italic ? 'italic' : 'normal';
 
-  const labelStyle = { color: 'var(--color-neutral-500)', fontSize: '0.75rem', fontWeight: 600 };
+  const labelStyle = { color: 'var(--color-neutral-600)', fontSize: '0.75rem', fontWeight: 600 };
   const inputStyle = {
     border: '1.5px solid var(--color-neutral-200)',
     borderRadius: 'var(--radius-md)',

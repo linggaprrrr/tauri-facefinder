@@ -183,7 +183,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
               {t('checkout.confirmTitle')}
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-500)' }}>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-600)' }}>
               {t('checkout.photosSelected', { count: state.selectedPhotos.length })}
             </p>
           </div>
@@ -242,7 +242,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             ))}
             {discountAmount > 0 && (
               <div className="flex items-center justify-between px-4 pt-3">
-                <span className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>{t('scan.discountApplied')}</span>
+                <span className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('scan.discountApplied')}</span>
                 <span className="text-sm font-semibold" style={{ color: 'var(--color-success)' }}>
                   - Rp {discountAmount.toLocaleString('id-ID')}
                 </span>
@@ -310,7 +310,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               style={{ width: 620, height: 640, maxWidth: '100%', border: '1.5px solid var(--color-neutral-200)' }}
             />
 
-            <p className="text-xs text-center" style={{ color: 'var(--color-neutral-500)' }}>
+            <p className="text-xs text-center" style={{ color: 'var(--color-neutral-600)' }}>
               {t('checkout.scanInstr')}
             </p>
           </div>
@@ -330,7 +330,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             </div>
 
             <div className="px-6 pt-4 flex flex-col gap-2">
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-400)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-600)' }}>
                 {t('checkout.orderDetails')}
               </p>
               {state.selectedPhotos.map((photo, i) => (
@@ -418,7 +418,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
               <p className="text-lg font-black" style={{ color: 'var(--color-neutral-900)' }}>
                 {t('checkout.cancelTitle')}
               </p>
-              <p className="text-sm mt-2" style={{ color: 'var(--color-neutral-500)' }}>
+              <p className="text-sm mt-2" style={{ color: 'var(--color-neutral-600)' }}>
                 {confirmMode === 'back'
                   ? t('checkout.cancelBackMsg')
                   : t('checkout.cancelOnlyMsg')}

@@ -13,7 +13,7 @@ export default function UploadPanel({ onAdd, awaitingCount, uploadedCount }) {
         <p className="text-sm font-semibold" style={{ color: 'var(--color-neutral-800)' }}>
           {t('upload.title')}
         </p>
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-500)' }}>
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--color-neutral-600)' }}>
           {t('upload.hint')}
         </p>
       </div>
@@ -61,7 +61,7 @@ export default function UploadPanel({ onAdd, awaitingCount, uploadedCount }) {
         ))}
       </ol>
 
-      <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-400)' }}>
+      <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
         <Smartphone size={14} className="shrink-0 mt-0.5" /> {t('upload.formats')}
       </p>
     </div>

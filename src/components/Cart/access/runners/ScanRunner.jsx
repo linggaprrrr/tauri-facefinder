@@ -125,7 +125,7 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
 
       {(status === 'arm' || status === 'checking') && (
         <form onSubmit={submitCode} className="flex flex-col gap-4 w-full">
-          <p className="text-sm text-center" style={{ color: 'var(--color-neutral-500)' }}>
+          <p className="text-sm text-center" style={{ color: 'var(--color-neutral-600)' }}>
             {isTicket ? t('scan.armTicket') : t('scan.armVoucher')}
           </p>
           <input

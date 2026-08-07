@@ -12,7 +12,7 @@ const STATES = {
   PRINTING: { key: 'printerState.printing', color: 'var(--color-success)' },
   PAUSED:   { key: 'printerState.paused',   color: 'var(--color-warning)' },
   OFFLINE:  { key: 'printerState.offline',  color: 'var(--color-error)' },
-  UNKNOWN:  { key: 'printerState.unknown',  color: 'var(--color-neutral-400)' },
+  UNKNOWN:  { key: 'printerState.unknown',  color: 'var(--color-neutral-600)' },
 };
 
 export default function PrinterStatus({ state }) {

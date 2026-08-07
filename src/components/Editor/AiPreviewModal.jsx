@@ -130,7 +130,7 @@ export default function AiPreviewModal({ template, onConfirm, onClose }) {
             <button
               onClick={onClose}
               className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors"
-              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)' }}
+              style={{ background: 'var(--color-neutral-100)', color: 'var(--color-neutral-600)' }}
             >
               <X size={18} />
             </button>
@@ -146,7 +146,7 @@ export default function AiPreviewModal({ template, onConfirm, onClose }) {
           </div>
 
           {!hasSample && (
-            <p className="text-sm" style={{ color: 'var(--color-neutral-500)' }}>
+            <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>
               {t('ai.noSampleNote')}
             </p>
           )}

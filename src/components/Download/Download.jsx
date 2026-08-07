@@ -397,7 +397,7 @@ export default function Download() {
           border: `2px solid ${secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-200)'}`,
         }}
       >
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-500)' }}>
+        <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
           {t('download.autoResetLabel')}
         </span>
         <span
@@ -414,7 +414,7 @@ export default function Download() {
           <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
             {t('download.success')}
           </h1>
-          <p className="mt-1 text-base" style={{ color: 'var(--color-neutral-500)' }}>
+          <p className="mt-1 text-base" style={{ color: 'var(--color-neutral-600)' }}>
             {t('download.scanInstr')}
           </p>
         </div>
@@ -435,7 +435,7 @@ export default function Download() {
             <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#013F65" />
           </div>
 
-          <p className="font-mono text-xs text-center break-all" style={{ color: 'var(--color-neutral-400)' }}>
+          <p className="font-mono text-xs text-center break-all" style={{ color: 'var(--color-neutral-600)' }}>
             {trxCode}
           </p>
 
@@ -447,7 +447,7 @@ export default function Download() {
           </div>
         </div>
 
-        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-400)' }}>
+        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-600)' }}>
           {t('download.cameraInstr')}
         </p>
 
@@ -461,7 +461,7 @@ export default function Download() {
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-500)' }}>
+            <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-600)' }}>
               {t('download.editedPhotos')}
             </p>
             <div className="flex flex-col gap-2">
@@ -616,7 +616,7 @@ export default function Download() {
 
         {/* Items */}
         <div className="px-6 py-4">
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-400)' }}>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-600)' }}>
             {t('download.itemsBought')}
           </p>
 
@@ -650,7 +650,7 @@ export default function Download() {
                 </div>
               );
             }) : (
-              <p className="text-sm" style={{ color: 'var(--color-neutral-400)' }}>{t('download.noItems')}</p>
+              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('download.noItems')}</p>
             )}
           </div>
 
@@ -658,13 +658,13 @@ export default function Download() {
           <div className="mt-4 flex flex-col gap-1.5">
             {discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-500)' }}>{t('download.discount')}</span>
+                <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.discount')}</span>
                 <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
               </div>
             )}
             {order.promo_code_used && (
               <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-500)' }}>{t('download.promoCode')}</span>
+                <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.promoCode')}</span>
                 <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
               </div>
             )}
@@ -705,7 +705,7 @@ export default function Download() {
         {/* Footer */}
         <div
           className="px-6 py-4 text-center text-xs"
-          style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-400)', borderTop: '1px solid var(--color-neutral-100)' }}
+          style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-600)', borderTop: '1px solid var(--color-neutral-100)' }}
         >
           {t('download.thanks')}
         </div>
