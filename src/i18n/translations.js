@@ -387,8 +387,9 @@ export const translations = {
   'editor.tabUpload':      { id: 'Foto Sendiri', en: 'Your Photo' },
   'splash.start':          { id: 'Mulai', en: 'Start' },
   'upload.title':          { id: 'Tambahkan Foto dari HP Anda', en: 'Add a photo from your phone' },
-  'upload.hint':           { id: 'Pindai QR dengan HP untuk mengirim foto Anda sendiri. Foto langsung muncul di canvas.', en: 'Scan a QR with your phone to send your own photo. It appears on the canvas automatically.' },
+  'upload.hint':           { id: 'Pindai QR dengan HP untuk mengirim foto Anda sendiri. Foto langsung muncul di canvas. Ulangi untuk menambah foto lain — jumlahnya bebas.', en: 'Scan a QR with your phone to send your own photo. It appears on the canvas automatically. Repeat to add more photos — as many as you like.' },
   'upload.add':            { id: 'Tambah Foto', en: 'Add Photo' },
+  'upload.addMore':        { id: 'Tambah Foto Lagi', en: 'Add Another Photo' },
   'upload.scanHint':       { id: 'Pindai QR ini dengan kamera HP Anda.', en: 'Scan this QR with your phone camera.' },
   'upload.waitingPhone':   { id: 'Menunggu foto dari HP…', en: 'Waiting for the photo from your phone…' },
   'upload.qrFailed':       { id: 'Gagal membuat QR. Tutup lalu coba lagi.', en: 'Could not generate the QR. Close and try again.' },
@@ -408,7 +409,7 @@ export const translations = {
   'editor.tabText':        { id: 'Teks', en: 'Text' },
   'editor.tabFilters':     { id: 'Filter', en: 'Filters' },
   'editor.tabAi':          { id: 'AI', en: 'AI' },
-  'editor.toolSelect':     { id: 'Pilih', en: 'Select' },
+  'editor.toolClose':      { id: 'Tutup', en: 'Close' },
   'editor.tabHint':        { id: 'Ketuk untuk menambahkan', en: 'Tap to add' },
 
   // ── AI Transform ─────────────────────────────────────────────────────────────

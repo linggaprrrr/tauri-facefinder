@@ -23,7 +23,7 @@ export default function UploadPanel({ onAdd, awaitingCount, uploadedCount }) {
         className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
         style={{ background: 'var(--color-primary)', color: '#fff' }}
       >
-        <QrCode size={18} /> {t('upload.add')}
+        <QrCode size={18} /> {t(uploadedCount > 0 ? 'upload.addMore' : 'upload.add')}
       </button>
 
       {/* Live status — the whole point of the feature is that the canvas

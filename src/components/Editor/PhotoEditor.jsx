@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
-  Plus, Minus, Pencil, MousePointer, Loader2, QrCode,
+  Plus, Minus, Pencil, X, Loader2, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { readCachedBranding } from '../../hooks/useBranding';
@@ -332,7 +332,10 @@ function BackgroundImage({ src, filters, canvasW, canvasH, onLoad }) {
 
   useEffect(() => {
     if (status === 'loaded') {
-      if (imageRef.current) imageRef.current.cache();
+      if (imageRef.current) {
+        imageRef.current.cache();
+        imageRef.current.getLayer()?.batchDraw();
+      }
       onLoad?.(image.naturalWidth, image.naturalHeight);
     }
   }, [image, status, filters, onLoad]);
@@ -1265,10 +1268,11 @@ export default function PhotoEditor() {
             style={{ height: 1, background: 'var(--color-neutral-200)' }}
           />
 
-          {/* No-tool / deselect mode */}
+          {/* Closes whatever tool panel is open — the canvas stays fully
+              interactive either way, this just gets the drawer out of the way. */}
           <button
             onClick={() => setActivePanel(null)}
-            aria-label="Pilih elemen di canvas"
+            aria-label={t('editor.toolClose')}
             className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
             style={{
               width: 52, height: 52,
@@ -1278,9 +1282,9 @@ export default function PhotoEditor() {
               cursor: 'pointer',
             }}
           >
-            <MousePointer size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
+            <X size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
             <span style={{ fontSize: 9, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
-              {t('editor.toolSelect')}
+              {t('editor.toolClose')}
             </span>
           </button>
         </div>
