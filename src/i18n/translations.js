@@ -489,6 +489,8 @@ export const translations = {
   'filter.brightness': { id: 'Kecerahan', en: 'Brightness' },
   'filter.contrast':   { id: 'Kontras', en: 'Contrast' },
   'filter.reset':      { id: 'Reset Filter', en: 'Reset Filters' },
+  'filter.save':       { id: 'Simpan Filter', en: 'Save Filter' },
+  'filter.saved':      { id: 'Tersimpan', en: 'Saved' },
 
   // ── Frame panel ─────────────────────────────────────────────────────────────
   'frame.title':   { id: 'Layout Multi-Foto', en: 'Multi-Photo Layout' },

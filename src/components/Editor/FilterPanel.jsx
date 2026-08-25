@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import Konva from 'konva';
-import { RotateCcw } from 'lucide-react';
+import { Check, RotateCcw, Save } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
 const FILTER_PRESETS = [
@@ -10,8 +11,9 @@ const FILTER_PRESETS = [
   { id: 'blur',      labelKey: 'filter.blur',   filters: [Konva.Filters.Blur] },
 ];
 
-export default function FilterPanel({ filters, onChange }) {
+export default function FilterPanel({ filters, onChange, onSave }) {
   const { t } = useLang();
+  const [justSaved, setJustSaved] = useState(false);
   const labelStyle = { color: 'var(--color-neutral-600)', fontSize: '0.75rem', fontWeight: 600 };
 
   function applyPreset(preset) {
@@ -83,6 +85,28 @@ export default function FilterPanel({ filters, onChange }) {
           style={{ width: '100%', accentColor: 'var(--color-primary)' }}
         />
       </div>
+
+      {/* Filters were only committed on leaving the photo, so a customer who
+          filtered and then opened a frame found only the unfiltered original in
+          the slot picker. This commits it on the spot. */}
+      {onSave && (
+        <button
+          className="py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
+          style={{
+            background: justSaved ? 'var(--color-neutral-100)' : 'var(--color-primary)',
+            color: justSaved ? 'var(--color-neutral-600)' : '#fff',
+          }}
+          onClick={() => {
+            onSave();
+            setJustSaved(true);
+            setTimeout(() => setJustSaved(false), 1600);
+          }}
+        >
+          {justSaved
+            ? <><Check size={16} /> {t('filter.saved')}</>
+            : <><Save size={16} /> {t('filter.save')}</>}
+        </button>
+      )}
 
       <button
         className="py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
