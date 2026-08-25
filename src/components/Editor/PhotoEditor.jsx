@@ -1718,7 +1718,15 @@ export default function PhotoEditor() {
                 uploadedCount={renderElements.filter((el) => el.type === 'upload' && el.attrs.src).length + uploadedToListCount}
               />
             )}
-            {activePanel === 'filters'  && <FilterPanel filters={filters} onChange={setFilters} />}
+            {activePanel === 'filters'  && (
+              <FilterPanel
+                filters={filters}
+                onChange={setFilters}
+                // No save inside a layout: there the whole collage is the
+                // output, committed by "Save as new photo" instead.
+                onSave={isLayoutFrame ? undefined : exportAndSave}
+              />
+            )}
             {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} faceCount={currentPhotoFaceCount} />}
 
             {!activePanel && (
