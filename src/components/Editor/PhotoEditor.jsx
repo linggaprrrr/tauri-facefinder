@@ -625,6 +625,9 @@ export default function PhotoEditor() {
     if (frame.id !== prevLayoutFrameId.current) {
       prevLayoutFrameId.current = frame.id;
       setLayoutSlots([]);
+      // Picking a layout while zoomed in would otherwise leave the frame stuck
+      // at that magnification with no control left to undo it.
+      setView({ scale: 1, x: 0, y: 0 });
     }
   }, [isLayoutFrame, frame]);
 
@@ -1070,6 +1073,11 @@ export default function PhotoEditor() {
   // Zoom about a focal point, keeping whatever is under the fingers pinned,
   // then clamp so the artwork can never be pulled off its own frame.
   function zoomAround(nextScale, focal) {
+    // A layout frame is the printed artwork itself, not a photo being viewed:
+    // scaling the stage blew up the border and the watermark along with it.
+    // Inside a layout, zoom belongs to the photo in the slot (SlotPhotoLayer),
+    // which has its own pinch/wheel handlers.
+    if (isLayoutFrame) return;
     setView((v) => {
       const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
       const worldX = (focal.x - v.x) / v.scale;
@@ -1537,8 +1545,8 @@ export default function PhotoEditor() {
             onZoomIn={() => zoomAround(view.scale * 1.25, canvasCentre())}
             onZoomOut={() => zoomAround(view.scale / 1.25, canvasCentre())}
             onZoomReset={resetView}
-            canZoomIn={view.scale < MAX_ZOOM}
-            canZoomOut={view.scale > MIN_ZOOM}
+            canZoomIn={!isLayoutFrame && view.scale < MAX_ZOOM}
+            canZoomOut={!isLayoutFrame && view.scale > MIN_ZOOM}
           />
 
           {/* ── Filmstrip: horizontal photo queue below canvas ──
