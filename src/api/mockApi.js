@@ -414,13 +414,17 @@ export async function getAiTemplates(outletId, etag = null) {
 }
 
 // Persist a client-rendered frame/collage as a free Photo. Returns { image_url, photo_id }.
-export async function createCompositePhoto({ outletId, sourcePhotoId, imageBase64, templateId, stickerIds }) {
+export async function createCompositePhoto({ outletId, sourcePhotoId, sourcePhotoIds, imageBase64, templateId, stickerIds }) {
   const res = await fetch(`${API_BASE}/kiosk-render/composite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'api-key': KIOSK_API_KEY },
     body: JSON.stringify({
       device_id: outletId,
       source_photo_id: sourcePhotoId ?? null,
+      // The backend photo ids this render is built from. Checkout keeps the
+      // result free only when they are bought alongside it, so a collage of
+      // paid photos can't be checked out on its own for Rp 0.
+      source_photo_ids: sourcePhotoIds?.length ? sourcePhotoIds : null,
       image_base64: imageBase64,
       template_id: templateId ?? null,
       sticker_ids: stickerIds ?? null,

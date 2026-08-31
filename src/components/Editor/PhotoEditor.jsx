@@ -731,9 +731,16 @@ export default function PhotoEditor() {
       const stickerIds = [...new Set(
         elements.filter((el) => el.type === 'sticker' && el.stickerId).map((el) => el.stickerId)
       )];
+      // Cart ids of the filled slots, and the backend photo ids behind them:
+      // the first scopes the cart's own cascade, the second is what the server
+      // checks the order against.
+      const slotIds = [...new Set(layoutSlots.filter((s) => s?.photoId).map((s) => s.photoId))];
       const result = await createCompositePhoto({
         outletId,
         sourcePhotoId: currentPhoto?.photo_id ?? null,
+        sourcePhotoIds: slotIds
+          .map((sid) => selectedPhotos.find((p) => p.id === sid)?.photo_id)
+          .filter(Boolean),
         imageBase64: dataUrl,
         templateId: isLayoutFrame ? frame.id : null,
         stickerIds: stickerIds.length ? stickerIds : null,
@@ -741,7 +748,14 @@ export default function PhotoEditor() {
       const newIndex = selectedPhotos.length; // appended at end by ADD_COMPOSITE_PHOTO
       dispatch({
         type: 'ADD_COMPOSITE_PHOTO',
-        payload: { url: result.image_url, photoId: result.photo_id, filename: frame?.label ? `Frame · ${frame.label}` : 'Frame' },
+        payload: {
+          url: result.image_url,
+          photoId: result.photo_id,
+          filename: frame?.label ? `Frame · ${frame.label}` : 'Frame',
+          // The cart photos this collage is made of. It is free only because
+          // they are paid for alongside it, so the cart drops it if they go.
+          sourceIds: slotIds,
+        },
       });
       // Reset the frame on the current photo and jump to the new collage output.
       setFrame('none');
@@ -860,6 +874,7 @@ export default function PhotoEditor() {
         price: 0,                        // AI photo is free; the free transform covers it
         filename: aiJob.template?.label ? `AI · ${aiJob.template.label}` : 'AI Photo',
         sourcePhotoId: currentPhoto?.photo_id ?? null,
+        sourceIds: currentPhoto ? [currentPhoto.id] : [],
       },
     });
     aiJobRef.current++;
