@@ -763,11 +763,7 @@ export default function PhotoEditor() {
         },
       });
       // Reset the frame on the current photo and jump to the new collage output.
-      setFrame('none');
-      setLayoutSlots([]);
-      setSelectedId(null);
-      setActivePanel(defaultPanel);
-      setPhotoIndex(newIndex);
+      jumpToNewPhoto(newIndex);
     } catch (err) {
       console.error('Failed to commit collage:', err);
       setToast(t('frame.commitError'));
@@ -812,6 +808,23 @@ export default function PhotoEditor() {
     setView({ scale: 1, x: 0, y: 0 });
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
+    setPhotoIndex(newIndex);
+  }
+
+  // A brand-new output (collage, AI result, phone upload) is appended to the end
+  // of the filmstrip and has no saved edit of its own, so there is nothing to
+  // restore — but setPhotoIndex alone leaves the PREVIOUS photo's filters,
+  // stickers and frame mounted on top of it. That is how an Invert filter ended
+  // up repainting a freshly saved collage, and how its stickers came back
+  // doubled over the ones already baked into the render.
+  function jumpToNewPhoto(newIndex) {
+    resetHistory([]);
+    setFilters(DEFAULT_FILTERS);
+    setFrame('none');
+    setLayoutSlots([]);
+    setSelectedId(null);
+    setActivePanel(defaultPanel);
+    setView({ scale: 1, x: 0, y: 0 });
     setPhotoIndex(newIndex);
   }
 
@@ -885,7 +898,7 @@ export default function PhotoEditor() {
     aiJobRef.current++;
     setAiResultOpen(false);
     dispatch({ type: 'SET_AI_JOB', payload: null });
-    setPhotoIndex(newIndex); // jump to the new AI photo so the customer sees it
+    jumpToNewPhoto(newIndex); // jump to the new AI photo so the customer sees it
   }
 
   // Discard / try another / dismiss — does NOT consume the free transform.
@@ -985,7 +998,7 @@ export default function PhotoEditor() {
       const newIndex = selectedPhotos.length;
       dispatch({ type: 'ADD_COMPOSITE_PHOTO', payload: { url: result.image_url, photoId: result.photo_id, filename: 'Foto Sendiri' } });
       setUploadedToListCount((n) => n + 1);
-      setPhotoIndex(newIndex);
+      jumpToNewPhoto(newIndex);
     } catch (err) {
       console.error('Failed to add phone upload as a new photo:', err);
       setToast(t('frame.commitError'));
