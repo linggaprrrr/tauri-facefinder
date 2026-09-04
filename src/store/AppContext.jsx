@@ -34,7 +34,9 @@ const initialState = {
   uploadSessionId: crypto.randomUUID(),
 };
 
-function reducer(state, action) {
+// Exported for src/store/cartRemoval.test.js — the free-checkout guard below.
+// eslint-disable-next-line react-refresh/only-export-components
+export function reducer(state, action) {
   switch (action.type) {
     case 'SET_CAPTURED_FACE':
       return { ...state, capturedFace: action.payload };
@@ -55,6 +57,8 @@ function reducer(state, action) {
         filename: action.payload.filename ?? 'AI Photo',
         photo_id: action.payload.photoId ?? null, // real backend Photo id → checkout resolves it
         sourcePhotoId: action.payload.sourcePhotoId ?? null,
+        // Cart ids of the photos this was derived from — see TOGGLE_PHOTO.
+        sourceIds: action.payload.sourceIds ?? [],
         isAiGenerated: true,
       };
       return {
@@ -73,6 +77,10 @@ function reducer(state, action) {
         price: 0,                                  // free, like AI photos
         filename: action.payload.filename ?? 'Frame',
         photo_id: action.payload.photoId ?? null,  // real backend Photo id → checkout resolves it
+        // Cart ids of the photos in its slots — see TOGGLE_PHOTO. A phone
+        // upload commits through here too and has none: it is the customer's
+        // own picture, free on its own terms, so nothing can orphan it.
+        sourceIds: action.payload.sourceIds ?? [],
         isComposite: true,
       };
       return {
@@ -81,18 +89,40 @@ function reducer(state, action) {
       };
     }
     case 'TOGGLE_PHOTO': {
-      const exists = state.selectedPhotos.some((p) => p.id === action.payload.id);
+      const { id } = action.payload;
+      if (!state.selectedPhotos.some((p) => p.id === id)) {
+        return { ...state, selectedPhotos: [...state.selectedPhotos, action.payload] };
+      }
+      // A derived photo (AI result, frame collage) is priced 0 because the
+      // photos it was built from are paid for in the SAME order. Removing a
+      // source and keeping the derivative broke that: delete every paid photo
+      // from the cart and the collage of them checked out for Rp 0.
+      // Repeat until stable — a collage slot can hold another derived photo.
+      const dropped = new Set([id]);
+      let keep = state.selectedPhotos.filter((p) => p.id !== id);
+      let before;
+      do {
+        before = keep.length;
+        keep = keep.filter((p) => {
+          if (!p.sourceIds?.some((sid) => dropped.has(sid))) return true;
+          dropped.add(p.id);
+          return false;
+        });
+      } while (keep.length !== before);
+
+      // Print lines naming a photo that just left the cart. Resolved from
+      // state, not from the payload: Cart dispatches only { id }, so reading
+      // action.payload.photo_id here pruned nothing and left a removed photo's
+      // print still billed.
+      const goneIds = state.selectedPhotos
+        .filter((p) => dropped.has(p.id))
+        .map((p) => p.photo_id)
+        .filter(Boolean);
       return {
         ...state,
-        selectedPhotos: exists
-          ? state.selectedPhotos.filter((p) => p.id !== action.payload.id)
-          : [...state.selectedPhotos, action.payload],
-        // Cart composition just changed — a print line may reference a photo
-        // that is no longer in the cart. Drop only the lines that actually
-        // named it; clearing every line would punish someone who added a
-        // second photo after configuring their prints.
+        selectedPhotos: keep,
         printItems: state.printItems.filter(
-          (item) => !item.photoIds?.includes(action.payload.photo_id)
+          (item) => !item.photoIds?.some((pid) => goneIds.includes(pid))
         ),
       };
     }

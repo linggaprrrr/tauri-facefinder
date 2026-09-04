@@ -8,6 +8,7 @@ import {
   Plus, Minus, Pencil, X, Loader2, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
+import { clampPan, nextView } from '../../utils/viewTransform';
 import { readCachedBranding } from '../../hooks/useBranding';
 import { useLang } from '../../i18n/LanguageContext';
 import { useHistory } from '../../hooks/useHistory';
@@ -602,9 +603,13 @@ export default function PhotoEditor() {
   const [showDoneWarning, setShowDoneWarning] = useState(false);
   const [committingFrame, setCommittingFrame] = useState(false); // collage → new output upload
   const [toast, setToast] = useState(null);
-  // View-only zoom/pan for the touchscreen — see zoomAround() below.
+  // View-only zoom/pan for the touchscreen — see zoomBy() below.
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
   const pinchRef = useRef(null);
+  const tweenRef = useRef(0);
+  const [panning, setPanning] = useState(false);
+
+  useEffect(() => () => cancelAnimationFrame(tweenRef.current), []);
 
   // When navigating back to the editor with a completed AI job, re-open the result modal.
   useEffect(() => {
@@ -731,9 +736,16 @@ export default function PhotoEditor() {
       const stickerIds = [...new Set(
         elements.filter((el) => el.type === 'sticker' && el.stickerId).map((el) => el.stickerId)
       )];
+      // Cart ids of the filled slots, and the backend photo ids behind them:
+      // the first scopes the cart's own cascade, the second is what the server
+      // checks the order against.
+      const slotIds = [...new Set(layoutSlots.filter((s) => s?.photoId).map((s) => s.photoId))];
       const result = await createCompositePhoto({
         outletId,
         sourcePhotoId: currentPhoto?.photo_id ?? null,
+        sourcePhotoIds: slotIds
+          .map((sid) => selectedPhotos.find((p) => p.id === sid)?.photo_id)
+          .filter(Boolean),
         imageBase64: dataUrl,
         templateId: isLayoutFrame ? frame.id : null,
         stickerIds: stickerIds.length ? stickerIds : null,
@@ -741,14 +753,17 @@ export default function PhotoEditor() {
       const newIndex = selectedPhotos.length; // appended at end by ADD_COMPOSITE_PHOTO
       dispatch({
         type: 'ADD_COMPOSITE_PHOTO',
-        payload: { url: result.image_url, photoId: result.photo_id, filename: frame?.label ? `Frame · ${frame.label}` : 'Frame' },
+        payload: {
+          url: result.image_url,
+          photoId: result.photo_id,
+          filename: frame?.label ? `Frame · ${frame.label}` : 'Frame',
+          // The cart photos this collage is made of. It is free only because
+          // they are paid for alongside it, so the cart drops it if they go.
+          sourceIds: slotIds,
+        },
       });
       // Reset the frame on the current photo and jump to the new collage output.
-      setFrame('none');
-      setLayoutSlots([]);
-      setSelectedId(null);
-      setActivePanel(defaultPanel);
-      setPhotoIndex(newIndex);
+      jumpToNewPhoto(newIndex);
     } catch (err) {
       console.error('Failed to commit collage:', err);
       setToast(t('frame.commitError'));
@@ -793,6 +808,23 @@ export default function PhotoEditor() {
     setView({ scale: 1, x: 0, y: 0 });
     const cached = orientationCache.current[selectedPhotos[newIndex].id];
     if (cached) setCanvas(fitDimensions(cached.natW, cached.natH, maxCanvasW, maxCanvasH));
+    setPhotoIndex(newIndex);
+  }
+
+  // A brand-new output (collage, AI result, phone upload) is appended to the end
+  // of the filmstrip and has no saved edit of its own, so there is nothing to
+  // restore — but setPhotoIndex alone leaves the PREVIOUS photo's filters,
+  // stickers and frame mounted on top of it. That is how an Invert filter ended
+  // up repainting a freshly saved collage, and how its stickers came back
+  // doubled over the ones already baked into the render.
+  function jumpToNewPhoto(newIndex) {
+    resetHistory([]);
+    setFilters(DEFAULT_FILTERS);
+    setFrame('none');
+    setLayoutSlots([]);
+    setSelectedId(null);
+    setActivePanel(defaultPanel);
+    setView({ scale: 1, x: 0, y: 0 });
     setPhotoIndex(newIndex);
   }
 
@@ -860,12 +892,13 @@ export default function PhotoEditor() {
         price: 0,                        // AI photo is free; the free transform covers it
         filename: aiJob.template?.label ? `AI · ${aiJob.template.label}` : 'AI Photo',
         sourcePhotoId: currentPhoto?.photo_id ?? null,
+        sourceIds: currentPhoto ? [currentPhoto.id] : [],
       },
     });
     aiJobRef.current++;
     setAiResultOpen(false);
     dispatch({ type: 'SET_AI_JOB', payload: null });
-    setPhotoIndex(newIndex); // jump to the new AI photo so the customer sees it
+    jumpToNewPhoto(newIndex); // jump to the new AI photo so the customer sees it
   }
 
   // Discard / try another / dismiss — does NOT consume the free transform.
@@ -965,7 +998,7 @@ export default function PhotoEditor() {
       const newIndex = selectedPhotos.length;
       dispatch({ type: 'ADD_COMPOSITE_PHOTO', payload: { url: result.image_url, photoId: result.photo_id, filename: 'Foto Sendiri' } });
       setUploadedToListCount((n) => n + 1);
-      setPhotoIndex(newIndex);
+      jumpToNewPhoto(newIndex);
     } catch (err) {
       console.error('Failed to add phone upload as a new photo:', err);
       setToast(t('frame.commitError'));
@@ -1070,30 +1103,49 @@ export default function PhotoEditor() {
      where the finger is — which a CSS transform on the wrapper would break.
      exportStage() resets this before capture, so none of it reaches the file. */
 
-  // Zoom about a focal point, keeping whatever is under the fingers pinned,
-  // then clamp so the artwork can never be pulled off its own frame.
-  function zoomAround(nextScale, focal) {
-    // A layout frame is the printed artwork itself, not a photo being viewed:
-    // scaling the stage blew up the border and the watermark along with it.
-    // Inside a layout, zoom belongs to the photo in the slot (SlotPhotoLayer),
-    // which has its own pinch/wheel handlers.
-    if (isLayoutFrame) return;
-    setView((v) => {
-      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
-      const worldX = (focal.x - v.x) / v.scale;
-      const worldY = (focal.y - v.y) / v.scale;
-      const minX = activeCanvas.width  - activeCanvas.width  * scale;
-      const minY = activeCanvas.height - activeCanvas.height * scale;
-      return {
-        scale,
-        x: Math.min(0, Math.max(minX, focal.x - worldX * scale)),
-        y: Math.min(0, Math.max(minY, focal.y - worldY * scale)),
-      };
-    });
+  const canvasCentre = () => ({ x: activeCanvas.width / 2, y: activeCanvas.height / 2 });
+  const { width: cw, height: ch } = activeCanvas;
+  // Bound to this canvas; the maths itself lives in utils/viewTransform.js so
+  // the focal-point arithmetic is testable without a stage.
+  const boundPan = (pos) => clampPan(pos, view.scale, cw, ch);
+  const zoomed = (v, factor, focal) => nextView(v, factor, focal, cw, ch, MIN_ZOOM, MAX_ZOOM);
+
+  // A layout frame is the printed artwork itself, not a photo being viewed:
+  // scaling the stage blew up the border and the watermark along with it.
+  // Inside a layout, zoom belongs to the photo in the slot (SlotPhotoLayer),
+  // which has its own pinch/wheel handlers.
+  const canZoom = !isLayoutFrame;
+
+  // Continuous input (wheel, pinch) applies on the spot — easing it would put
+  // the canvas behind the finger. Functional update, so a burst of events in
+  // one frame compounds instead of all resolving against the same old scale.
+  function zoomBy(factor, focal) {
+    if (!canZoom) return;
+    cancelAnimationFrame(tweenRef.current);
+    setView((v) => zoomed(v, factor, focal));
   }
 
-  const canvasCentre = () => ({ x: activeCanvas.width / 2, y: activeCanvas.height / 2 });
-  const resetView = () => setView({ scale: 1, x: 0, y: 0 });
+  // Discrete input (the +/− buttons, reset) eases to its target — that is the
+  // only place a transition reads as polish rather than lag.
+  function animateView(target, ms = 200) {
+    cancelAnimationFrame(tweenRef.current);
+    const from = view;
+    const t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms);
+      const e = 1 - (1 - k) ** 3; // ease-out cubic
+      setView({
+        scale: from.scale + (target.scale - from.scale) * e,
+        x: from.x + (target.x - from.x) * e,
+        y: from.y + (target.y - from.y) * e,
+      });
+      if (k < 1) tweenRef.current = requestAnimationFrame(step);
+    };
+    tweenRef.current = requestAnimationFrame(step);
+  }
+
+  const zoomTo = (factor, focal) => canZoom && animateView(zoomed(view, factor, focal));
+  const resetView = () => { cancelAnimationFrame(tweenRef.current); setView({ scale: 1, x: 0, y: 0 }); };
 
   function handleStageTouchMove(e) {
     const touches = e.evt.touches;
@@ -1108,28 +1160,23 @@ export default function PhotoEditor() {
     };
     // The first move of a gesture only establishes the baseline. Applying a
     // ratio against a stale distance is what makes pinch jump on frame one.
-    if (pinchRef.current) zoomAround(view.scale * (dist / pinchRef.current.dist), focal);
+    if (pinchRef.current) zoomBy(dist / pinchRef.current.dist, focal);
     pinchRef.current = { dist };
   }
 
   function handleStageWheel(e) {
     e.evt.preventDefault();
     const stage = e.target.getStage();
-    zoomAround(
-      view.scale * (e.evt.deltaY < 0 ? 1.08 : 1 / 1.08),
-      stage.getPointerPosition() ?? canvasCentre()
+    // Exponential in the raw delta, not a fixed step: a trackpad sends many
+    // tiny deltas and a mouse wheel a few coarse ones, and one 8%-per-event
+    // step made the first crawl and the second lurch. deltaMode 1 is lines.
+    // A trackpad pinch arrives as ctrlKey+wheel — same gesture, steeper gain.
+    const raw = e.evt.deltaMode === 1 ? e.evt.deltaY * 16 : e.evt.deltaY;
+    const delta = Math.max(-120, Math.min(120, raw));
+    zoomBy(
+      Math.exp(-delta * (e.evt.ctrlKey || e.evt.metaKey ? 0.01 : 0.003)),
+      stage.getPointerPosition() ?? canvasCentre(),
     );
-  }
-
-  // Pan bounds, recomputed per drag rather than stored: the zoom level can
-  // change between drags and a stale bound would let the photo drift off-frame.
-  function clampPan(pos) {
-    const minX = activeCanvas.width  - activeCanvas.width  * view.scale;
-    const minY = activeCanvas.height - activeCanvas.height * view.scale;
-    return {
-      x: Math.min(0, Math.max(minX, pos.x)),
-      y: Math.min(0, Math.max(minY, pos.y)),
-    };
   }
 
   // Toggle sidebar tool — clicking active tool collapses panel
@@ -1317,6 +1364,7 @@ export default function PhotoEditor() {
               // canvas — preventDefault alone loses that race on a passive
               // listener.
               touchAction: 'none',
+              cursor: view.scale > 1 ? (panning ? 'grabbing' : 'grab') : 'default',
             }}
           >
             {isLoading && !isLayoutFrame && (
@@ -1345,9 +1393,22 @@ export default function PhotoEditor() {
               // Pan only once there is something to pan to; a draggable stage at
               // 1:1 would let the customer shove the photo out of its frame.
               draggable={view.scale > 1}
-              dragBoundFunc={clampPan}
+              dragBoundFunc={boundPan}
+              onDragStart={(e) => {
+                if (e.target !== e.target.getStage()) return;
+                cancelAnimationFrame(tweenRef.current); // a pan cancels an in-flight ease
+                setPanning(true);
+              }}
+              // Synced every frame, not just at the end: any re-render during
+              // the drag (a wheel, a panel opening) reset the Stage to the
+              // stale x/y prop and the canvas jumped back under the finger.
+              onDragMove={(e) => {
+                const node = e.target;
+                if (node === node.getStage()) setView((v) => ({ ...v, x: node.x(), y: node.y() }));
+              }}
               onDragEnd={(e) => {
                 const node = e.target;
+                setPanning(false);
                 if (node === node.getStage()) setView((v) => ({ ...v, x: node.x(), y: node.y() }));
               }}
               onMouseDown={handleStageClick}
@@ -1542,8 +1603,8 @@ export default function PhotoEditor() {
             canUndo={canUndo} canRedo={canRedo}
             onUndo={undo} onRedo={redo}
             zoom={view.scale}
-            onZoomIn={() => zoomAround(view.scale * 1.25, canvasCentre())}
-            onZoomOut={() => zoomAround(view.scale / 1.25, canvasCentre())}
+            onZoomIn={() => zoomTo(1.25, canvasCentre())}
+            onZoomOut={() => zoomTo(1 / 1.25, canvasCentre())}
             onZoomReset={resetView}
             canZoomIn={!isLayoutFrame && view.scale < MAX_ZOOM}
             canZoomOut={!isLayoutFrame && view.scale > MIN_ZOOM}
