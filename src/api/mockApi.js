@@ -44,8 +44,12 @@ function similarityLabel(score) {
   return 'Mungkin anda';
 }
 
-// Call the real face-search API, returns matched photos
-export async function scanFace(base64Image, timeoutMs = 20000) {
+// Call the real face-search API, returns matched photos.
+// 45s, not 20: the request is a ~250KB upload plus detect + embed + vector
+// search, and on a busy outlet uplink 20s was aborting scans that the server
+// went on to answer — the customer read that as "Koneksi terputus" while the
+// link was in fact up (the /health heartbeat kept passing right through it).
+export async function scanFace(base64Image, timeoutMs = 45000) {
   const blob = base64ToBlob(base64Image);
   const form = new FormData();
   form.append('file', blob, 'face.jpg');
