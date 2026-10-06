@@ -33,7 +33,7 @@ export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], l
       {!layoutLoading && layoutFrames.length === 0 && (
         <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{t('frame.empty')}</p>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 sm:portrait:grid-cols-4 gap-2">
         {/* None option — always first */}
         <button
           onClick={() => onSelect('none')}
