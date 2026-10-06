@@ -125,17 +125,18 @@ export default function FaceScan() {
         </div>
 
         {/* Camera / loading area — responsive: fills width on phones, capped at
-            640px on desktop, with a 4:3 box so it never overflows the viewport. */}
+            640px on a landscape screen (880px on a portrait one, which has the
+            height to spare), with a 4:3 box so it never overflows the viewport. */}
         {status === 'scanning' ? (
           <div
-            className="w-full max-w-[640px] aspect-[4/3] flex items-center justify-center rounded-3xl"
+            className="w-full max-w-[640px] portrait:max-w-[880px] aspect-[4/3] flex items-center justify-center rounded-3xl"
             style={{ background: 'var(--color-primary-50)' }}
           >
             <LoadingSpinner message={t('scan.scanningFace')} />
           </div>
         ) : (
           <div
-            className="relative rounded-3xl overflow-hidden w-full max-w-[640px] aspect-[4/3]"
+            className="relative rounded-3xl overflow-hidden w-full max-w-[640px] portrait:max-w-[880px] aspect-[4/3]"
             style={{
               boxShadow: 'var(--shadow-pop)',
               border: '4px solid #fff',

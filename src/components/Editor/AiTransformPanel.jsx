@@ -78,7 +78,7 @@ export default function AiTransformPanel({ templates, loading, onGenerate, aiTra
         </div>
 
         {/* Template list */}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col sm:portrait:grid sm:portrait:grid-cols-3 gap-1.5">
           {templates.map((tpl) => {
             const isActive = selected === tpl.id;
             return (

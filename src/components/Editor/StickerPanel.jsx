@@ -76,7 +76,9 @@ export default function StickerPanel({ onAdd, stickers = [], loading = false }) 
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5">
+        // On a portrait kiosk this panel is a full-width row under the canvas
+        // (see PhotoEditor), so 2 columns would make ~500px tiles.
+        <div className="grid grid-cols-2 sm:portrait:grid-cols-5 gap-2.5">
           {visible.map((s) => (
             <button
               key={s.id}

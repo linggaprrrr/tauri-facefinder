@@ -28,7 +28,7 @@ export default function FilterPanel({ filters, onChange, onSave }) {
   return (
     <div className="flex flex-col gap-4">
       {/* Preset grid */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 sm:portrait:grid-cols-4 gap-2">
         {FILTER_PRESETS.map((p) => (
           <button
             key={p.id}

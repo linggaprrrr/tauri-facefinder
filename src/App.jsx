@@ -137,13 +137,16 @@ function Layout() {
   const forced = !isConfigured;
 
   return (
-    <div className="app-bg min-h-screen flex flex-col">
+    /* Kiosk sizes lock to the screen so <main> is the scroll box and pages can
+       fill it (h-full) — on a tall portrait screen the gallery/editor action
+       bars otherwise float mid-screen. Phones keep window scrolling (ScrollHint). */
+    <div className="app-bg min-h-screen sm:h-screen flex flex-col">
       {/* Connectivity banner — sits above the header when the server is unreachable */}
       <OfflineBanner />
 
       {/* Header — frosted festive bar, brand mark left, stepper center */}
       <header
-        className="flex items-center justify-between px-3 sm:px-8 py-2 sm:py-3 shrink-0 sticky top-0 z-30"
+        className="flex flex-wrap items-center justify-between px-3 sm:px-8 py-2 sm:py-3 shrink-0 sticky top-0 z-30"
         style={{
           background: 'rgba(255,255,255,0.82)',
           backdropFilter: 'blur(12px)',
@@ -169,8 +172,10 @@ function Layout() {
           </div>
         </div>
 
-        {/* Step indicator — centered (hidden on phones to save header width) */}
-        <div className="hidden sm:flex">
+        {/* Step indicator — centered (hidden on phones to save header width).
+            Below xl (a portrait kiosk is ~1080px wide) it can't share the row
+            with the brand and controls, so it drops to a full-width row. */}
+        <div className="hidden sm:flex justify-center order-last basis-full xl:order-none xl:basis-auto">
           <StepIndicator current={step} />
         </div>
 
