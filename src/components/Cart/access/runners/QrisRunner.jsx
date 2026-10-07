@@ -270,13 +270,15 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
 
       {/* ── QRIS Payment Screen ── */}
       {status === 'waiting' && transaction && (
-        <div className="flex flex-col sm:flex-row gap-6 w-full items-stretch sm:items-start">
+        // Stacked on a portrait kiosk: beside the 620px DOKU frame the order
+        // summary was squeezed to ~150px.
+        <div className="flex flex-col sm:flex-row sm:portrait:flex-col gap-6 w-full items-stretch sm:items-start sm:portrait:items-stretch">
 
           {/* Left: DOKU payment gateway card — sized to be the focal point;
               DOKU's own hosted page already shows its payment countdown, so
               we don't duplicate one here. */}
           <div
-            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto"
+            className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto sm:portrait:w-full"
             style={{
               background: '#fff',
               boxShadow: 'var(--shadow-xl)',

@@ -180,8 +180,10 @@ export default function Gallery() {
       ) : (
         /* Uniform grid, capped at 5 columns. It used to widen to 8 on a large
            kiosk screen, which pushed each photo below the size where a face is
-           recognisable — the one thing the customer is scanning for. */
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 flex-1 overflow-y-auto pb-4 no-scrollbar content-start">
+           recognisable — the one thing the customer is scanning for. A portrait
+           kiosk gets 2 for the same reason: 3 left half the screen empty and
+           every face small. */
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 sm:portrait:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 flex-1 overflow-y-auto pb-4 no-scrollbar content-start">
           {visiblePhotos.map((photo) => {
             const orderIdx = selectedPhotos.findIndex((p) => p.id === photo.id);
             const isSelected = orderIdx !== -1;

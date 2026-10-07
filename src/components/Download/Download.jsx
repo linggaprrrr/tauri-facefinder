@@ -380,7 +380,10 @@ export default function Download() {
 
 
   return (
-    <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-start justify-center w-full max-w-4xl mx-auto py-4 sm:py-8">
+    // Portrait kiosk: stacked and vertically centred with a bigger QR. Side by
+    // side they squeezed into the top third of a tall screen around a QR the
+    // customer has to scan from arm's length.
+    <div className="flex flex-col sm:flex-row sm:portrait:flex-col gap-6 sm:gap-8 items-stretch sm:items-start sm:portrait:items-stretch justify-center w-full max-w-4xl sm:portrait:max-w-2xl sm:portrait:min-h-full sm:portrait:pb-32 mx-auto py-4 sm:py-8">
 
       {/* Floating, not inline: this screen scrolls on shorter kiosk panels, and
           a countdown that scrolls out of view is the same as resetting without
@@ -388,10 +391,9 @@ export default function Download() {
           pointer-events-none so it can never swallow a tap meant for the
           receipt underneath — every tap here restarts the clock. */}
       <div
-        className="fixed z-50 pointer-events-none flex flex-col items-center px-8 py-4 rounded-3xl"
+        // Bottom-right on portrait: top-right sits on the header's step bar there.
+        className="fixed z-50 pointer-events-none flex flex-col items-center px-8 py-4 rounded-3xl top-6 right-6 sm:portrait:top-auto sm:portrait:bottom-6"
         style={{
-          top: 24,
-          right: 24,
           background: '#fff',
           boxShadow: 'var(--shadow-xl)',
           border: `2px solid ${secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-200)'}`,
@@ -432,7 +434,7 @@ export default function Download() {
             className="p-4 rounded-2xl"
             style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}
           >
-            <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#013F65" />
+            <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#013F65" className="sm:portrait:w-80 sm:portrait:h-80" />
           </div>
 
           <p className="font-mono text-xs text-center break-all" style={{ color: 'var(--color-neutral-600)' }}>
@@ -583,7 +585,7 @@ export default function Download() {
 
       {/* ── Right: Receipt ── */}
       <div
-        className="w-full sm:flex-1 rounded-3xl overflow-hidden"
+        className="w-full sm:flex-1 sm:portrait:flex-none rounded-3xl overflow-hidden"
         style={{
           background: '#fff',
           boxShadow: 'var(--shadow-xl)',
