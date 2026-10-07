@@ -368,6 +368,7 @@ export const translations = {
   'editor.done':           { id: 'Selesai', en: 'Done' },
   'editor.next':           { id: 'Lanjut', en: 'Next' },
   'editor.loadingPhoto':   { id: 'Memuat foto…', en: 'Loading photo…' },
+  'editor.loadFailed':    { id: 'Foto gagal dimuat.', en: 'Couldn\'t load this photo.' },
   'editor.loadingSlots':   { id: 'Memuat konfigurasi slot…', en: 'Loading slot configuration…' },
   'editor.slot':           { id: 'Slot {n}', en: 'Slot {n}' },
   'editor.noPhotos':       { id: 'Tidak ada foto dipilih.', en: 'No photos selected.' },

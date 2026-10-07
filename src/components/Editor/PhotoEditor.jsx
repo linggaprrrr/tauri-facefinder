@@ -327,11 +327,14 @@ function StickerShape({ element, isSelected, onSelect, onChange }) {
   );
 }
 
-function BackgroundImage({ src, filters, canvasW, canvasH, onLoad }) {
+function BackgroundImage({ src, filters, canvasW, canvasH, onLoad, onError }) {
   const [image, status] = useImage(src, 'anonymous');
   const imageRef = useRef(null);
 
   useEffect(() => {
+    // useImage has no timeout or retry: without this a 404 / CORS / network
+    // failure leaves the "Loading photo…" overlay up forever.
+    if (status === 'failed') onError?.();
     if (status === 'loaded') {
       if (imageRef.current) {
         imageRef.current.cache();
@@ -339,7 +342,7 @@ function BackgroundImage({ src, filters, canvasW, canvasH, onLoad }) {
       }
       onLoad?.(image.naturalWidth, image.naturalHeight);
     }
-  }, [image, status, filters, onLoad]);
+  }, [image, status, filters, onLoad, onError]);
 
   return (
     <KonvaImage
@@ -657,6 +660,9 @@ export default function PhotoEditor() {
   }, [isLayoutFrame, frame]);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0); // bump to remount BackgroundImage = refetch
+  const handleImageError = useCallback(() => setLoadFailed(true), []);
   const photoUrl = currentPhoto?.proxyUrl ?? currentPhoto?.url;
   const orientationCache = useRef({});
 
@@ -669,6 +675,7 @@ export default function PhotoEditor() {
     orientationCache.current[currentPhoto.id] = { natW, natH };
     setCanvas(fitDimensions(natW, natH, maxCanvasW, maxCanvasH));
     setIsLoading(false);
+    setLoadFailed(false);
   }, [currentPhoto?.id, maxCanvasW, maxCanvasH]);
 
   useEffect(() => {
@@ -676,6 +683,10 @@ export default function PhotoEditor() {
       const src = photo.proxyUrl ?? photo.url;
       if (!src || orientationCache.current[photo.id]) return;
       const img = new Image();
+      // Must match useImage's 'anonymous': MinIO only sends CORS headers when
+      // asked, and WebView2 (Windows) reuses this cached no-CORS response for
+      // BackgroundImage's CORS request, which then fails — editor stuck loading.
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
         // Cache natural size, not fitted dims, so canvas can re-fit on resize.
         orientationCache.current[photo.id] = { natW: img.naturalWidth, natH: img.naturalHeight };
@@ -683,6 +694,8 @@ export default function PhotoEditor() {
       img.src = src;
     });
   }, [selectedPhotos]);
+
+  useEffect(() => { setLoadFailed(false); }, [photoUrl]);
 
   useEffect(() => {
     if (!photoUrl) return;
@@ -1402,6 +1415,24 @@ export default function PhotoEditor() {
                 </span>
               </div>
             )}
+            {loadFailed && !isLayoutFrame && (
+              <div
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3"
+                style={{ background: 'var(--color-neutral-100)' }}
+              >
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-700)' }}>
+                  {t('editor.loadFailed')}
+                </span>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                  style={{ background: 'var(--color-primary-500)' }}
+                  onClick={() => { setLoadFailed(false); setLoadAttempt((n) => n + 1); }}
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
+            )}
             <Stage
               key={`${activeCanvas.width}x${activeCanvas.height}`}
               width={activeCanvas.width}
@@ -1443,11 +1474,13 @@ export default function PhotoEditor() {
               <Layer>
                 {!isLayoutFrame && photoUrl && (
                   <BackgroundImage
+                    key={loadAttempt}
                     src={photoUrl}
                     filters={filters}
                     canvasW={activeCanvas.width}
                     canvasH={activeCanvas.height}
                     onLoad={handleImageLoad}
+                    onError={handleImageError}
                   />
                 )}
 
