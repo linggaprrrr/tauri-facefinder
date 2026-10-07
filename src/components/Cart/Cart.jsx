@@ -151,7 +151,7 @@ export default function Cart() {
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full py-4 sm:py-6">
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full min-h-full py-4 sm:py-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-h1 font-black on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
           {t('cart.title')}
@@ -173,8 +173,10 @@ export default function Cart() {
         /* Two columns: the order on the left, what it costs on the right.
            The summary was previously a band at the bottom of a single column,
            so on a long order the total — and the pay button — sat below the
-           fold while the customer was still deciding. */
-        <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] items-start">
+           fold while the customer was still deciding. A portrait kiosk is too
+           narrow for two columns, so there the summary docks to the bottom
+           instead — same thumb zone as the gallery and editor action bars. */
+        <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] items-start flex-1 sm:portrait:grid-rows-[1fr_auto]">
 
           {/* ── Left: order lines ── */}
           <div className="flex flex-col gap-3 min-w-0">
@@ -192,7 +194,7 @@ export default function Cart() {
                   <div className="flex gap-2 shrink-0">
                     {/* Original */}
                     <div className="flex flex-col items-center gap-1">
-                      <div className="rounded-lg overflow-hidden" style={{ width: 80, height: 80 }}>
+                      <div className="rounded-lg overflow-hidden w-20 h-20 sm:portrait:w-36 sm:portrait:h-36">
                         <img src={photo.thumbnail} alt={sourceLabel} className="w-full h-full object-cover" />
                       </div>
                       <span className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{sourceLabel}</span>
@@ -201,7 +203,7 @@ export default function Cart() {
                     {/* Edited result — only if user made edits */}
                     {editedDataUrl && (
                       <div className="flex flex-col items-center gap-1">
-                        <div className="rounded-lg overflow-hidden" style={{ width: 80, height: 80 }}>
+                        <div className="rounded-lg overflow-hidden w-20 h-20 sm:portrait:w-36 sm:portrait:h-36">
                           <img src={editedDataUrl} alt={t('cart.edited')} className="w-full h-full object-cover" />
                         </div>
                         <span className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>{t('cart.edited')}</span>
@@ -396,7 +398,7 @@ export default function Cart() {
           </div>
 
           {/* ── Right: sticky order summary ── */}
-          <aside className="card p-5 flex flex-col gap-3 w-full lg:sticky lg:top-4">
+          <aside className="card p-5 flex flex-col gap-3 w-full lg:sticky lg:top-4 sm:portrait:sticky sm:portrait:bottom-0">
             <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
               <ShoppingCart size={20} /> {t('cart.summaryTitle')}
             </h2>
@@ -431,7 +433,9 @@ export default function Cart() {
               {t('cart.payNow')} <ArrowRight size={20} />
             </Button>
 
-            <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
+            {/* Centred on portrait, where the docked summary is the last row and
+                the help FAB (bottom-left) would otherwise cover this line. */}
+            <p className="text-xs flex items-start sm:portrait:justify-center gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
               <ShieldCheck size={14} className="shrink-0 mt-0.5" /> {t('cart.secureNote')}
             </p>
           </aside>

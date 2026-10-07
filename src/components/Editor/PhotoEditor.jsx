@@ -569,21 +569,31 @@ export default function PhotoEditor() {
   // fixed 780px spilled over the tool rail and panel whenever the column was
   // narrower (any screen under ~1450px wide, and every portrait one).
   const centerColRef = useRef(null);
+  // Portrait only: the box left for the canvas once the toolbar, filmstrip,
+  // tool bar and panel have taken their own height. A fixed share of the
+  // screen (it was 42%) left a portrait print small with empty space round it.
+  const canvasAreaRef = useRef(null);
   const [colW, setColW] = useState(0);
+  const [areaH, setAreaH] = useState(0);
   const hasPhoto = !!state.selectedPhotos.length;
   useEffect(() => {
     const el = centerColRef.current;
+    const area = canvasAreaRef.current;
     if (!el) return;
     // Read once now: the observer's first report lands a frame later, after
     // the canvas was already fitted (and its Stage mounted) at the fallback.
-    setColW(el.clientWidth);
-    const ro = new ResizeObserver(([entry]) => setColW(Math.floor(entry.contentRect.width)));
+    const measure = () => { setColW(el.clientWidth); if (area) setAreaH(area.clientHeight); };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
+    if (area) ro.observe(area);
     return () => ro.disconnect();
   }, [hasPhoto]);
   const deskMaxW = isPortrait ? (colW || MAX_CANVAS_W) : Math.min(colW || MAX_CANVAS_W, MAX_CANVAS_W);
   const maxCanvasW = isMobile ? Math.max(200, viewport.w - 24) : deskMaxW;
-  const maxCanvasH = isMobile || isPortrait ? Math.max(220, Math.round(viewport.h * 0.42)) : MAX_CANVAS_H;
+  const maxCanvasH = isMobile ? Math.max(220, Math.round(viewport.h * 0.42))
+    : isPortrait ? Math.max(220, areaH || Math.round(viewport.h * 0.42))
+    : MAX_CANVAS_H;
 
   const selectedPhotos = state.selectedPhotos;
   const photoEdits = state.photoEdits;
@@ -1292,8 +1302,11 @@ export default function PhotoEditor() {
         className="flex-1 min-h-0 no-scrollbar"
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : isPortrait ? '96px 1fr' : '96px 1fr 320px',
-          gridTemplateRows: isPortrait ? 'auto minmax(0, 1fr)' : undefined,
+          // Portrait: canvas on top taking whatever is left, then a horizontal
+          // tool bar, then the panel sized to its content — so the photo grows
+          // instead of an emptyish panel claiming half the screen.
+          gridTemplateColumns: isMobile || isPortrait ? 'minmax(0, 1fr)' : '96px 1fr 320px',
+          gridTemplateRows: isPortrait ? 'minmax(0, 1fr) auto auto' : undefined,
           gap: 12,
           overflowY: isMobile ? 'auto' : 'visible',
         }}
@@ -1302,6 +1315,7 @@ export default function PhotoEditor() {
         <div
           className="flex flex-row sm:flex-col items-center gap-1 px-2 sm:px-0 py-2 sm:py-3 rounded-xl shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar"
           style={{
+            ...(isPortrait && { gridRow: 2, flexDirection: 'row', justifyContent: 'space-evenly', padding: '6px 8px' }),
             background: '#fff',
             border: '1.5px solid var(--color-neutral-200)',
             boxShadow: 'var(--shadow-sm)',
@@ -1352,10 +1366,12 @@ export default function PhotoEditor() {
           })}
 
           {/* Divider (horizontal sidebar hides it on mobile) */}
-          <div
-            className="hidden sm:block my-1 w-6 shrink-0"
-            style={{ height: 1, background: 'var(--color-neutral-200)' }}
-          />
+          {!isPortrait && (
+            <div
+              className="hidden sm:block my-1 w-6 shrink-0"
+              style={{ height: 1, background: 'var(--color-neutral-200)' }}
+            />
+          )}
 
           {/* Closes whatever tool panel is open — the canvas stays fully
               interactive either way, this just gets the drawer out of the way. */}
@@ -1379,9 +1395,14 @@ export default function PhotoEditor() {
         </div>
 
         {/* ── Center: toolbar + canvas + filmstrip ── */}
-        <div ref={centerColRef} className="flex flex-col gap-3 min-w-0">
+        <div ref={centerColRef} className="flex flex-col gap-3 min-w-0 min-h-0" style={{ gridRow: isPortrait ? 1 : undefined }}>
 
-
+          {/* `contents` keeps the landscape layout exactly as it was; on portrait
+              this is the measured box the canvas is fitted into. */}
+          <div
+            ref={canvasAreaRef}
+            className={isPortrait ? 'flex-1 min-h-0 flex items-center justify-center' : 'contents'}
+          >
           {/* Canvas */}
           <div
             className="relative overflow-hidden shrink-0"
@@ -1624,6 +1645,8 @@ export default function PhotoEditor() {
             })}
           </div>
 
+          </div>
+
           {/* ── Collage commit bar — turns the frame into a NEW output ── */}
           {isLayoutFrame && (() => {
             const filled = layoutSlots.filter((s) => s?.photoId).length;
@@ -1653,6 +1676,9 @@ export default function PhotoEditor() {
           {/* Document-scope toolbar. Sits under the canvas as a centred pill
               rather than a full-width bar above it — with only two controls in
               it, the bar was mostly empty and pushed the photo down the page. */}
+          {/* Portrait: filmstrip and this pill share one row — stacked they cost
+              the canvas ~60px it can't spare on a tall screen. */}
+          <div className={isPortrait ? 'flex items-center gap-3 shrink-0' : 'contents'}>
           <EditorToolbar
             canUndo={canUndo} canRedo={canRedo}
             onUndo={undo} onRedo={redo}
@@ -1669,7 +1695,7 @@ export default function PhotoEditor() {
               gesture a kiosk touchscreen makes awkward — there is no trackpad
               and the strip can run past the edge. navigateTo() bounds-checks
               on its own; disabling them is affordance, not enforcement. */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={`flex items-center gap-2 ${isPortrait ? 'flex-1 min-w-0 order-first' : 'shrink-0'}`}>
             <IconButton
               icon={ChevronLeft}
               label={t('editor.prevPhoto')}
@@ -1776,22 +1802,27 @@ export default function PhotoEditor() {
               onClick={() => navigateTo(photoIndex + 1)}
             />
           </div>
+          </div>
         </div>
 
         {/* ── Right: active panel, with the element controls docked beneath
               (full-width row under the canvas on a portrait screen) ── */}
-        <div className="flex flex-col gap-3 min-h-0" style={{ gridColumn: isPortrait ? '1 / -1' : undefined }}>
+        <div className="flex flex-col gap-3 min-h-0" style={{ gridRow: isPortrait ? 3 : undefined }}>
+        {/* Portrait: closing the tool hides the panel so the photo gets the room. */}
+        {!(isPortrait && !activePanel) && (
         <div
           className="flex flex-col flex-1 min-h-0 sm:min-h-0 min-h-[280px] rounded-xl overflow-hidden"
           style={{
+            maxHeight: isPortrait ? '20vh' : undefined,
             background: '#fff',
             border: '1.5px solid var(--color-neutral-200)',
             boxShadow: 'var(--shadow-sm)',
           }}
         >
-          {/* Panel header */}
+          {/* Panel header — dropped on portrait, where the highlighted tool
+              right above already names the panel and every px goes to the photo. */}
           <div
-            className="flex items-center gap-3 px-4 py-3 shrink-0"
+            className={`${isPortrait ? 'hidden' : 'flex'} items-center gap-3 px-4 py-3 shrink-0`}
             style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
           >
             {activeTool ? (
@@ -1859,10 +1890,15 @@ export default function PhotoEditor() {
             )}
           </div>
         </div>
+        )}
 
           {/* Element-scope controls, docked under the panel. Kept in the same
               column as the tools rather than over the canvas, so the photo
               never shifts down when something is selected. */}
+          {/* sm:portrait:ml-40 clears the help FAB (bottom-left, ~150px) — this
+              is the last row on a portrait screen, so it would sit on the
+              hint and cover the element toolbar's first buttons. */}
+          <div className="contents sm:portrait:block sm:portrait:ml-40">
           {selectedElement ? (
             <ElementToolbar
               label={selectedLabel}
@@ -1887,15 +1923,15 @@ export default function PhotoEditor() {
               💡 {t('editor.hintSelectEl')}
             </p>
           )}
+          </div>
         </div>
       </div>
 
       {/* ── Progress footer ── */}
       <div
-        // sm:portrait: — on a portrait kiosk the editor runs edge to edge, so the
-        // help FAB (bottom-left, ~150px) would sit on "Foto 1 dari 3". Landscape
-        // centres the editor clear of it; phones hide the FAB off home.
-        className="shrink-0 flex items-center justify-between px-4 sm:portrait:pl-40 py-2.5 rounded-xl"
+        // Hidden on a portrait kiosk: the pager and filmstrip already say which
+        // photo this is, and the canvas needs the height more than a third copy.
+        className="shrink-0 flex sm:portrait:hidden items-center justify-between px-4 py-2.5 rounded-xl"
         style={{
           background: '#fff',
           border: '1.5px solid var(--color-neutral-200)',
