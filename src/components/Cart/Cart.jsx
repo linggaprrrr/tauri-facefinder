@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Check, X, Printer, ShieldCheck, Wallet, Smartphone, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ShoppingCart, Check, X, Printer, ShieldCheck, Wallet, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { usePrintProducts } from '../../hooks/usePrintProducts';
 import { copiesOf, setCopies, setCopiesForAll, addCollage, printTotals, MAX_COPIES } from '../../utils/printLines';
 import PrintAddonSelector from '../Print/PrintAddonSelector';
-import PrintFormatArt from '../Print/PrintFormatArt';
 import PrintPreview from '../Print/PrintPreview';
 import WatermarkOverlay from '../common/WatermarkOverlay';
 import QtyStepper from '../Print/QtyStepper';
+import ProductArt from '../Print/ProductArt';
 import Button from '../common/Button';
 import IconButton from '../common/IconButton';
 import Modal from '../common/Modal';
@@ -29,6 +29,48 @@ function Section({ title, action, children, className = '' }) {
       </div>
       {children}
     </section>
+  );
+}
+
+// Product row: round check (top-left), art, name/description, price, and a
+// control underneath. `locked` = always included (soft file), check disabled.
+function ProductCard({ on, locked, onToggle, art, title, desc, price, control, note }) {
+  return (
+    <div
+      className="relative rounded-2xl p-3 pl-11 flex flex-col gap-2 transition-shadow"
+      style={{
+        background: 'var(--color-neutral-50)',
+        border: `2px solid ${on ? 'var(--color-primary)' : 'var(--color-neutral-200)'}`,
+        boxShadow: on ? '0 0 0 3px var(--color-primary-100), 0 6px 14px rgba(90,64,24,0.16)' : '0 6px 14px rgba(90,64,24,0.12)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={locked}
+        aria-pressed={on}
+        aria-label={title}
+        className="absolute top-3 left-3 w-7 h-7 rounded-full flex items-center justify-center disabled:cursor-default"
+        style={on
+          ? { background: 'var(--gradient-primary)', color: '#fff', boxShadow: 'var(--shadow-glow-primary)' }
+          : { background: '#fff', border: '2px solid var(--color-neutral-300)' }}
+      >
+        {on && <Check size={16} strokeWidth={3.5} />}
+      </button>
+      <div className="flex items-center gap-3">
+        {art}
+        <span className="flex-1 min-w-0">
+          <span className="block text-lg sm:text-xl font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>{title}</span>
+          <span className="block text-sm leading-snug mt-0.5" style={{ color: 'var(--color-neutral-700)' }}>{desc}</span>
+        </span>
+      </div>
+      {/* Price shares the control row, so the name gets the full width. */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xl font-black" style={{ color: 'var(--color-accent-700)' }}>{price}</span>
+        {control}
+      </div>
+      {note && <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{note}</p>}
+    </div>
   );
 }
 
@@ -98,6 +140,11 @@ export default function Cart() {
     }
   }
 
+  function addStrip(product) {
+    const photos = (ticked.length ? ticked : selectedPhotos.filter((p) => p.photo_id)).map(asLineRef);
+    setItems(addCollage(printItems, { printType: product.printType, photos, slotCount: product.slotCount, price: product.price }));
+  }
+
   const collageLines = printItems
     .map((item) => ({ item, product: collageProducts.find((p) => p.printType === item.printType) }))
     .filter(({ product }) => product);
@@ -114,6 +161,9 @@ export default function Cart() {
   const activeTab = previewTabs.find((p) => p.printType === tab) ?? previewTabs[0];
   const previewPool = ticked.length ? ticked : selectedPhotos;
   const previewPhoto = previewPool[previewIdx % Math.max(1, previewPool.length)];
+  // The photo the product cards are drawn from: first ticked, else first.
+  const artPhoto = ticked[0] ?? selectedPhotos[0];
+  const artSrc = artPhoto ? (photoEdits[artPhoto.id]?.dataUrl ?? artPhoto.thumbnail ?? artPhoto.url) : undefined;
   const lightSrc = (p) => photoEdits[p.id]?.dataUrl ?? p.proxyUrl ?? p.url ?? p.thumbnail;
 
   function handleRemove(photoId) {
@@ -145,12 +195,12 @@ export default function Cart() {
               <Section
                 title={t('cart.selectedPhotos', { count: selectedPhotos.length })}
                 action={canOffer && (
-                  <button type="button" onClick={toggleAll} className="text-sm font-bold flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
+                  <button type="button" onClick={toggleAll} className="text-base font-bold flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
                     {ticked.length ? t('cart.printNone') : t('cart.printAll')}
                   </button>
                 )}
               >
-                {canOffer && <p className="text-sm -mt-1" style={{ color: 'var(--color-neutral-700)' }}>{t('cart.tickHint')}</p>}
+                {canOffer && <p className="text-base -mt-1" style={{ color: 'var(--color-neutral-700)' }}>{t('cart.tickHint')}</p>}
                 <div className="grid grid-cols-3 gap-2.5">
                   {selectedPhotos.map((photo) => {
                     const on = printFor.has(photo.id) && !!photo.photo_id;
@@ -177,7 +227,7 @@ export default function Cart() {
                         <span className="absolute top-1 right-1">
                           <IconButton icon={X} label={t('cart.removeAria')} variant="danger" size="sm" onClick={() => setConfirmRemove(photo)} />
                         </span>
-                        <span className="absolute bottom-2 left-2 right-2 text-xs font-black text-white text-right" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                        <span className="absolute bottom-2 left-2 right-2 text-sm font-black text-white text-right" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
                           {photo.price ? rp(photo.price) : t('cart.free')}
                         </span>
                       </div>
@@ -195,7 +245,7 @@ export default function Cart() {
                       role="tab"
                       aria-selected={activeTab.printType === p.printType}
                       onClick={() => setTab(p.printType)}
-                      className="flex-1 py-2 rounded-full text-sm font-bold transition-colors"
+                      className="flex-1 py-2.5 rounded-full text-base font-bold transition-colors"
                       style={activeTab.printType === p.printType
                         ? { background: 'var(--gradient-primary)', color: '#fff', boxShadow: 'var(--shadow-glow-primary)' }
                         : { color: 'var(--color-neutral-800)' }}
@@ -206,7 +256,9 @@ export default function Cart() {
                 </div>
                 <div className="flex items-center gap-2">
                   <IconButton icon={ChevronLeft} label={t('editor.prevPhoto')} variant="subtle" size="sm" disabled={previewPool.length < 2} onClick={() => setPreviewIdx((i) => (i - 1 + previewPool.length) % previewPool.length)} />
-                  <div className="flex-1 flex justify-center py-2">
+                  {/* min-w-0: without it this flex item grows to the preview's
+                      natural width and a wide 4R spilled over the next column. */}
+                  <div className="flex-1 min-w-0 flex justify-center py-2">
                     {previewPhoto && (activeTab.printType === 'soft' ? (
                       // The soft file is the photo itself, on the customer's phone.
                       <div className="w-36 rounded-[1.75rem] p-2" style={{ background: 'var(--color-neutral-900)', boxShadow: 'var(--shadow-lg)' }}>
@@ -234,70 +286,60 @@ export default function Cart() {
             {/* ── Right: products and what they cost ── */}
             <div className="flex flex-col gap-4 min-w-0">
               <Section title={t('cart.productsTitle')}>
-                {canOffer && singleProducts.map((product) => {
-                  const q = productQty(product);
+                {/* One card per product, as in the design: a round check, the
+                    product drawn from the customer's own photo, price, and
+                    (for prints) the quantity. */}
+                {canOffer && products.map((product) => {
+                  const single = product.slotCount === 1;
+                  const q = single ? productQty(product) : null;
+                  const strips = single ? 0 : collageLines.filter(({ item }) => item.printType === product.printType).length;
+                  const on = single ? q.value > 0 : strips > 0;
+                  const toggle = () => {
+                    if (single) setProductQty(product, on ? 0 : 1);
+                    else if (on) setItems(printItems.filter((it) => it.printType !== product.printType));
+                    else addStrip(product);
+                  };
                   return (
-                    <div key={product.printType} className="raised-tile rounded-2xl p-3 flex flex-col gap-2" style={q.value ? { borderColor: 'var(--color-primary)', boxShadow: '0 0 0 2px var(--color-primary)' } : undefined}>
-                      <div className="flex items-center gap-3">
-                        <PrintFormatArt slots={product.slotCount} className="w-12 h-12 shrink-0" />
-                        <span className="flex-1 min-w-0">
-                          <span className="block font-black" style={{ color: 'var(--color-neutral-900)' }}>{t(product.labelKey)}</span>
-                          <span className="block text-xs" style={{ color: 'var(--color-neutral-700)' }}>{t('cart.perPhoto')}</span>
-                        </span>
-                        <span className="font-black" style={{ color: 'var(--color-accent-700)' }}>{rp(product.price)}</span>
-                      </div>
-                      <div className="flex justify-end">
-                        <QtyStepper
-                          value={q.value}
-                          display={q.display}
-                          max={MAX_COPIES}
-                          onChange={(n) => setProductQty(product, n)}
-                        />
-                      </div>
-                      {!ticked.length && <p className="text-xs" style={{ color: 'var(--color-neutral-600)' }}>{t('cart.tickFirst')}</p>}
-                    </div>
-                  );
-                })}
-
-                {canOffer && collageProducts.map((product) => {
-                  const count = collageLines.filter(({ item }) => item.printType === product.printType).length;
-                  return (
-                    <div key={product.printType} className="raised-tile rounded-2xl p-3 flex items-center gap-3">
-                      <PrintFormatArt slots={product.slotCount} className="w-12 h-12 shrink-0" />
-                      <span className="flex-1 min-w-0">
-                        <span className="block font-black" style={{ color: 'var(--color-neutral-900)' }}>{t(product.labelKey)}</span>
-                        <span className="block text-xs" style={{ color: 'var(--color-neutral-700)' }}>
-                          {count ? t('cart.stripsAdded', { count }) : t('cart.stripDesc', { count: product.slotCount })}
-                        </span>
-                      </span>
-                      <span className="font-black" style={{ color: 'var(--color-accent-700)' }}>{rp(product.price)}</span>
-                      <button
-                        type="button"
-                        onClick={() => setItems(addCollage(printItems, { printType: product.printType, photos: (ticked.length ? ticked : selectedPhotos.filter((p) => p.photo_id)).map(asLineRef), slotCount: product.slotCount, price: product.price }))}
-                        aria-label={t('cart.addStrip')}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
-                        style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-glow-primary)' }}
-                      >
-                        <Plus size={18} strokeWidth={3} />
-                      </button>
-                    </div>
+                    <ProductCard
+                      key={product.printType}
+                      on={on}
+                      onToggle={toggle}
+                      art={<ProductArt kind={product.printType === 'secondary' ? 'strip' : 'print'} src={artSrc} />}
+                      title={t(product.labelKey)}
+                      desc={single ? t('cart.perPhoto') : (strips ? t('cart.stripsAdded', { count: strips }) : t('cart.stripDesc', { count: product.slotCount }))}
+                      price={rp(product.price)}
+                      control={single ? (
+                        <QtyStepper value={q.value} display={q.display} max={MAX_COPIES} onChange={(n) => setProductQty(product, n)} />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => addStrip(product)}
+                          className="raised-tile flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold"
+                          style={{ color: 'var(--color-primary)' }}
+                        >
+                          <Plus size={16} strokeWidth={3} /> {t('cart.addStrip')}
+                        </button>
+                      )}
+                      note={single && !ticked.length ? t('cart.tickFirst') : null}
+                    />
                   );
                 })}
 
                 {/* Soft file — every photo in the order IS the digital file, so
-                    it is always included: no stepper, priced per photo. */}
-                <div className="raised-tile rounded-2xl p-3 flex items-center gap-3" style={{ borderColor: 'var(--color-primary)', boxShadow: '0 0 0 2px var(--color-primary)' }}>
-                  <span className="flex w-12 h-12 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}>
-                    <Smartphone size={26} />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-black" style={{ color: 'var(--color-neutral-900)' }}>{t('cart.softFile')}</span>
-                    <span className="block text-xs" style={{ color: 'var(--color-neutral-700)' }}>{t('cart.softFileDesc')}</span>
-                  </span>
-                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-                    <Check size={14} strokeWidth={3} /> {t('cart.included')}
-                  </span>
-                </div>
+                    it is always included: locked on, no stepper, priced per photo. */}
+                <ProductCard
+                  on
+                  locked
+                  art={<ProductArt kind="soft" src={artSrc} />}
+                  title={t('cart.softFile')}
+                  desc={t('cart.softFileDesc')}
+                  price={rp(photoTotal)}
+                  control={
+                    <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-black" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+                      <Check size={14} strokeWidth={3} /> {t('cart.included')}
+                    </span>
+                  }
+                />
               </Section>
 
               <Section title={<span className="flex items-center gap-2"><ShoppingCart size={20} /> {t('cart.summaryTitle')}</span>}>
@@ -306,7 +348,7 @@ export default function Cart() {
                     const tot = printTotals(printItems, product.printType);
                     if (!tot.copies) return null;
                     return (
-                      <div key={product.printType} className="flex items-baseline justify-between gap-3 text-sm">
+                      <div key={product.printType} className="flex items-baseline justify-between gap-3 text-base">
                         <span style={{ color: 'var(--color-neutral-800)' }}>
                           <span className="font-bold">{t(product.labelKey)}</span>{' '}
                           <span style={{ color: 'var(--color-neutral-600)' }}>{rp(product.price)} × {tot.copies}</span>
@@ -315,7 +357,7 @@ export default function Cart() {
                       </div>
                     );
                   })}
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <div className="flex items-baseline justify-between gap-3 text-base">
                     <span style={{ color: 'var(--color-neutral-800)' }}>
                       <span className="font-bold">{t('cart.softFile')}</span>{' '}
                       <span style={{ color: 'var(--color-neutral-600)' }}>{t('cart.photoCount', { count: selectedPhotos.length })}</span>
@@ -327,8 +369,8 @@ export default function Cart() {
                   <span className="font-black text-lg" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
                   <span className="text-2xl font-black" style={{ color: 'var(--color-accent-700)' }}>{rp(grandTotal)}</span>
                 </div>
-                <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
-                  <ShieldCheck size={14} className="shrink-0 mt-0.5" /> {t('cart.secureNote')}
+                <p className="text-sm flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
+                  <ShieldCheck size={16} className="shrink-0 mt-0.5" /> {t('cart.secureNote')}
                 </p>
               </Section>
             </div>
