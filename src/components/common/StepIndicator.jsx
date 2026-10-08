@@ -27,17 +27,28 @@ export default function StepIndicator({ current }) {
         return (
           <div key={key} className={`flex items-start ${index < STEPS.length - 1 ? 'flex-1' : ''}`}>
             <div className="flex flex-col items-center gap-2.5 shrink-0" style={{ minWidth: TILE }}>
-              <div
-                className={`flex items-center justify-center transition-all duration-200 ${isActive ? '' : 'raised-tile'}`}
-                style={{
-                  width: TILE, height: TILE, borderRadius: 28,
-                  background: isActive ? 'var(--gradient-primary)' : undefined,
-                  color: isActive ? '#fff' : isDone ? 'var(--color-primary)' : 'var(--color-neutral-800)',
-                  boxShadow: isActive ? 'var(--shadow-glow-primary)' : undefined,
-                  transform: isActive ? 'scale(1.06)' : 'none',
-                }}
-              >
-                <Icon size={44} strokeWidth={isActive ? 2.2 : 1.8} />
+              <div className="relative">
+                {/* Active step: a ring pings outward behind the tile (see
+                    .step-ping / .step-breathe in index.css). */}
+                {isActive && (
+                  <span
+                    aria-hidden
+                    className="step-ping absolute inset-0"
+                    style={{ borderRadius: 28, background: 'var(--color-primary)' }}
+                  />
+                )}
+                <div
+                  className={`relative flex items-center justify-center transition-colors duration-200 ${isActive ? 'step-breathe' : 'raised-tile'}`}
+                  aria-current={isActive ? 'step' : undefined}
+                  style={{
+                    width: TILE, height: TILE, borderRadius: 28,
+                    background: isActive ? 'var(--gradient-primary)' : undefined,
+                    color: isActive ? '#fff' : isDone ? 'var(--color-primary)' : 'var(--color-neutral-800)',
+                    boxShadow: isActive ? 'var(--shadow-glow-primary)' : undefined,
+                  }}
+                >
+                  <Icon size={44} strokeWidth={isActive ? 2.2 : 1.8} />
+                </div>
               </div>
               <span
                 className="uppercase text-center whitespace-nowrap"
