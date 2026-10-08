@@ -104,7 +104,7 @@ export const translations = {
   // ── Cart ────────────────────────────────────────────────────────────────────
   'cart.title':      { id: 'Pesanan Anda', en: 'Your Order' },
   'cart.subtitle':   { id: 'Periksa pesanan Anda, lalu bayar', en: 'Review your order, then pay' },
-  'cart.backSub':    { id: 'Hias foto', en: 'Customize photos' },
+  'cart.backSub':    { id: 'Edit foto', en: 'Customize photos' },
   'cart.selectedPhotos': { id: 'Foto Dipilih ({count})', en: 'Selected Photos ({count})' },
   'cart.printAll':   { id: 'Pilih Semua', en: 'Select All' },
   'cart.printNone':  { id: 'Batal Pilih Semua', en: 'Deselect All' },
@@ -399,7 +399,7 @@ export const translations = {
   'editor.printEach':      { id: 'lembar', en: 'print' },
   'editor.printHint':      { id: 'Strip foto & jumlah cetak lainnya bisa diatur di halaman Bayar.', en: 'Photo strips and other print counts can be set on the Pay page.' },
   'editor.printUnavailable': { id: 'Foto ini tidak bisa dicetak.', en: 'This photo can\'t be printed.' },
-  'editor.title':          { id: 'Hias Foto Anda', en: 'Customize Your Photo' },
+  'editor.title':          { id: 'Edit Foto Anda', en: 'Customize Your Photo' },
   'editor.backSub':        { id: 'Pilih foto', en: 'Choose photos' },
   'editor.nextSub':        { id: 'Lanjut ke pembayaran', en: 'Continue to payment' },
   'editor.subtitle':       { id: 'Pilih alat lalu ketuk foto untuk mengedit', en: 'Choose a tool then tap the photo to edit' },
