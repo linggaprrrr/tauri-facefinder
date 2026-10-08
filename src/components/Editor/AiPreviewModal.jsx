@@ -47,7 +47,7 @@ export default function AiPreviewModal({ template, onConfirm, onClose }) {
       <div
         className="rounded-3xl overflow-hidden flex flex-col w-full mx-3"
         style={{
-          background: '#fff',
+          background: 'var(--color-card)',
           maxWidth: hasSample ? 'min(960px, calc(100vw - 48px))' : 420,
           maxHeight: '92vh',
           boxShadow: '0 24px 64px rgba(0,0,0,0.3)',

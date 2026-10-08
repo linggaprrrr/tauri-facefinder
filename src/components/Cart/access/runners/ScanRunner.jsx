@@ -181,7 +181,7 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
           style={{
             padding: '12px 28px',
             fontSize: 16,
-            background: '#fff',
+            background: 'var(--color-card)',
             color: 'var(--color-neutral-700)',
             border: '2px solid var(--color-neutral-300)',
             boxShadow: 'var(--shadow-sm)',

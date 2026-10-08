@@ -54,18 +54,28 @@
   --color-accent-800:   #8A5509;
   --color-accent-900:   #5C3805;
 
-  /* ── Neutral Grays ── */
+  /* ── Neutrals: warm sandstone surfaces, navy ink ──
+     Light end is cream (the panels, tiles and borders of the theme-park
+     design); dark end is navy, so headings and body text read as one family
+     with the blue brand instead of a cold grey. 600 is the lightest step that
+     still clears 4.5:1 on the cream surfaces. */
   --color-neutral-0:    #FFFFFF;
-  --color-neutral-50:   #F8F9FA;
-  --color-neutral-100:  #F1F3F5;
-  --color-neutral-200:  #E9ECEF;
-  --color-neutral-300:  #DEE2E6;
-  --color-neutral-400:  #CED4DA;
-  --color-neutral-500:  #ADB5BD;
-  --color-neutral-600:  #6C757D;
-  --color-neutral-700:  #495057;
-  --color-neutral-800:  #343A40;
-  --color-neutral-900:  #1A1D23;
+  --color-neutral-50:   #F8F3EA;
+  --color-neutral-100:  #F1E9DC;
+  --color-neutral-200:  #E4D8C4;
+  --color-neutral-300:  #D6C7AE;
+  --color-neutral-400:  #C4B8A3;
+  --color-neutral-500:  #9C9483;
+  --color-neutral-600:  #5F6A86;
+  --color-neutral-700:  #43506E;
+  --color-neutral-800:  #22305A;
+  --color-neutral-900:  #0E1F4D;
+
+  /* Card surface inside the sand panel — sampled from the design mockups
+     (cards #F3EBE0–#F4EDE1 on a #EEE2D4 panel). One step lighter than the
+     panel so cards lift off it; pure white read as a cold sticker on the
+     sandstone. Utility: bg-card. */
+  --color-card:         #F5EEE3;
 
   /* ── Semantic States ── */
   --color-success:      #16A34A;
@@ -173,14 +183,11 @@ h1, h2, h3 {
   letter-spacing: -0.01em;
 }
 
-/* The outlet's background photo, blurred, behind everything.
-   It lives here rather than on .app-bg because a CSS filter applies to the
-   whole element — blurring it there would blur the entire UI with it. Fixed
-   and scaled slightly so the blur cannot bleed a soft edge in at the sides,
-   and it does not drift while a page scrolls.
-   Kept deliberately light (4px): enough to soften detail so text is not
-   fighting wood grain and bookshelves, but the backdrop is still recognisably
-   the operator's own photo. Heavier blur read as an out-of-focus mistake. */
+/* The outlet's background art, sharp, behind everything. Fixed so it does
+   not drift while a page scrolls. No blur and no wash any more: every page now
+   sits inside `.kiosk-panel` and the header in `.header-pill`s, so text never
+   lands on the art itself — the art is decoration around the panel, and is
+   designed (9:16, scene at the top) to be seen as-is. */
 body::before {
   content: "";
   position: fixed;
@@ -188,9 +195,7 @@ body::before {
   z-index: -1;
   background-image: var(--brand-bg-image, none), var(--gradient-hero);
   background-size: cover, auto;
-  background-position: center;
-  filter: blur(4px) saturate(1.05);
-  transform: scale(1.03);
+  background-position: center top;
   pointer-events: none;
 }
 
@@ -298,29 +303,42 @@ textarea:focus-visible,
    Festive Park — backdrop, decoration & delight
 ───────────────────────────────────────────── */
 
-/* Page backdrop: warm sky gradient + soft colored light blobs.
-   Applied to the app shell so every screen sits on a lively stage. */
+/* App shell. Transparent: the art is drawn by `body::before`, and anything
+   opaque here would paint straight over it. */
 .app-bg {
   position: relative;
-  /* The brand image and the stock fallback gradient are both drawn by
-     `body::before`, blurred. All that sits here is a light wash to lift text
-     contrast — it must stay translucent, since anything opaque on this element
-     would paint straight over the layer beneath. */
-  background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45));
   overflow: hidden;
 }
-/* Text that sits directly on the branded background rather than inside a card.
-   The scrim guarantees a light surface, but a busy photo still competes with
-   glyph edges, so this adds a short white halo — invisible on the stock
-   gradient, and the difference between readable and not over a wooden wall or
-   a crowd shot. Apply to page headings/subtitles that have no card behind
-   them; anything inside a white surface does not need it. */
-.on-bg-text {
-  text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.9),
-    0 1px 2px rgba(255, 255, 255, 0.95);
-}
 
+/* Cream surfaces that carry all text over the background art. Near-opaque on
+   purpose — a see-through panel over a busy scene is the readability problem
+   the old white wash existed to solve. */
+/* Opaque on purpose: a see-through panel lets the art bleed into the UI. */
+.kiosk-panel {
+  background: #EDE3D3;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 4px 8px rgba(70, 48, 16, 0.22),
+    0 24px 52px rgba(50, 32, 8, 0.38),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+.header-pill {
+  background: var(--color-card);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 3px 6px rgba(70, 48, 16, 0.22),
+    0 14px 30px rgba(50, 32, 8, 0.34),
+    inset 0 1px 0 #fff;
+}
+.kiosk-panel { border-radius: 2.25rem; }
+.header-pill { border-radius: 1.75rem; }
+
+/* Raised cream tile — step bar icons and similar chunky controls. */
+.raised-tile {
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+  box-shadow: 0 2px 3px rgba(90, 64, 24, 0.22), 0 8px 16px rgba(90, 64, 24, 0.26), inset 0 1px 0 #fff;
+}
 /* The brand wordmark, gradient-filled. background-clip:text needs a
    transparent fill, so this cannot be expressed as a colour utility.
    The solid colour is declared first and only overridden where the clip is
@@ -344,8 +362,8 @@ textarea:focus-visible,
    light surface for text, which a translucent panel over a busy photo would
    not, for the same reason `.app-bg`'s scrim exists. */
 .festive-card {
-  background: #fff;
-  border: 1.5px solid var(--color-primary-100);
+  background: var(--color-card);
+  border: 1.5px solid var(--color-neutral-200);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-pop);
 }
@@ -366,10 +384,13 @@ textarea:focus-visible,
    a wrapper whose entire job is to set four properties would cost an import in
    every file that happens to contain a panel. */
 .card {
-  background: #fff;
+  background: var(--color-card);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  /* Soft "pressed sandstone" bevel from the design: a light top edge and a
+     warm drop shadow, so cards read as raised tiles on the panel. */
+  /* Two layers: a tight contact shadow for the edge, a wide soft one for lift. */
+  box-shadow: 0 2px 4px rgba(90, 64, 24, 0.20), 0 10px 24px rgba(90, 64, 24, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 /* ── Native <dialog>, stripped to a transparent positioning box ──

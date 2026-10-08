@@ -22,7 +22,7 @@ export default function FramePanel({ activeFrame, onSelect, layoutFrames = [], l
   return (
     <div
       className="rounded-2xl p-4 h-full overflow-y-auto no-scrollbar"
-      style={{ background: '#fff', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
+      style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
     >
       <h3 className="font-bold mb-3" style={{ color: 'var(--color-neutral-700)' }}>
         {t('frame.title')}

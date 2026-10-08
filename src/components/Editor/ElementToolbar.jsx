@@ -31,7 +31,7 @@ export default function ElementToolbar({
     <div
       className="pop-in flex items-center gap-1.5 flex-wrap p-2 rounded-xl"
       style={{
-        background: '#fff',
+        background: 'var(--color-card)',
         border: '1.5px solid var(--color-primary-100)',
         boxShadow: 'var(--shadow-md)',
       }}

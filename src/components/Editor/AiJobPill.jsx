@@ -53,7 +53,7 @@ export default function AiJobPill({ job, onView, onRetry, onDismiss }) {
   // error
   return (
     <div style={wrap}>
-      <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl" style={{ background: '#fff', border: '1px solid #fca5a5', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+      <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl" style={{ background: 'var(--color-card)', border: '1px solid #fca5a5', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
         <AlertTriangle size={18} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
         <span className="text-xs leading-snug" style={{ color: 'var(--color-error)', maxWidth: 240 }}>
           {job.errorMsg || t('ai.failed')}

@@ -1,14 +1,13 @@
 import { useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { useNavigate } from 'react-router-dom';
-import { Check, Zap, ShieldCheck, Lightbulb } from 'lucide-react';
+import { Check, ShieldCheck, ScanFace, ArrowRight } from 'lucide-react';
 import { StepFaceCamera, StepInsideOval, StepSmile } from './ScanStepArt';
 import { useCamera } from '../../hooks/useCamera';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { scanFace } from '../../api/mockApi';
 import LoadingSpinner from '../common/LoadingSpinner';
-import Button from '../common/Button';
 import FaceOverlay from './FaceOverlay';
 
 // ponytail: `ideal`, and no facingMode — a USB webcam has no front/back and
@@ -70,111 +69,71 @@ export default function FaceScan() {
     }
   }, [capture, dispatch, navigate]);
 
+  const canScan = status !== 'scanning' && cameraReady;
+
   return (
-    /* Three columns only from xl. Below that the guidance stacks under the
-       camera at full width rather than being squeezed into a narrow rail —
-       the columns need real width now that the type is sized for the 50–70cm
-       viewing distance the tips themselves ask for. */
-    <div className="w-full max-w-7xl mx-auto py-4 sm:py-8 grid gap-5 xl:gap-8 xl:grid-cols-[18rem_minmax(0,1fr)_18rem] items-start">
+    /* Theme-park layout: camera card, one big "Scan my face" button, then the
+       three steps. Portrait stacks them; a landscape kiosk puts the steps in a
+       rail beside the camera so nothing has to scroll. */
+    <div className="w-full max-w-4xl mx-auto grid gap-5 sm:gap-6 xl:landscape:max-w-7xl xl:landscape:grid-cols-[minmax(0,1fr)_24rem] items-start">
 
-      {/* ── Left: how to scan + tips ──
-          Two cards side by side while stacked, one above the other once the
-          rail exists. */}
-      <aside className="order-2 xl:order-1 w-full grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-        <div className="card p-5 flex flex-col gap-4">
-          <h2 className="text-h3 font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('scan.howTitle')}
-          </h2>
-          {STEPS.map(({ Art, key }, i) => (
-            <div key={key} className="flex items-center gap-3">
-              <span className="shrink-0" style={{ width: 60, height: 60 }}>
-                <Art />
-              </span>
-              <p className="text-base font-semibold leading-snug" style={{ color: 'var(--color-neutral-800)' }}>
-                <span style={{ color: 'var(--color-primary)' }}>{i + 1}.</span> {t(key)}
-              </p>
+      {/* Capped on a landscape kiosk: at full column width the 4:3 camera is
+          taller than a 1080px screen leaves, pushing the Scan button below the
+          fold. Portrait has the height, so it stays full width there. */}
+      <div className="flex flex-col gap-5 min-w-0 w-full xl:landscape:max-w-[700px] xl:landscape:justify-self-center">
+        {/* Camera card */}
+        <div className="card p-2.5 sm:p-3" style={{ borderRadius: '2rem' }}>
+          {status === 'scanning' ? (
+            <div
+              className="w-full aspect-[4/3] flex items-center justify-center rounded-3xl"
+              style={{ background: 'var(--color-primary-50)' }}
+            >
+              <LoadingSpinner message={t('scan.scanningFace')} />
             </div>
-          ))}
+          ) : (
+            <div className="relative rounded-3xl overflow-hidden w-full aspect-[4/3]" style={{ background: 'var(--color-neutral-800)' }}>
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                screenshotFormat="image/jpeg"
+                // Capture at the camera's own resolution, not the element's.
+                // react-webcam defaults to `video.clientWidth` for the canvas, so
+                // without this the face sent to search is only as detailed as the
+                // video happens to be *laid out* — a narrower column silently
+                // produced a smaller image, a weaker embedding, and a similarity
+                // score that drifted across the backend's threshold. It also
+                // caches that canvas on first capture, so the size was decided
+                // once per session by whatever the layout measured at that moment.
+                forceScreenshotSourceSize
+                videoConstraints={VIDEO_CONSTRAINTS}
+                className="block w-full h-full object-cover"
+                onUserMedia={() => setCameraReady(true)}
+                onUserMediaError={(err) => {
+                  console.error('getUserMedia failed:', err);
+                  setCameraReady(false);
+                  setErrorDetail(err?.name || String(err));
+                  setErrorKey('scan.cameraError');
+                  setStatus('error');
+                }}
+              />
+              <FaceOverlay />
+              {cameraReady && (
+                <span
+                  className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-black tracking-wide text-white"
+                  style={{ background: 'rgba(14,31,77,0.55)' }}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: '#ef4444' }} />
+                  {t('scan.live')}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-
-        <div
-          className="p-5 rounded-xl flex flex-col gap-2.5"
-          style={{ background: 'var(--color-accent-50)', border: '1.5px solid var(--color-accent-100)' }}
-        >
-          <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
-            <Lightbulb size={20} /> {t('scan.tipsTitle')}
-          </h2>
-          {TIPS.map((key) => (
-            <p key={key} className="text-base flex items-start gap-2 leading-snug" style={{ color: 'var(--color-neutral-800)' }}>
-              <Check size={18} strokeWidth={3} className="shrink-0 mt-0.5" style={{ color: 'var(--color-success)' }} />
-              {t(key)}
-            </p>
-          ))}
-        </div>
-      </aside>
-
-      {/* ── Center: heading, camera, CTA ── */}
-      <div className="order-1 xl:order-2 flex flex-col items-center gap-5 w-full min-w-0">
-        <div className="text-center">
-          <h1 className="text-3xl sm:text-display font-black text-gradient-brand pb-1">
-            {t('scan.title')}
-          </h1>
-          <p className="mt-2 text-base sm:text-lg" style={{ color: 'var(--color-neutral-600)' }}>
-            {t('scan.positionPre')}<strong>{t('scan.action')}</strong>
-          </p>
-        </div>
-
-        {/* Camera / loading area — responsive: fills width on phones, capped at
-            640px on a landscape screen (880px on a portrait one, which has the
-            height to spare), with a 4:3 box so it never overflows the viewport. */}
-        {status === 'scanning' ? (
-          <div
-            className="w-full max-w-[640px] portrait:max-w-[880px] aspect-[4/3] flex items-center justify-center rounded-3xl"
-            style={{ background: 'var(--color-primary-50)' }}
-          >
-            <LoadingSpinner message={t('scan.scanningFace')} />
-          </div>
-        ) : (
-          <div
-            className="relative rounded-3xl overflow-hidden w-full max-w-[640px] portrait:max-w-[880px] aspect-[4/3]"
-            style={{
-              boxShadow: 'var(--shadow-pop)',
-              border: '4px solid #fff',
-              outline: '3px solid var(--color-primary-200)',
-            }}
-          >
-            <Webcam
-              ref={webcamRef}
-              audio={false}
-              screenshotFormat="image/jpeg"
-              // Capture at the camera's own resolution, not the element's.
-              // react-webcam defaults to `video.clientWidth` for the canvas, so
-              // without this the face sent to search is only as detailed as the
-              // video happens to be *laid out* — a narrower column silently
-              // produced a smaller image, a weaker embedding, and a similarity
-              // score that drifted across the backend's threshold. It also
-              // caches that canvas on first capture, so the size was decided
-              // once per session by whatever the layout measured at that moment.
-              forceScreenshotSourceSize
-              videoConstraints={VIDEO_CONSTRAINTS}
-              className="block w-full h-full object-cover"
-              onUserMedia={() => setCameraReady(true)}
-              onUserMediaError={(err) => {
-                console.error('getUserMedia failed:', err);
-                setCameraReady(false);
-                setErrorDetail(err?.name || String(err));
-                setErrorKey('scan.cameraError');
-                setStatus('error');
-              }}
-            />
-            <FaceOverlay />
-          </div>
-        )}
 
         {/* Error feedback */}
         {status === 'error' && (
           <p
-            className="font-semibold px-4 py-3 rounded-xl"
+            className="font-semibold px-4 py-3 rounded-xl text-center"
             style={{
               color: 'var(--color-error)',
               background: 'var(--color-error-bg)',
@@ -185,54 +144,79 @@ export default function FaceScan() {
           </p>
         )}
 
-        {/* Primary CTA. We DON'T hard-disable on a missed heartbeat (that would
-            falsely block the kiosk's main action on a transient blip); instead the
-            attempt surfaces a clear 'reconnecting' message on a real network error,
-            and the offline banner already signals connectivity. */}
-        <Button
-          size="lg"
+        {/* Primary CTA — the whole pill is the button. We DON'T hard-disable on
+            a missed heartbeat (that would falsely block the kiosk's main action
+            on a transient blip); instead the attempt surfaces a clear
+            'reconnecting' message on a real network error, and the offline
+            banner already signals connectivity. */}
+        <button
+          type="button"
           onClick={handleCapture}
-          disabled={status === 'scanning' || !cameraReady}
-          className="w-full max-w-72"
+          disabled={!canScan}
+          className="card flex items-center gap-3 sm:gap-5 w-full rounded-full p-2 sm:p-3 text-left transition-transform active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ borderRadius: 9999, boxShadow: canScan ? 'var(--shadow-glow-primary)' : 'var(--shadow-sm)', border: '2px solid var(--color-primary-200)' }}
         >
-          {status === 'scanning' ? t('scan.scanning') : t('scan.cta')}
-        </Button>
+          <span className="raised-tile hidden sm:flex shrink-0 items-center justify-center rounded-full w-20 h-20" style={{ color: 'var(--color-neutral-900)' }}>
+            <ScanFace size={40} strokeWidth={1.8} />
+          </span>
+          <span className="flex-1 min-w-0 pl-3 sm:pl-0">
+            <span className="block text-xl sm:text-h2 font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
+              {status === 'scanning' ? t('scan.scanning') : t('scan.cta')}
+            </span>
+            <span className="block text-sm sm:text-lg" style={{ color: 'var(--color-neutral-700)' }}>{t('scan.ctaSub')}</span>
+          </span>
+          <span
+            className="flex shrink-0 items-center justify-center rounded-full w-14 h-14 sm:w-20 sm:h-20 text-white"
+            style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-glow-primary)' }}
+          >
+            <ArrowRight size={34} strokeWidth={2.6} />
+          </span>
+        </button>
+
+        {/* Reuses the existing privacy line rather than writing a new one —
+            this is a claim about data handling, not marketing copy to vary. */}
+        <p className="flex items-center justify-center gap-2 text-sm text-center" style={{ color: 'var(--color-neutral-700)' }}>
+          <ShieldCheck size={18} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
+          {t('scan.privacy')}
+        </p>
       </div>
 
-      {/* ── Right: what happens next ── */}
-      <aside className="order-3 w-full grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-        <div className="card p-5 flex flex-col gap-2.5">
-          <span
-            className="flex items-center justify-center rounded-xl"
-            style={{ width: 48, height: 48, background: 'var(--color-accent-50)', color: 'var(--color-accent-700)' }}
-          >
-            <Zap size={24} />
-          </span>
-          <h2 className="text-h3 font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('scan.benefitFastTitle')}
-          </h2>
-          <p className="text-base leading-snug" style={{ color: 'var(--color-neutral-700)' }}>
-            {t('scan.benefitFastDesc')}
-          </p>
+      {/* How to scan: numbered steps, with the tips as chips underneath. */}
+      <section className="card p-5 sm:p-6 flex flex-col gap-5">
+        <h2 className="text-h3 font-black" style={{ color: 'var(--color-neutral-900)' }}>
+          {t('scan.howTitle')}
+        </h2>
+        <ol className="grid grid-cols-3 xl:landscape:grid-cols-1 gap-3 sm:gap-4">
+          {STEPS.map(({ Art, key }, i) => (
+            <li key={key} className="flex flex-col xl:landscape:flex-row items-center gap-3 text-center xl:landscape:text-left">
+              <span className="relative raised-tile flex items-center justify-center rounded-3xl shrink-0 w-24 h-24">
+                <span className="w-16 h-16"><Art /></span>
+                <span
+                  className="absolute -top-2 -left-2 flex items-center justify-center rounded-full w-8 h-8 text-sm font-black text-white"
+                  style={{ background: 'var(--gradient-primary)' }}
+                >
+                  {i + 1}
+                </span>
+              </span>
+              <span className="text-base sm:text-lg font-bold leading-snug" style={{ color: 'var(--color-neutral-900)' }}>
+                {t(key)}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div className="flex flex-wrap gap-2 pt-1" aria-label={t('scan.tipsTitle')}>
+          {TIPS.map((key) => (
+            <span
+              key={key}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+              style={{ background: 'var(--color-accent-50)', color: 'var(--color-neutral-800)', border: '1px solid var(--color-accent-100)' }}
+            >
+              <Check size={16} strokeWidth={3} style={{ color: 'var(--color-success)' }} />
+              {t(key)}
+            </span>
+          ))}
         </div>
-
-        <div className="card p-5 flex flex-col gap-2.5">
-          <span
-            className="flex items-center justify-center rounded-xl"
-            style={{ width: 48, height: 48, background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
-          >
-            <ShieldCheck size={24} />
-          </span>
-          <h2 className="text-h3 font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('scan.benefitPrivacyTitle')}
-          </h2>
-          {/* Reuses the existing privacy line rather than writing a new one —
-              this is a claim about data handling, not marketing copy to vary. */}
-          <p className="text-base leading-snug" style={{ color: 'var(--color-neutral-700)' }}>
-            {t('scan.privacy')}
-          </p>
-        </div>
-      </aside>
+      </section>
     </div>
   );
 }

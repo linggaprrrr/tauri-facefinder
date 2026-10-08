@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle, Hourglass, Home, Camera, ScanLine } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
@@ -14,6 +14,7 @@ import { composePrintImage } from '../../utils/composePrintImage';
 import { resolvePrintSource } from '../../utils/resolvePrintSource';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
+import NavBar from '../common/NavBar';
 
 const DOWNLOAD_BASE = import.meta.env.VITE_DOWNLOAD_LINK ?? 'https://myphoto.com';
 
@@ -351,7 +352,7 @@ export default function Download() {
         total: finalPrice,
         paymentLabel: `${isCash ? t('download.cash') : t('download.qris')}${order.paid ? ` · ${t('download.paid')}` : ''}`,
         downloadUrl,
-        // Same number as the on-screen help FAB (Settings → Nomor Bantuan), so
+        // Same number as the header help button (Settings → Nomor Bantuan), so
         // staff configure it once and the paper agrees with the screen.
         helpNumber: deviceConfig?.helpNumber,
       });
@@ -379,340 +380,381 @@ export default function Download() {
   const countdown = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`;
 
 
-  return (
-    // Portrait kiosk: stacked and vertically centred with a bigger QR. Side by
-    // side they squeezed into the top third of a tall screen around a QR the
-    // customer has to scan from arm's length.
-    <div className="flex flex-col sm:flex-row sm:portrait:flex-col gap-6 sm:gap-8 items-stretch sm:items-start sm:portrait:items-stretch justify-center w-full max-w-4xl sm:portrait:max-w-2xl sm:portrait:min-h-full sm:portrait:pb-32 mx-auto py-4 sm:py-8">
+  const danger = secondsLeft <= 30;
 
-      {/* Floating, not inline: this screen scrolls on shorter kiosk panels, and
-          a countdown that scrolls out of view is the same as resetting without
-          warning. Fixed to the viewport it is unmissable at any scroll offset.
-          pointer-events-none so it can never swallow a tap meant for the
-          receipt underneath — every tap here restarts the clock. */}
-      <div
-        // Bottom-right on portrait: top-right sits on the header's step bar there.
-        className="fixed z-50 pointer-events-none flex flex-col items-center px-8 py-4 rounded-3xl top-6 right-6 sm:portrait:top-auto sm:portrait:bottom-6"
-        style={{
-          background: '#fff',
-          boxShadow: 'var(--shadow-xl)',
-          border: `2px solid ${secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-200)'}`,
-        }}
-      >
-        <span className="text-sm font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
-          {t('download.autoResetLabel')}
-        </span>
-        <span
-          className="text-5xl font-black tabular-nums leading-none mt-1"
-          style={{ color: secondsLeft <= 30 ? 'var(--color-error)' : 'var(--color-neutral-900)' }}
+  return (
+    <div className="flex flex-col gap-4 sm:gap-5 w-full max-w-5xl mx-auto min-h-full">
+
+      {/* Success banner + auto-reset countdown. Sticky to the top of the
+          page's scroll box: this screen scrolls on shorter kiosk panels, and a
+          countdown that scrolls out of view is the same as resetting without
+          warning. (It used to be position:fixed over the page instead.) */}
+      <div className="sticky top-0 z-10 grid gap-3 sm:gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="card flex items-center gap-3 sm:gap-4 p-3 sm:p-5" style={{ borderRadius: '1.75rem' }}>
+          <span
+            className="flex shrink-0 items-center justify-center rounded-full w-12 h-12 sm:w-16 sm:h-16 text-white"
+            style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-glow-primary)' }}
+          >
+            <Check size={32} strokeWidth={3} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-h2 font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
+              {t('download.success')}
+            </h1>
+            <p className="text-sm sm:text-lg" style={{ color: 'var(--color-neutral-700)' }}>{t('download.readySub')}</p>
+          </div>
+        </div>
+        <div
+          className="card flex items-center gap-3 p-3 sm:px-6"
+          style={{ borderRadius: '1.75rem', border: `2px solid ${danger ? 'var(--color-error)' : 'var(--color-neutral-200)'}` }}
         >
-          {countdown}
-        </span>
+          <Hourglass size={30} className="hidden sm:block shrink-0" style={{ color: 'var(--color-accent-600)' }} />
+          <div>
+            <span className="block text-xs sm:text-sm font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
+              {t('download.autoResetLabel')}
+            </span>
+            <span
+              className="block text-3xl sm:text-5xl font-black tabular-nums leading-none mt-1"
+              style={{ color: danger ? 'var(--color-error)' : 'var(--color-neutral-900)' }}
+            >
+              {countdown}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* ── Left: QR download ── */}
-      <div className="flex flex-col items-center gap-5 shrink-0 w-full sm:w-auto">
-        <div className="text-center">
-          <h1 className="text-3xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('download.success')}
-          </h1>
-          <p className="mt-1 text-base" style={{ color: 'var(--color-neutral-600)' }}>
-            {t('download.scanInstr')}
-          </p>
-        </div>
+      <div className="grid gap-4 sm:gap-5 sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
 
-        <div
-          className="flex flex-col items-center gap-4 p-6 rounded-3xl"
-          style={{
-            background: '#fff',
-            boxShadow: 'var(--shadow-xl)',
-            border: '2px solid var(--color-primary-100)',
-            minWidth: 280,
-          }}
-        >
-          <div
-            className="p-4 rounded-2xl"
-            style={{ background: 'var(--color-primary-50)', border: '1.5px solid var(--color-primary-100)' }}
-          >
-            <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#013F65" className="sm:portrait:w-80 sm:portrait:h-80" />
-          </div>
+        {/* ── Left: QR download + print status ── */}
+        <div className="flex flex-col gap-4 min-w-0">
+          <section className="card p-5 sm:p-6 flex flex-col items-center gap-4" style={{ borderRadius: '1.75rem' }}>
+            <div className="flex items-center gap-3 self-stretch">
+              <span
+                className="flex shrink-0 items-center justify-center text-white"
+                style={{ width: 56, height: 56, borderRadius: 18, background: 'var(--gradient-accent)', boxShadow: 'var(--shadow-glow-accent)' }}
+              >
+                <DownloadIcon size={28} strokeWidth={2.4} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-h3 font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>
+                  {t('download.getTitle')}
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--color-neutral-700)' }}>{t('download.scanInstr')}</p>
+              </div>
+            </div>
 
-          <p className="font-mono text-xs text-center break-all" style={{ color: 'var(--color-neutral-600)' }}>
-            {trxCode}
-          </p>
+            {/* QR inside orange corner brackets. Plain white behind the code, not
+                a tint: maximum contrast is what makes a phone lock on quickly. */}
+            <div className="relative w-full max-w-[320px] p-4">
+              {['top-0 left-0 border-t-4 border-l-4 rounded-tl-2xl', 'top-0 right-0 border-t-4 border-r-4 rounded-tr-2xl',
+                'bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl', 'bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl'].map((pos) => (
+                <span key={pos} aria-hidden className={`absolute w-10 h-10 ${pos}`} style={{ borderColor: 'var(--color-accent)' }} />
+              ))}
+              <div className="p-3 rounded-2xl" style={{ background: '#fff' }}>
+                <QRCodeSVG value={downloadUrl} size={200} level="H" fgColor="#0E1F4D" className="block w-full h-auto" />
+              </div>
+            </div>
 
-          <div
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
-            style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
-          >
-            <Clock size={16} /> {t('download.valid24')}
-          </div>
-        </div>
-
-        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--color-neutral-600)' }}>
-          {t('download.cameraInstr')}
-        </p>
-
-        {/* Locally-edited photos download */}
-        {editedPhotos.length > 0 && (
-          <div
-            className="w-full rounded-2xl p-4 flex flex-col gap-3"
-            style={{
-              background: '#fff',
-              border: '1.5px solid var(--color-neutral-200)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
-            <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-600)' }}>
-              {t('download.editedPhotos')}
+            <p className="text-sm font-black tracking-[0.3em] text-center" style={{ color: 'var(--color-neutral-800)' }}>
+              {t('download.scanLabel')}
             </p>
-            <div className="flex flex-col gap-2">
-              {editedPhotos.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <img
-                    src={photoEdits[p.id].dataUrl}
-                    alt=""
-                    className="rounded-lg object-cover shrink-0"
-                    style={{ width: 56, height: 40 }}
-                  />
-                  <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--color-neutral-700)' }}>
-                    {t('common.photoN', { n: i + 1 })}
-                  </span>
-                  <button
-                    onClick={() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`)}
-                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
-                    style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
-                  >
-                    <DownloadIcon size={14} /> {t('download.save')}
-                  </button>
-                </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="font-mono text-xs" style={{ color: 'var(--color-neutral-600)' }}>{trxCode}</span>
+              <span
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
+                style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+              >
+                <Clock size={16} /> {t('download.valid24')}
+              </span>
+            </div>
+          </section>
+
+          {/* Locally-edited photos download */}
+          {editedPhotos.length > 0 && (
+            <div
+              className="w-full rounded-2xl p-4 flex flex-col gap-3"
+              style={{
+                background: 'var(--color-card)',
+                border: '1.5px solid var(--color-neutral-200)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              <p className="text-xs font-bold" style={{ color: 'var(--color-neutral-600)' }}>
+                {t('download.editedPhotos')}
+              </p>
+              <div className="flex flex-col gap-2">
+                {editedPhotos.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <img
+                      src={photoEdits[p.id].dataUrl}
+                      alt=""
+                      className="rounded-lg object-cover shrink-0"
+                      style={{ width: 56, height: 40 }}
+                    />
+                    <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--color-neutral-700)' }}>
+                      {t('common.photoN', { n: i + 1 })}
+                    </span>
+                    <button
+                      onClick={() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`)}
+                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+                      style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                    >
+                      <DownloadIcon size={14} /> {t('download.save')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  editedPhotos.forEach((p, i) => {
+                    setTimeout(() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`), i * 300);
+                  });
+                }}
+                className="w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                style={{ background: 'var(--color-primary)', color: '#fff' }}
+              >
+                <DownloadIcon size={16} /> {t('download.downloadAll', { count: editedPhotos.length })}
+              </button>
+            </div>
+          )}
+
+          {/* Held above the error/receipt blocks: while this is up the kiosk is
+              deliberately not resetting, and the customer needs to know the wait
+              is the printer, not a stuck screen. */}
+          {printPending && (
+            <div
+              className="w-full rounded-2xl p-5 flex items-center gap-4"
+              style={{ background: 'var(--color-primary-50)', border: '2px solid var(--color-primary)' }}
+            >
+              <Printer size={32} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+              <div className="min-w-0">
+                <p className="text-lg font-black leading-tight" style={{ color: 'var(--color-primary)' }}>
+                  {t('print.inProgressTitle')}
+                </p>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-600)' }}>
+                  {t('print.inProgressHint')}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {paidItems.length > 0 && (addonPrintError || paidVersionMissing) && (
+            <div
+              className="w-full rounded-2xl p-4 flex flex-col gap-2"
+              style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
+            >
+              <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
+                <AlertTriangle size={16} /> {t('print.addonErr')}
+              </p>
+              <button
+                onClick={() => setAddonPrintAttempt((n) => n + 1)}
+                className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: 'var(--color-card)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+              >
+                <RefreshCw size={14} /> {t('common.retry')}
+              </button>
+            </div>
+          )}
+
+          {canPrintReceipt && (
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={handlePrintReceipt}
+              disabled={receiptStatus === 'printing'}
+              className="w-full"
+            >
+              <Printer size={20} /> {receiptStatus === 'printing' ? t('download.printingReceipt') : t('download.printReceipt')}
+            </Button>
+          )}
+          {receiptStatus === 'fail' && (
+            <p className="text-xs text-center" style={{ color: 'var(--color-error)' }}>{t('download.receiptFail')}</p>
+          )}
+
+          {/* Print jobs that failed after payment already succeeded — reprint
+              reuses the already-composed bitmap, no new charge. */}
+          {failedJobs.length > 0 && (
+            <div
+              className="w-full rounded-2xl p-4 flex flex-col gap-2"
+              style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
+            >
+              <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
+                <AlertTriangle size={16} /> {t('print.someFailed', { count: failedJobs.length })}
+              </p>
+              {failedJobs.map((job) => (
+                <button
+                  key={job.jobId}
+                  onClick={() => handleReprint(job)}
+                  className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
+                  style={{ background: 'var(--color-card)', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+                >
+                  <RefreshCw size={14} /> {t('print.reprint')}
+                </button>
               ))}
             </div>
-            <button
-              onClick={() => {
-                editedPhotos.forEach((p, i) => {
-                  setTimeout(() => downloadDataUrl(photoEdits[p.id].dataUrl, `edited_photo_${i + 1}.jpg`), i * 300);
-                });
-              }}
-              className="w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}
-            >
-              <DownloadIcon size={16} /> {t('download.downloadAll', { count: editedPhotos.length })}
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Held above the error/receipt blocks: while this is up the kiosk is
-            deliberately not resetting, and the customer needs to know the wait
-            is the printer, not a stuck screen. */}
-        {printPending && (
+        {/* ── Right: receipt + how to download ── */}
+        <div className="flex flex-col gap-4 min-w-0">
+        {/* ── Right: Receipt ── */}
+        <div
+          className="card w-full overflow-hidden"
+          style={{ borderRadius: '1.75rem', minWidth: 0 }}
+        >
+          {/* Receipt header */}
           <div
-            className="w-full rounded-2xl p-5 flex items-center gap-4"
-            style={{ background: 'var(--color-primary-50)', border: '2px solid var(--color-primary)' }}
+            className="px-6 py-5"
+            style={{
+              background: 'var(--color-primary)',
+              color: '#fff',
+            }}
           >
-            <Printer size={32} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-            <div className="min-w-0">
-              <p className="text-lg font-black leading-tight" style={{ color: 'var(--color-primary)' }}>
-                {t('print.inProgressTitle')}
-              </p>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-600)' }}>
-                {t('print.inProgressHint')}
-              </p>
+            <div className="flex items-center gap-3 mb-3">
+              <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
+              <div>
+                <p className="font-black text-xl leading-tight">Ownize AI Studio</p>
+                {unitName && (
+                  <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-between text-sm opacity-80">
+              <span>{t('download.code')} <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
+              <span>{formatDate(order.created_at ?? order.paid_at)}</span>
             </div>
           </div>
-        )}
 
-        {paidItems.length > 0 && (addonPrintError || paidVersionMissing) && (
-          <div
-            className="w-full rounded-2xl p-4 flex flex-col gap-2"
-            style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
-          >
-            <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
-              <AlertTriangle size={16} /> {t('print.addonErr')}
+          {/* Items */}
+          <div className="px-6 py-4">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-600)' }}>
+              {t('download.itemsBought')}
             </p>
-            <button
-              onClick={() => setAddonPrintAttempt((n) => n + 1)}
-              className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
-              style={{ background: '#fff', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
-            >
-              <RefreshCw size={14} /> {t('common.retry')}
-            </button>
-          </div>
-        )}
 
-        {canPrintReceipt && (
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={handlePrintReceipt}
-            disabled={receiptStatus === 'printing'}
-            className="w-full"
-          >
-            <Printer size={20} /> {receiptStatus === 'printing' ? t('download.printingReceipt') : t('download.printReceipt')}
-          </Button>
-        )}
-        {receiptStatus === 'fail' && (
-          <p className="text-xs text-center" style={{ color: 'var(--color-error)' }}>{t('download.receiptFail')}</p>
-        )}
+            <div className="flex flex-col gap-2">
+              {lineItems.length > 0 ? lineItems.map((item, i) => {
+                const isPrint = item.key.startsWith('print-');
+                return (
+                  <div
+                    key={item.key}
+                    className="flex items-center justify-between py-2"
+                    style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
+                        style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                      >
+                        {isPrint ? <Printer size={14} /> : i + 1}
+                      </div>
+                      <span
+                        className="text-sm truncate"
+                        style={{ color: 'var(--color-neutral-700)' }}
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
+                      {formatRp(item.price)}
+                    </span>
+                  </div>
+                );
+              }) : (
+                <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('download.noItems')}</p>
+              )}
+            </div>
 
-        {/* Print jobs that failed after payment already succeeded — reprint
-            reuses the already-composed bitmap, no new charge. */}
-        {failedJobs.length > 0 && (
-          <div
-            className="w-full rounded-2xl p-4 flex flex-col gap-2"
-            style={{ background: 'var(--color-error-bg)', border: '1.5px solid var(--color-error)' }}
-          >
-            <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
-              <AlertTriangle size={16} /> {t('print.someFailed', { count: failedJobs.length })}
-            </p>
-            {failedJobs.map((job) => (
-              <button
-                key={job.jobId}
-                onClick={() => handleReprint(job)}
-                className="w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5"
-                style={{ background: '#fff', color: 'var(--color-error)', border: '1.5px solid var(--color-error)' }}
+            {/* Totals */}
+            <div className="mt-4 flex flex-col gap-1.5">
+              {discount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.discount')}</span>
+                  <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
+                </div>
+              )}
+              {order.promo_code_used && (
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.promoCode')}</span>
+                  <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
+                </div>
+              )}
+              <div
+                className="flex justify-between items-center pt-3 mt-1"
+                style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
               >
-                <RefreshCw size={14} /> {t('print.reprint')}
-              </button>
-            ))}
-          </div>
-        )}
+                <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
+                <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
+                  {formatRp(finalPrice)}
+                </span>
+              </div>
+            </div>
 
-        <Button size="xl" onClick={handleRestart} className="w-full">
-          {t('download.newTransaction')}
-        </Button>
-      </div>
-
-      {/* ── Right: Receipt ── */}
-      <div
-        className="w-full sm:flex-1 sm:portrait:flex-none rounded-3xl overflow-hidden"
-        style={{
-          background: '#fff',
-          boxShadow: 'var(--shadow-xl)',
-          border: '2px solid var(--color-neutral-100)',
-          minWidth: 0,
-        }}
-      >
-        {/* Receipt header */}
-        <div
-          className="px-6 py-5"
-          style={{
-            background: 'var(--color-primary)',
-            color: '#fff',
-          }}
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
-            <div>
-              <p className="font-black text-xl leading-tight">Ownize AI Studio</p>
-              {unitName && (
-                <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
+            {/* Payment method badge */}
+            <div className="mt-4 flex items-center gap-2">
+              <span
+                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5"
+                style={{
+                  background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
+                  color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
+                }}
+              >
+                {isCash ? <Banknote size={14} /> : <Smartphone size={14} />}
+                {isCash ? t('download.cash') : t('download.qris')}
+              </span>
+              {order.paid && (
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                  style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+                >
+                  <Check size={14} strokeWidth={3} /> {t('download.paid')}
+                </span>
               )}
             </div>
           </div>
-          <div className="flex justify-between text-sm opacity-80">
-            <span>{t('download.code')} <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
-            <span>{formatDate(order.created_at ?? order.paid_at)}</span>
+
+          {/* Footer */}
+          <div
+            className="px-6 py-4 text-center text-xs"
+            style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-600)', borderTop: '1px solid var(--color-neutral-100)' }}
+          >
+            {t('download.thanks')}
           </div>
         </div>
 
-        {/* Items */}
-        <div className="px-6 py-4">
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-600)' }}>
-            {t('download.itemsBought')}
-          </p>
-
-          <div className="flex flex-col gap-2">
-            {lineItems.length > 0 ? lineItems.map((item, i) => {
-              const isPrint = item.key.startsWith('print-');
-              return (
-                <div
-                  key={item.key}
-                  className="flex items-center justify-between py-2"
-                  style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
-                      style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
-                    >
-                      {isPrint ? <Printer size={14} /> : i + 1}
-                    </div>
-                    <span
-                      className="text-sm truncate"
-                      style={{ color: 'var(--color-neutral-700)' }}
-                      title={item.name}
-                    >
-                      {item.name}
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
-                    {formatRp(item.price)}
+          <section className="card p-5 sm:p-6 flex flex-col gap-4" style={{ borderRadius: '1.75rem' }}>
+            <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
+              <Smartphone size={22} style={{ color: 'var(--color-primary)' }} /> {t('download.howTitle')}
+            </h2>
+            <ol className="flex flex-col gap-3">
+              {[[Camera, 'download.how1'], [ScanLine, 'download.how2'], [DownloadIcon, 'download.how3']].map(([Icon, key], i) => (
+                <li key={key} className="flex items-center gap-3">
+                  <span
+                    className="flex shrink-0 items-center justify-center rounded-full w-9 h-9 text-base font-black text-white"
+                    style={{ background: 'var(--gradient-primary)' }}
+                  >
+                    {i + 1}
                   </span>
-                </div>
-              );
-            }) : (
-              <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('download.noItems')}</p>
-            )}
-          </div>
-
-          {/* Totals */}
-          <div className="mt-4 flex flex-col gap-1.5">
-            {discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.discount')}</span>
-                <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
-              </div>
-            )}
-            {order.promo_code_used && (
-              <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.promoCode')}</span>
-                <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
-              </div>
-            )}
-            <div
-              className="flex justify-between items-center pt-3 mt-1"
-              style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
-            >
-              <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
-              <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
-                {formatRp(finalPrice)}
-              </span>
-            </div>
-          </div>
-
-          {/* Payment method badge */}
-          <div className="mt-4 flex items-center gap-2">
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5"
-              style={{
-                background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
-                color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
-              }}
-            >
-              {isCash ? <Banknote size={14} /> : <Smartphone size={14} />}
-              {isCash ? t('download.cash') : t('download.qris')}
-            </span>
-            {order.paid && (
-              <span
-                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
-                style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
-              >
-                <Check size={14} strokeWidth={3} /> {t('download.paid')}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          className="px-6 py-4 text-center text-xs"
-          style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-600)', borderTop: '1px solid var(--color-neutral-100)' }}
-        >
-          {t('download.thanks')}
+                  <Icon size={26} className="shrink-0" style={{ color: 'var(--color-neutral-800)' }} />
+                  <span className="text-base leading-snug" style={{ color: 'var(--color-neutral-800)' }}>{t(key)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
       </div>
 
+      <div className="mt-auto">
+        <NavBar
+          next={{
+            label: t('download.newTransaction'),
+            sub: t('download.newSub'),
+            onClick: handleRestart,
+            icon: <Home size={26} strokeWidth={2.4} />,
+          }}
+        />
+      </div>
     </div>
   );
 }

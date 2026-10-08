@@ -45,7 +45,7 @@ export default function AiResultModal({ originalUrl, resultUrl, label, onUse, on
       <div
         className="rounded-3xl overflow-hidden flex flex-col sm:flex-row w-full mx-3"
         style={{
-          background: '#fff',
+          background: 'var(--color-card)',
           maxWidth: 'min(1240px, calc(100vw - 48px))',
           maxHeight: '92vh',
           boxShadow: '0 24px 64px rgba(0,0,0,0.3)',

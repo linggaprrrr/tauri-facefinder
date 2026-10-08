@@ -45,7 +45,7 @@ export default function OrderRecovery({ order, onClose }) {
     >
       <div
         className="flex flex-col gap-4 p-6 rounded-3xl w-full max-w-sm text-center"
-        style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}
+        style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-xl)' }}
       >
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-neutral-600)' }}>

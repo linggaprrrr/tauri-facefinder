@@ -4,7 +4,7 @@ import useImage from 'use-image';
 import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
-  ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check,
+  ChevronLeft, ChevronRight, Check,
   Plus, Minus, Pencil, X, Loader2, QrCode,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
@@ -20,6 +20,8 @@ import SlotPhotoPicker from './SlotPhotoPicker';
 import UploadPanel from './UploadPanel';
 import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
+import PageHeader from '../common/PageHeader';
+import NavBar from '../common/NavBar';
 import ElementToolbar from './ElementToolbar';
 import { useSessionUploads } from '../../hooks/useSessionUploads';
 import { sessionUploadUrl } from '../../api/mockApi';
@@ -1244,58 +1246,45 @@ export default function PhotoEditor() {
   return (
     <div className="flex flex-col h-full gap-3 max-w-7xl mx-auto w-full">
 
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between gap-2 sm:gap-4 shrink-0 flex-wrap">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black shrink-0 on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('editor.title')}
-          </h1>
-          {/* neutral-600, not 400: this sits directly on the outlet's
-              background photo, where a near-white grey vanished entirely. */}
-          <p className="hidden sm:block text-sm mt-0.5 on-bg-text" style={{ color: 'var(--color-neutral-600)' }}>
-            {t('editor.subtitle')}
-          </p>
-        </div>
-
-        {/* Photo counter nav */}
-        <div
-          className="flex items-center gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 shrink-0"
-          style={{ background: 'var(--color-neutral-100)', border: '1.5px solid var(--color-neutral-200)' }}
-        >
-          <button
-            disabled={photoIndex === 0}
-            onClick={() => navigateTo(photoIndex - 1)}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
-            style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
-            aria-label="Previous"
+      {/* Not on a portrait kiosk: there the step bar already says "Customize"
+          and the filmstrip has its own prev/next, so this row would only cost
+          the canvas ~84px of height it can't spare. */}
+      {!isPortrait && (
+      <PageHeader
+        icon={SlidersHorizontal}
+        title={t('editor.title')}
+        subtitle={t('editor.subtitle')}
+        // Photo counter nav
+        action={
+          <div
+            className="flex items-center gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 shrink-0"
+            style={{ background: 'var(--color-neutral-100)', border: '1.5px solid var(--color-neutral-200)' }}
           >
-            <ChevronLeft size={18} />
-          </button>
-          <span className="text-sm font-bold px-1" style={{ color: 'var(--color-neutral-700)', minWidth: 40, textAlign: 'center' }}>
-            {photoIndex + 1} / {selectedPhotos.length}
-          </span>
-          <button
-            disabled={isLast}
-            onClick={() => navigateTo(photoIndex + 1)}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
-            style={{ background: 'white', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
-            aria-label="Next"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-
-        <div className="flex gap-2 shrink-0">
-          <Button variant="ghost" onClick={() => navigate('/gallery')}>
-            <ArrowLeft size={18} /> {t('editor.gallery')}
-          </Button>
-          <Button onClick={handleDone}>
-            {isLast
-              ? <>{t('editor.done')} <Check size={18} strokeWidth={3} /></>
-              : <>{t('editor.next')} <ArrowRight size={18} /></>}
-          </Button>
-        </div>
-      </div>
+            <button
+              disabled={photoIndex === 0}
+              onClick={() => navigateTo(photoIndex - 1)}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+              style={{ background: 'var(--color-card)', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
+              aria-label="Previous"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="text-sm font-bold px-1" style={{ color: 'var(--color-neutral-700)', minWidth: 40, textAlign: 'center' }}>
+              {photoIndex + 1} / {selectedPhotos.length}
+            </span>
+            <button
+              disabled={isLast}
+              onClick={() => navigateTo(photoIndex + 1)}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+              style={{ background: 'var(--color-card)', border: '1.5px solid var(--color-neutral-200)', color: 'var(--color-neutral-600)' }}
+              aria-label="Next"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        }
+      />
+      )}
 
       {/* ── Main body: 3-column on desktop, stacked on mobile ── */}
       <div
@@ -1316,7 +1305,7 @@ export default function PhotoEditor() {
           className="flex flex-row sm:flex-col items-center gap-1 px-2 sm:px-0 py-2 sm:py-3 rounded-xl shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar"
           style={{
             ...(isPortrait && { gridRow: 2, flexDirection: 'row', justifyContent: 'space-evenly', padding: '6px 8px' }),
-            background: '#fff',
+            background: 'var(--color-card)',
             border: '1.5px solid var(--color-neutral-200)',
             boxShadow: 'var(--shadow-sm)',
           }}
@@ -1654,7 +1643,7 @@ export default function PhotoEditor() {
             return (
               <div
                 className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl shrink-0"
-                style={{ background: '#fff', border: '1.5px solid var(--color-primary-200)', boxShadow: 'var(--shadow-sm)' }}
+                style={{ background: 'var(--color-card)', border: '1.5px solid var(--color-primary-200)', boxShadow: 'var(--shadow-sm)' }}
               >
                 <span className="text-xs font-medium" style={{ color: 'var(--color-neutral-600)' }}>
                   {t('frame.slotsFilled', { filled, total: frameSlots.length })}
@@ -1707,7 +1696,7 @@ export default function PhotoEditor() {
 
             <div
               className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 rounded-xl flex-1 min-w-0"
-              style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+              style={{ background: 'var(--color-card)', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
             >
               {selectedPhotos.map((p, i) => {
                 const isActive = i === photoIndex;
@@ -1814,7 +1803,7 @@ export default function PhotoEditor() {
           className="flex flex-col flex-1 min-h-0 sm:min-h-0 min-h-[280px] rounded-xl overflow-hidden"
           style={{
             maxHeight: isPortrait ? '20vh' : undefined,
-            background: '#fff',
+            background: 'var(--color-card)',
             border: '1.5px solid var(--color-neutral-200)',
             boxShadow: 'var(--shadow-sm)',
           }}
@@ -1895,10 +1884,6 @@ export default function PhotoEditor() {
           {/* Element-scope controls, docked under the panel. Kept in the same
               column as the tools rather than over the canvas, so the photo
               never shifts down when something is selected. */}
-          {/* sm:portrait:ml-40 clears the help FAB (bottom-left, ~150px) — this
-              is the last row on a portrait screen, so it would sit on the
-              hint and cover the element toolbar's first buttons. */}
-          <div className="contents sm:portrait:block sm:portrait:ml-40">
           {selectedElement ? (
             <ElementToolbar
               label={selectedLabel}
@@ -1923,7 +1908,6 @@ export default function PhotoEditor() {
               💡 {t('editor.hintSelectEl')}
             </p>
           )}
-          </div>
         </div>
       </div>
 
@@ -1933,7 +1917,7 @@ export default function PhotoEditor() {
         // photo this is, and the canvas needs the height more than a third copy.
         className="shrink-0 flex sm:portrait:hidden items-center justify-between px-4 py-2.5 rounded-xl"
         style={{
-          background: '#fff',
+          background: 'var(--color-card)',
           border: '1.5px solid var(--color-neutral-200)',
           boxShadow: 'var(--shadow-sm)',
         }}
@@ -1967,6 +1951,11 @@ export default function PhotoEditor() {
           {t('editor.autoSave')}
         </span>
       </div>
+
+      <NavBar
+        back={{ label: t('nav.back'), sub: t('editor.backSub'), onClick: () => { exportAndSave(); navigate('/gallery'); } }}
+        next={{ label: t('nav.next'), sub: t('editor.nextSub'), onClick: handleDone }}
+      />
 
       {showSlotPicker && (
         <SlotPhotoPicker
