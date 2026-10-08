@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { composePrintImage } from '../../utils/composePrintImage';
+import WatermarkOverlay from '../common/WatermarkOverlay';
 
 // "This is how your print will look": the real print composition (template,
 // frame, logo, text) from the same composePrintImage the printer gets, shown
@@ -41,6 +42,8 @@ export default function PrintPreview({ templateVersion, srcs, outletName, classN
       ) : (
         <div className="absolute inset-0 animate-pulse" style={{ background: 'var(--color-neutral-200)' }} />
       )}
+      {/* Always: every place this renders is before payment. */}
+      <WatermarkOverlay scale={0.45} />
     </div>
   );
 }

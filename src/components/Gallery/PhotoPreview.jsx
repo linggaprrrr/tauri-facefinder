@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, Check, Plus } from 'lucide-react';
 import { usePhotoCache } from '../../hooks/usePhotoCache';
+import WatermarkOverlay from '../common/WatermarkOverlay';
 import { useLang } from '../../i18n/LanguageContext';
 
 export default function PhotoPreview({ photo, photos, onClose, onNavigate, selected, onToggleSelect }) {
@@ -70,12 +71,17 @@ export default function PhotoPreview({ photo, photos, onClose, onNavigate, selec
             being computed and then ignored here, so every preview re-fetched a
             photo the grid had already downloaded. Falls back to the URL while
             the cache entry is still resolving. */}
-        <img
-          src={cachedUrl ?? photo.thumbnail ?? photo.url}
-          alt="Preview"
-          className="block object-contain"
-          style={{ maxHeight: '72vh', maxWidth: '80vw' }}
-        />
+        <div className="relative">
+          <img
+            src={cachedUrl ?? photo.thumbnail ?? photo.url}
+            alt="Preview"
+            className="block object-contain"
+            style={{ maxHeight: '72vh', maxWidth: '80vw' }}
+          />
+          {/* The largest unpaid view of a photo in the flow — watermarked like
+              the editor canvas, so a phone snap of the screen is not a copy. */}
+          <WatermarkOverlay scale={0.8} />
+        </div>
 
         {/* Bottom bar */}
         <div

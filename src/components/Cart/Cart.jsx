@@ -8,6 +8,7 @@ import { copiesOf, setCopies, setCopiesForAll, addCollage, printTotals, MAX_COPI
 import PrintAddonSelector from '../Print/PrintAddonSelector';
 import PrintFormatArt from '../Print/PrintFormatArt';
 import PrintPreview from '../Print/PrintPreview';
+import WatermarkOverlay from '../common/WatermarkOverlay';
 import QtyStepper from '../Print/QtyStepper';
 import Button from '../common/Button';
 import IconButton from '../common/IconButton';
@@ -209,7 +210,10 @@ export default function Cart() {
                     {previewPhoto && (activeTab.printType === 'soft' ? (
                       // The soft file is the photo itself, on the customer's phone.
                       <div className="w-36 rounded-[1.75rem] p-2" style={{ background: 'var(--color-neutral-900)', boxShadow: 'var(--shadow-lg)' }}>
-                        <img src={lightSrc(previewPhoto)} alt="" className="w-full aspect-[9/16] object-cover rounded-[1.25rem]" />
+                        <div className="relative rounded-[1.25rem] overflow-hidden">
+                          <img src={lightSrc(previewPhoto)} alt="" className="block w-full aspect-[9/16] object-cover" />
+                          <WatermarkOverlay scale={0.4} />
+                        </div>
                       </div>
                     ) : (
                       <PrintPreview
