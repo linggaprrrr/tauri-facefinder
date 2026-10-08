@@ -155,6 +155,15 @@
   --shadow-glow-primary: 0 12px 28px rgba(1,125,197,0.32), 0 4px 10px rgba(1,125,197,0.20);
   --shadow-glow-accent:  0 12px 28px rgba(251,165,25,0.38), 0 4px 10px rgba(249,115,22,0.22);
   --shadow-pop:          0 18px 40px rgba(1,125,197,0.16), 0 6px 14px rgba(251,165,25,0.14);
+
+  /* ── Soft 3D (neumorphic): light from the top-left. Raised = white highlight
+     up-left + warm shadow down-right; pressed = the same pair, inset. ── */
+  --shadow-neu:         -6px -6px 14px rgba(255,255,255,0.95), 7px 7px 16px rgba(90,64,24,0.24);
+  --shadow-neu-pressed: inset 4px 4px 9px rgba(90,64,24,0.24), inset -4px -4px 9px rgba(255,255,255,0.9);
+  /* Coloured buttons: same outer pair plus an inner bevel so they read as domed. */
+  --shadow-neu-color:   -5px -5px 12px rgba(255,255,255,0.9), 7px 7px 16px rgba(14,31,77,0.28),
+                        inset 0 2px 1px rgba(255,255,255,0.45), inset 0 -4px 6px rgba(0,0,0,0.18);
+  --shadow-neu-color-pressed: inset 3px 3px 8px rgba(0,0,0,0.28), inset -2px -2px 6px rgba(255,255,255,0.25);
 }
 
 /* ─────────────────────────────────────────────
@@ -238,16 +247,15 @@ body::before {
   background: var(--gradient-primary);
   color: #fff;
   border: 2px solid transparent;
-  box-shadow: var(--shadow-glow-primary);
+  box-shadow: var(--shadow-neu-color);
 }
 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.05);
-  box-shadow: var(--shadow-glow-primary), 0 0 0 4px var(--color-primary-100);
   transform: translateY(-2px);
 }
 .btn-primary:active:not(:disabled) {
   transform: translateY(0) scale(0.97);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-neu-color-pressed);
 }
 .btn-primary:disabled {
   background: var(--color-primary-200);
@@ -260,17 +268,16 @@ body::before {
   background: var(--gradient-accent);
   color: var(--color-neutral-900);
   border: 2px solid transparent;
-  box-shadow: var(--shadow-glow-accent);
+  box-shadow: var(--shadow-neu-color);
 }
 .btn-secondary:hover:not(:disabled) {
   filter: brightness(1.05);
   color: var(--color-neutral-900);
-  box-shadow: var(--shadow-glow-accent), 0 0 0 4px var(--color-accent-100);
   transform: translateY(-2px);
 }
 .btn-secondary:active:not(:disabled) {
   transform: translateY(0) scale(0.97);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-neu-color-pressed);
 }
 .btn-secondary:disabled {
   background: var(--color-accent-100);
@@ -280,16 +287,16 @@ body::before {
 
 /* Ghost: transparent with blue border */
 .btn-ghost {
-  background: transparent;
+  background: var(--color-card);
   color: var(--color-primary);
-  border: 2px solid var(--color-primary-200);
+  border: 2px solid transparent;
+  box-shadow: var(--shadow-neu);
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--color-primary-50);
-  border-color: var(--color-primary-400);
 }
 .btn-ghost:active:not(:disabled) {
-  background: var(--color-primary-100);
+  box-shadow: var(--shadow-neu-pressed);
   transform: scale(0.97);
 }
 .btn-ghost:disabled {
@@ -302,6 +309,10 @@ body::before {
   background: var(--color-error-bg);
   color: var(--color-error);
   border: 2px solid transparent;
+  box-shadow: var(--shadow-neu);
+}
+.btn-danger:active:not(:disabled) {
+  box-shadow: var(--shadow-neu-pressed);
 }
 .btn-danger:hover:not(:disabled) {
   background: var(--color-error);
@@ -374,10 +385,18 @@ textarea:focus-visible,
 
 /* Raised cream tile — step bar icons and similar chunky controls. */
 .raised-tile {
-  background: var(--color-neutral-50);
-  border: 1px solid var(--color-neutral-200);
-  box-shadow: 0 2px 3px rgba(90, 64, 24, 0.22), 0 8px 16px rgba(90, 64, 24, 0.26), inset 0 1px 0 #fff;
+  /* Same colour as the panel it sits on — the shadows alone carve the shape,
+     which is what makes it read as pushed up out of the surface. */
+  background: var(--color-card);
+  box-shadow: var(--shadow-neu);
+  transition: box-shadow 120ms ease, transform 120ms ease;
 }
+.raised-tile:is(button, a):active:not(:disabled),
+:is(button, a):active > .raised-tile {
+  box-shadow: var(--shadow-neu-pressed);
+}
+/* A control that can't be pressed shouldn't look pressable: it goes flat. */
+.raised-tile:disabled { box-shadow: none; }
 /* The brand wordmark, gradient-filled. background-clip:text needs a
    transparent fill, so this cannot be expressed as a colour utility.
    The solid colour is declared first and only overridden where the clip is

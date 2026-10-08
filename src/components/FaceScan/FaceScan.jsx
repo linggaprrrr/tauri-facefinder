@@ -156,8 +156,7 @@ export default function FaceScan() {
           type="button"
           onClick={handleCapture}
           disabled={!canScan}
-          className="card flex items-center gap-3 sm:gap-5 w-full rounded-full p-2 sm:p-3 text-left transition-transform active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{ borderRadius: 9999, boxShadow: canScan ? 'var(--shadow-glow-primary)' : 'var(--shadow-sm)', border: '2px solid var(--color-primary-200)' }}
+          className="raised-tile flex items-center gap-3 sm:gap-5 w-full rounded-full p-2 sm:p-3 text-left active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <span className="raised-tile hidden sm:flex shrink-0 items-center justify-center rounded-full w-20 h-20" style={{ color: 'var(--color-neutral-900)' }}>
             <ScanFace size={40} strokeWidth={1.8} />
@@ -170,7 +169,7 @@ export default function FaceScan() {
           </span>
           <span
             className="flex shrink-0 items-center justify-center rounded-full w-14 h-14 sm:w-20 sm:h-20 text-white"
-            style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-glow-primary)' }}
+            style={{ background: 'var(--gradient-primary)', boxShadow: 'var(--shadow-neu-color)' }}
           >
             <ArrowRight size={34} strokeWidth={2.6} />
           </span>

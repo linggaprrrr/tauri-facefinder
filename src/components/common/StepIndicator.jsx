@@ -44,7 +44,7 @@ export default function StepIndicator({ current }) {
                     width: TILE, height: TILE, borderRadius: 28,
                     background: isActive ? 'var(--gradient-primary)' : undefined,
                     color: isActive ? '#fff' : isDone ? 'var(--color-primary)' : 'var(--color-neutral-800)',
-                    boxShadow: isActive ? 'var(--shadow-glow-primary)' : undefined,
+                    boxShadow: isActive ? 'var(--shadow-neu-color)' : undefined,
                   }}
                 >
                   <Icon size={44} strokeWidth={isActive ? 2.2 : 1.8} />
