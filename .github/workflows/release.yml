@@ -6,21 +6,15 @@ on:
       - 'v*'
 
 jobs:
+  # Windows only: every kiosk runs Windows. The old macOS matrix entries ran in
+  # parallel and all rewrote the release's latest.json (the updater manifest);
+  # in v1.8.1 they raced, the Windows job's write 404'd, and the manifest
+  # shipped without a Windows entry — so no kiosk would have auto-updated.
+  # One job, one writer. For a Mac build, run `npm run tauri build` locally.
   release:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
-          - platform: windows-latest
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +26,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install frontend deps
         run: npm install
@@ -50,4 +42,3 @@ jobs:
           releaseBody: 'See the assets below to download this version.'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
