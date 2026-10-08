@@ -40,7 +40,7 @@ export const translations = {
   'nav.next':      { id: 'Lanjut',  en: 'Next' },
   'step.scan':     { id: 'Pindai',     en: 'Scan' },
   'step.gallery':  { id: 'Pilih',      en: 'Choose' },
-  'step.editor':   { id: 'Hias',       en: 'Customize' },
+  'step.editor':   { id: 'Editing',    en: 'Customize' },
   'step.cart':     { id: 'Bayar',      en: 'Pay' },
   'step.download': { id: 'Ambil Foto', en: 'Get Photo' },
 
