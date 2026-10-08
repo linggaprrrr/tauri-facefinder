@@ -41,7 +41,7 @@ export default function SlotPhotoPicker({ photos, assignedPhotoIds, slotIndex, o
                   />
                   {!isUsed && (
                     <span
-                      className="absolute bottom-0 inset-x-0 text-[10px] font-bold py-0.5"
+                      className="absolute bottom-0 inset-x-0 text-xs font-bold py-0.5"
                       style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
                     >
                       {t(source === 'edited' ? 'cart.edited' : 'cart.original')}

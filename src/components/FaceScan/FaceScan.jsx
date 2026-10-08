@@ -7,6 +7,7 @@ import { useCamera } from '../../hooks/useCamera';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { scanFace } from '../../api/mockApi';
+import { playSound } from '../../utils/sounds';
 import LoadingSpinner from '../common/LoadingSpinner';
 import FaceOverlay from './FaceOverlay';
 
@@ -58,12 +59,14 @@ export default function FaceScan() {
     dispatch({ type: 'SET_CAPTURED_FACE', payload: image });
     try {
       const result = await scanFace(image);
+      playSound(result.photos.length ? 'found' : 'notFound');
       dispatch({ type: 'SET_PHOTOS', payload: result.photos });
       navigate('/gallery');
     } catch (err) {
       console.error('scanFace failed:', err);
       // A dead link / timeout reads as "reconnecting", not "scan failed".
       const offlineKind = err?.kind === 'network' || err?.kind === 'timeout';
+      playSound('error');
       setErrorKey(offlineKind ? 'scan.offline' : 'scan.error');
       setStatus('error');
     }

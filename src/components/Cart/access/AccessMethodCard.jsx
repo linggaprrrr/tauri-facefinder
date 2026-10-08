@@ -21,7 +21,7 @@ export default function AccessMethodCard({ method, price, onSelect }) {
     >
       {method.badge === 'recommended' && (
         <span
-          className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
+          className="absolute top-3 left-3 text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
           style={{ background: 'var(--color-primary)', color: '#fff' }}
         >
           {t('access.recommended')}

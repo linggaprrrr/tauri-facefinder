@@ -37,7 +37,11 @@ export default function Checkout() {
   const [chainedDiscount, setChainedDiscount] = useState(null); // { promoCode, discountAmount } | null
   const [showStaffGrant, setShowStaffGrant] = useState(false);
 
-  const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0);
+  // Photos AND billable prints — the same total the Pay page and the QRIS
+  // screen show. Photos alone made the method cards quote a lower price than
+  // the customer was about to be charged whenever prints were in the order.
+  const total = state.selectedPhotos.reduce((sum, p) => sum + p.price, 0)
+    + state.printItems.reduce((sum, it) => sum + (it.canSubmit ? it.totalPrice : 0), 0);
 
   let content;
   if (loading) {

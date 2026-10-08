@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, Check,
-  Plus, Minus, Pencil, X, Loader2, QrCode,
+  Plus, Minus, Pencil, X, Loader2, QrCode, Printer,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { clampPan, nextView } from '../../utils/viewTransform';
@@ -20,6 +20,9 @@ import SlotPhotoPicker from './SlotPhotoPicker';
 import UploadPanel from './UploadPanel';
 import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
+import WatermarkOverlay from '../common/WatermarkOverlay';
+import PrintPanel from './PrintPanel';
+import { usePrintProducts } from '../../hooks/usePrintProducts';
 import PageHeader from '../common/PageHeader';
 import NavBar from '../common/NavBar';
 import ElementToolbar from './ElementToolbar';
@@ -373,57 +376,6 @@ function FrameOverlay({ src, canvasW, canvasH }) {
   );
 }
 
-function WatermarkOverlay({ canvasW, canvasH }) {
-  const [pos, setPos] = useState({ x: 60, y: 60 });
-  const [opacity, setOpacity] = useState(0.35);
-
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const col = Math.floor(Math.random() * 3);
-      const row = Math.floor(Math.random() * 3);
-      setPos({ x: (canvasW / 3) * col + 20, y: (canvasH / 3) * row + 20 });
-    }, 1200);
-    return () => clearInterval(iv);
-  }, [canvasW, canvasH]);
-
-  useEffect(() => {
-    let t = 0;
-    const iv = setInterval(() => {
-      t += 0.12;
-      setOpacity(0.25 + 0.15 * Math.abs(Math.sin(t)));
-    }, 80);
-    return () => clearInterval(iv);
-  }, []);
-
-  const offsets = [-240, -120, 0, 120, 240, 360];
-  return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6, overflow: 'hidden' }}>
-      {offsets.map((offset) => (
-        <span
-          key={offset}
-          style={{
-            position: 'absolute',
-            left: pos.x + offset * 0.9,
-            top: pos.y + offset * 0.5,
-            transform: 'rotate(-28deg)',
-            transformOrigin: '0 0',
-            fontSize: 32,
-            fontFamily: 'Arial, sans-serif',
-            fontWeight: 'bold',
-            color: 'white',
-            opacity,
-            textShadow: '0 0 6px rgba(0,0,0,0.6)',
-            userSelect: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          OWNIZE PHOTO
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function clampOffset(x, y, imgW, imgH, slotW, slotH) {
   return {
     x: Math.min(0, Math.max(x, slotW - imgW)),
@@ -542,6 +494,8 @@ const SIDEBAR_TOOLS = [
   { id: 'filters',  icon: SlidersHorizontal, labelKey: 'editor.tabFilters' },
   { id: 'ai',       icon: Sparkles,          labelKey: 'editor.tabAi' },
 ];
+// Only offered when this kiosk can actually print (see usePrintProducts).
+const PRINT_TOOL = { id: 'print', icon: Printer, labelKey: 'editor.tabPrint' };
 
 // Module-level counter so in-flight AI promises are correctly superseded even
 // when PhotoEditor unmounts and remounts (navigation away and back).
@@ -576,7 +530,7 @@ export default function PhotoEditor() {
   // screen (it was 42%) left a portrait print small with empty space round it.
   const canvasAreaRef = useRef(null);
   const [colW, setColW] = useState(0);
-  const [areaH, setAreaH] = useState(0);
+  const [areaH, setAreaH] = useState(null); // null = not measured yet
   const hasPhoto = !!state.selectedPhotos.length;
   useEffect(() => {
     const el = centerColRef.current;
@@ -591,11 +545,16 @@ export default function PhotoEditor() {
     if (area) ro.observe(area);
     return () => ro.disconnect();
   }, [hasPhoto]);
+  const mergeToolRow = !isMobile && (isPortrait || colW >= 720);
   const deskMaxW = isPortrait ? (colW || MAX_CANVAS_W) : Math.min(colW || MAX_CANVAS_W, MAX_CANVAS_W);
   const maxCanvasW = isMobile ? Math.max(200, viewport.w - 24) : deskMaxW;
+  // Kiosk sizes (portrait AND landscape) fit the canvas to the measured box it
+  // sits in. A fixed 520px on landscape overflowed any window shorter than a
+  // 1080px kiosk once the step bar and Back/Next bar took their height — the
+  // photo ended up on top of the Next button.
+  // A measured 0 is real (a very short window) — only `null` falls back.
   const maxCanvasH = isMobile ? Math.max(220, Math.round(viewport.h * 0.42))
-    : isPortrait ? Math.max(220, areaH || Math.round(viewport.h * 0.42))
-    : MAX_CANVAS_H;
+    : Math.max(160, areaH ?? (isPortrait ? Math.round(viewport.h * 0.42) : MAX_CANVAS_H));
 
   const selectedPhotos = state.selectedPhotos;
   const photoEdits = state.photoEdits;
@@ -616,7 +575,11 @@ export default function PhotoEditor() {
   // Admin-configured per outlet (Branding Kiosk modal), boot-cached same as
   // colours/images — a toggle lands next reboot, not mid-session.
   const disabledTools = readCachedBranding(state.deviceConfig.outlet?.id)?.disabled_tools ?? [];
-  const visibleSidebarTools = SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id));
+  const { products: printProducts, canOffer: canPrint } = usePrintProducts();
+  const visibleSidebarTools = [
+    ...SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id)),
+    ...(canPrint ? [PRINT_TOOL] : []),
+  ];
   // 'stickers' is the usual default panel (on load and whenever the editor
   // resets to a neutral tool), but if an outlet has disabled exactly that
   // tool, fall back to whatever's first available instead of landing on a
@@ -1225,6 +1188,28 @@ export default function PhotoEditor() {
   }
 
   // Toggle sidebar tool — clicking active tool collapses panel
+  // The Cetak panel previews the photo as edited right now. Rendered from the
+  // stage (debounced) rather than read from photoEdits, which only updates when
+  // the customer switches photo.
+  const [printSrc, setPrintSrc] = useState(null);
+  useEffect(() => {
+    if (activePanel !== 'print' || !stageRef.current) return undefined;
+    const timer = setTimeout(() => {
+      try { setPrintSrc(exportStage(stageRef.current)); } catch { setPrintSrc(null); }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activePanel, elements, filters, frame, photoIndex]);
+
+  // Reset this photo: stickers/text go through history (undoable), filters and
+  // frame back to none.
+  const canReset = elements.length > 0 || frame !== 'none' || filters.brightness !== 0 || filters.contrast !== 0 || (filters.list?.length ?? 0) > 0;
+  function resetPhoto() {
+    if (elements.length) pushHistory([]);
+    setFilters(DEFAULT_FILTERS);
+    setFrame('none');
+    setSelectedId(null);
+  }
+
   function handleSidebarTool(id) {
     setActivePanel((prev) => (prev === id ? null : id));
   }
@@ -1241,15 +1226,15 @@ export default function PhotoEditor() {
   }
 
   const isLast = photoIndex === selectedPhotos.length - 1;
-  const activeTool = SIDEBAR_TOOLS.find((s) => s.id === activePanel);
+  const activeTool = [...SIDEBAR_TOOLS, PRINT_TOOL].find((s) => s.id === activePanel);
 
   return (
     <div className="flex flex-col h-full gap-3 max-w-7xl mx-auto w-full">
 
-      {/* Not on a portrait kiosk: there the step bar already says "Customize"
-          and the filmstrip has its own prev/next, so this row would only cost
-          the canvas ~84px of height it can't spare. */}
-      {!isPortrait && (
+      {/* Phones only. On a kiosk (either orientation) the step bar already
+          says "Customize" and the filmstrip has its own prev/next, so this row
+          would only cost the canvas ~84px of height it can't spare. */}
+      {isMobile && (
       <PageHeader
         icon={SlidersHorizontal}
         title={t('editor.title')}
@@ -1295,14 +1280,19 @@ export default function PhotoEditor() {
           // tool bar, then the panel sized to its content — so the photo grows
           // instead of an emptyish panel claiming half the screen.
           gridTemplateColumns: isMobile || isPortrait ? 'minmax(0, 1fr)' : '96px 1fr 320px',
-          gridTemplateRows: isPortrait ? 'minmax(0, 1fr) auto auto' : undefined,
+          // minmax(0, 1fr), not the implicit auto row: an auto row grows to
+          // its content, so the columns spilled past the page onto the
+          // Back/Next bar instead of fitting (and scrolling) inside it.
+          gridTemplateRows: isPortrait ? 'minmax(0, 1fr) auto auto' : isMobile ? undefined : 'minmax(0, 1fr)',
           gap: 12,
           overflowY: isMobile ? 'auto' : 'visible',
         }}
       >
         {/* ── Tool icons: vertical sidebar on desktop, horizontal bar on mobile ── */}
         <div
-          className="flex flex-row sm:flex-col items-center gap-1 px-2 sm:px-0 py-2 sm:py-3 rounded-xl shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar"
+          // Scrolls when the column is shorter than the tool list (a short
+          // landscape window), instead of running out over the bar below.
+          className="flex flex-row sm:flex-col items-center gap-1 px-2 sm:px-0 py-2 sm:py-3 rounded-xl shrink-0 overflow-x-auto sm:overflow-x-visible sm:overflow-y-auto no-scrollbar min-h-0"
           style={{
             ...(isPortrait && { gridRow: 2, flexDirection: 'row', justifyContent: 'space-evenly', padding: '6px 8px' }),
             background: 'var(--color-card)',
@@ -1342,7 +1332,7 @@ export default function PhotoEditor() {
                 <span
                   className="text-center"
                   style={{
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: isActive ? 800 : 600,
                     lineHeight: 1.15,
                     color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-600)',
@@ -1377,7 +1367,7 @@ export default function PhotoEditor() {
             }}
           >
             <X size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
-            <span style={{ fontSize: 9, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+            <span style={{ fontSize: 12, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
               {t('editor.toolClose')}
             </span>
           </button>
@@ -1386,11 +1376,11 @@ export default function PhotoEditor() {
         {/* ── Center: toolbar + canvas + filmstrip ── */}
         <div ref={centerColRef} className="flex flex-col gap-3 min-w-0 min-h-0" style={{ gridRow: isPortrait ? 1 : undefined }}>
 
-          {/* `contents` keeps the landscape layout exactly as it was; on portrait
-              this is the measured box the canvas is fitted into. */}
+          {/* The measured box the canvas is fitted into (kiosk sizes). On a
+              phone it is `contents`: there the canvas sizes from the viewport. */}
           <div
             ref={canvasAreaRef}
-            className={isPortrait ? 'flex-1 min-h-0 flex items-center justify-center' : 'contents'}
+            className={isMobile ? 'contents' : 'flex-1 min-h-0 flex items-center justify-center'}
           >
           {/* Canvas */}
           <div
@@ -1541,7 +1531,7 @@ export default function PhotoEditor() {
               </Layer>
             </Stage>
 
-            <WatermarkOverlay canvasW={activeCanvas.width} canvasH={activeCanvas.height} />
+            <WatermarkOverlay />
 
             <div
               style={{
@@ -1665,11 +1655,14 @@ export default function PhotoEditor() {
           {/* Document-scope toolbar. Sits under the canvas as a centred pill
               rather than a full-width bar above it — with only two controls in
               it, the bar was mostly empty and pushed the photo down the page. */}
-          {/* Portrait: filmstrip and this pill share one row — stacked they cost
-              the canvas ~60px it can't spare on a tall screen. */}
-          <div className={isPortrait ? 'flex items-center gap-3 shrink-0' : 'contents'}>
+          {/* Filmstrip and this pill share one row wherever the column is wide
+              enough for both (portrait, or a wide landscape column) — stacked
+              they cost the canvas ~60px it can't spare. */}
+          <div className={mergeToolRow ? 'flex items-center gap-3 shrink-0' : 'contents'}>
           <EditorToolbar
             canUndo={canUndo} canRedo={canRedo}
+            onReset={resetPhoto} canReset={!isLayoutFrame && canReset}
+            compact={mergeToolRow}
             onUndo={undo} onRedo={redo}
             zoom={view.scale}
             onZoomIn={() => zoomTo(1.25, canvasCentre())}
@@ -1684,7 +1677,7 @@ export default function PhotoEditor() {
               gesture a kiosk touchscreen makes awkward — there is no trackpad
               and the strip can run past the edge. navigateTo() bounds-checks
               on its own; disabling them is affordance, not enforcement. */}
-          <div className={`flex items-center gap-2 ${isPortrait ? 'flex-1 min-w-0 order-first' : 'shrink-0'}`}>
+          <div className={`flex items-center gap-2 ${mergeToolRow ? 'flex-1 min-w-0 order-first' : 'shrink-0'}`}>
             <IconButton
               icon={ChevronLeft}
               label={t('editor.prevPhoto')}
@@ -1863,6 +1856,14 @@ export default function PhotoEditor() {
                 onSave={isLayoutFrame ? undefined : exportAndSave}
               />
             )}
+            {activePanel === 'print'    && (
+              <PrintPanel
+                products={printProducts}
+                photo={currentPhoto}
+                src={printSrc ?? state.photoEdits[currentPhoto.id]?.dataUrl ?? currentPhoto.proxyUrl ?? currentPhoto.url}
+                hasEdit={canReset}
+              />
+            )}
             {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} faceCount={currentPhotoFaceCount} />}
 
             {!activePanel && (
@@ -1913,9 +1914,9 @@ export default function PhotoEditor() {
 
       {/* ── Progress footer ── */}
       <div
-        // Hidden on a portrait kiosk: the pager and filmstrip already say which
-        // photo this is, and the canvas needs the height more than a third copy.
-        className="shrink-0 flex sm:portrait:hidden items-center justify-between px-4 py-2.5 rounded-xl"
+        // Phones only: on a kiosk the filmstrip already says which photo this
+        // is, and the canvas needs the height more than a second copy.
+        className="shrink-0 flex sm:hidden items-center justify-between px-4 py-2.5 rounded-xl"
         style={{
           background: 'var(--color-card)',
           border: '1.5px solid var(--color-neutral-200)',

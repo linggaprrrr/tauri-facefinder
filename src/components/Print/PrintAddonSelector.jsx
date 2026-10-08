@@ -137,7 +137,7 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
                     <>
                       <img src={previewOf(assigned)} alt="" className="w-full h-full" style={{ objectFit: 'cover' }} />
                       <span
-                        className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold"
+                        className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md text-xs font-bold"
                         style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
                       >
                         {t(assigned.source === 'edited' ? 'cart.edited' : 'cart.original')}
@@ -222,7 +222,7 @@ export default function PrintAddonSelector({ photos, templateVersion, printPrice
         </div>
 
         <div className="text-right shrink-0 leading-tight">
-          <span className="block text-[11px]" style={{ color: 'var(--color-neutral-600)' }}>
+          <span className="block text-xs" style={{ color: 'var(--color-neutral-600)' }}>
             {t('print.perPrint')}: Rp {(printPrice ?? 0).toLocaleString('id-ID')}
           </span>
           <span className="block font-black" style={{ color: 'var(--color-primary)' }}>

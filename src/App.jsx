@@ -284,7 +284,10 @@ function Layout() {
       <main className="flex-1 min-h-0 flex flex-col px-3 sm:px-6 pb-3 sm:pb-6">
         <div className="kiosk-panel flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Hidden on phones, where five tiles cannot fit a 375px row. */}
-          <div className="hidden sm:block shrink-0 px-6 pt-5">
+          {/* Also hidden on windows under 820px tall (desktop/test windows —
+              kiosks are 1080+): there it leaves pages, the editor above all,
+              too little height to work in. */}
+          <div className="hidden sm:block [@media(max-height:820px)]:hidden shrink-0 px-6 pt-5">
             <div className="card px-4 py-4" style={{ borderRadius: '1.75rem' }}>
               <StepIndicator current={step} />
             </div>

@@ -1,3 +1,4 @@
+import { ZoomIn } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLang } from '../../i18n/LanguageContext';
 
@@ -155,6 +156,16 @@ export default function PhotoCard({ photo, selected, selectionOrder, onPreview, 
             {photo.label}
           </span>
         )}
+
+        {/* Zoom hint. Decorative — the whole card already opens the preview;
+            this just tells a customer that tapping the photo enlarges it. */}
+        <span
+          aria-hidden
+          className="absolute top-2 right-2 flex items-center justify-center w-9 h-9 rounded-full"
+          style={{ background: 'rgba(14,31,77,0.55)', color: '#fff' }}
+        >
+          <ZoomIn size={18} strokeWidth={2.4} />
+        </span>
 
         {/* Bottom gradient bar — filename + price */}
         <div
