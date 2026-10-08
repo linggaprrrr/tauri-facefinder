@@ -1296,8 +1296,7 @@ export default function PhotoEditor() {
           style={{
             ...(isPortrait && { gridRow: 2, flexDirection: 'row', justifyContent: 'space-evenly', padding: '6px 8px' }),
             background: 'var(--color-card)',
-            border: '1.5px solid var(--color-neutral-200)',
-            boxShadow: 'var(--shadow-sm)',
+            boxShadow: 'var(--shadow-neu)',
           }}
         >
           {visibleSidebarTools.map(({ id, icon: Icon, labelKey }) => {
@@ -1319,12 +1318,12 @@ export default function PhotoEditor() {
                 {/* The filled tile IS the active indicator — it replaces a 3px
                     edge sliver that was easy to miss at arm's length. */}
                 <span
-                  className="flex items-center justify-center rounded-2xl transition-all"
+                  className={`flex items-center justify-center rounded-2xl transition-all ${isActive ? '' : 'raised-tile'}`}
                   style={{
                     width: 48, height: 48,
-                    background: isActive ? 'var(--gradient-primary)' : 'var(--color-neutral-100)',
+                    background: isActive ? 'var(--gradient-primary)' : undefined,
                     color: isActive ? '#fff' : 'var(--color-neutral-700)',
-                    boxShadow: isActive ? 'var(--shadow-glow-primary)' : 'none',
+                    boxShadow: isActive ? 'var(--shadow-neu-color)' : undefined,
                   }}
                 >
                   <Icon size={24} strokeWidth={isActive ? 2.4 : 1.9} />
@@ -1357,10 +1356,11 @@ export default function PhotoEditor() {
           <button
             onClick={() => setActivePanel(null)}
             aria-label={t('editor.toolClose')}
-            className="flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all active:scale-90"
+            className="raised-tile flex flex-col items-center justify-center gap-0.5 rounded-xl active:scale-90"
             style={{
               width: 52, height: 52,
-              background: !activePanel ? 'var(--color-primary-50)' : 'transparent',
+              // No panel open = this is the current state: shown pressed in.
+              boxShadow: !activePanel ? 'var(--shadow-neu-pressed)' : undefined,
               color: !activePanel ? 'var(--color-primary)' : 'var(--color-neutral-600)',
               border: 'none',
               cursor: 'pointer',

@@ -22,18 +22,19 @@ export default function EditorToolbar({
   zoom = 1, onZoomIn, onZoomOut, onZoomReset, canZoomIn, canZoomOut,
 }) {
   const { t } = useLang();
-  const pill = 'px-4 rounded-full text-sm font-semibold transition-all active:scale-95 inline-flex items-center gap-1.5 disabled:cursor-not-allowed cursor-pointer';
-  const round = 'w-10 h-10 rounded-full inline-flex items-center justify-center transition-all active:scale-90 disabled:cursor-not-allowed cursor-pointer';
+  // raised-tile: soft 3D when enabled, flat when disabled (index.css).
+  const pill = 'raised-tile px-4 rounded-full text-sm font-semibold transition-all active:scale-95 inline-flex items-center gap-1.5 disabled:cursor-not-allowed cursor-pointer';
+  const round = 'raised-tile w-10 h-10 rounded-full inline-flex items-center justify-center transition-all active:scale-90 disabled:cursor-not-allowed cursor-pointer';
 
   const tone = (enabled) => ({
-    background: enabled ? 'var(--color-primary-50)' : 'transparent',
+    background: enabled ? undefined : 'transparent',
     color: enabled ? 'var(--color-primary)' : 'var(--color-neutral-400)',
   });
 
   return (
     <div
-      className="flex flex-wrap justify-center items-center gap-1.5 self-center max-w-full p-1.5 rounded-[1.5rem] shrink-0"
-      style={{ background: 'var(--color-card)', border: '1px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-md)' }}
+      className="flex flex-wrap justify-center items-center gap-2.5 self-center max-w-full p-1.5 rounded-[1.5rem] shrink-0"
+      style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-neu)' }}
     >
       {/* compact: icon-only, for when this pill shares a row with the
           filmstrip — with labels it pushed the photo thumbnails out of view. */}
