@@ -9,36 +9,40 @@ const STEPS = [
   { key: 'step.download', icon: Download },
 ];
 
+const TILE = 92;
+
 // Icon tiles rather than numbered dots: a customer reads "where am I" from the
 // picture at a glance, and the tile is a big enough shape to carry the active
-// state by colour alone. The underline under each label fills as the flow
-// advances, so progress reads left to right without counting.
+// state by colour alone. Sized as the most important wayfinding on screen —
+// it is the one thing telling a customer how far through the flow they are.
+// The lines between tiles fill the gap and turn blue up to the current step,
+// so progress reads left to right without counting.
 export default function StepIndicator({ current }) {
   const { t } = useLang();
   return (
-    <div className="flex items-start justify-between gap-1 w-full">
+    <div className="flex items-start w-full">
       {STEPS.map(({ key, icon: Icon }, index) => {
         const isDone = index < current;
         const isActive = index === current;
         return (
-          <div key={key} className="flex items-start flex-1 min-w-0">
-            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+          <div key={key} className={`flex items-start ${index < STEPS.length - 1 ? 'flex-1' : ''}`}>
+            <div className="flex flex-col items-center gap-2.5 shrink-0" style={{ minWidth: TILE }}>
               <div
                 className={`flex items-center justify-center transition-all duration-200 ${isActive ? '' : 'raised-tile'}`}
                 style={{
-                  width: 72, height: 72, borderRadius: 22,
+                  width: TILE, height: TILE, borderRadius: 28,
                   background: isActive ? 'var(--gradient-primary)' : undefined,
                   color: isActive ? '#fff' : isDone ? 'var(--color-primary)' : 'var(--color-neutral-800)',
                   boxShadow: isActive ? 'var(--shadow-glow-primary)' : undefined,
-                  transform: isActive ? 'scale(1.08)' : 'none',
+                  transform: isActive ? 'scale(1.06)' : 'none',
                 }}
               >
-                <Icon size={34} strokeWidth={isActive ? 2.2 : 1.8} />
+                <Icon size={44} strokeWidth={isActive ? 2.2 : 1.8} />
               </div>
               <span
-                className="uppercase text-center truncate max-w-full"
+                className="uppercase text-center whitespace-nowrap"
                 style={{
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: isActive ? 900 : 700,
                   letterSpacing: '0.02em',
                   color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-800)',
@@ -47,15 +51,15 @@ export default function StepIndicator({ current }) {
                 {t(key)}
               </span>
               <span
-                className="block h-1.5 rounded-full w-14"
+                className="block h-2 rounded-full w-16"
                 style={{ background: isDone || isActive ? 'var(--gradient-primary)' : 'var(--color-neutral-200)' }}
               />
             </div>
             {index < STEPS.length - 1 && (
               <span
                 aria-hidden
-                className="shrink-0 w-4 h-0.5 rounded-full"
-                style={{ marginTop: 36, background: 'var(--color-neutral-300)' }}
+                className="flex-1 h-1.5 rounded-full mx-2"
+                style={{ marginTop: TILE / 2 - 3, background: isDone ? 'var(--gradient-primary)' : 'var(--color-neutral-300)' }}
               />
             )}
           </div>
