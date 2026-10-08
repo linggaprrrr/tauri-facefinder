@@ -5,6 +5,7 @@ import { useApp } from '../../../../store/AppContext';
 import { useLang } from '../../../../i18n/LanguageContext';
 import { validateAccessMethod, grantAccess } from '../../../../api/mockApi';
 import LoadingSpinner from '../../../common/LoadingSpinner';
+import { playSound } from '../../../../utils/sounds';
 import Button from '../../../common/Button';
 
 // Shared by Event Ticket and Promo Voucher — same scan/type → validate →
@@ -44,6 +45,7 @@ export default function ScanRunner({ method, onChainToQris, onBack }) {
 
   const [code, setCode] = useState('');
   const [status, setStatus] = useState('arm'); // arm | checking | granting | rejected
+  useEffect(() => { if (status === 'rejected') playSound('error'); }, [status]);
   const [rejectReason, setRejectReason] = useState(null);
   const inputRef = useRef(null);
 

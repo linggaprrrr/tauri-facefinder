@@ -8,6 +8,7 @@ import { savePendingOrder, updatePendingOrder, clearPendingOrder } from '../../.
 import LoadingSpinner from '../../../common/LoadingSpinner';
 import PageHeader from '../../../common/PageHeader';
 import NavBar from '../../../common/NavBar';
+import { playSound } from '../../../../utils/sounds';
 import Button from '../../../common/Button';
 
 const POLL_INTERVAL_MS = 3000;
@@ -31,6 +32,8 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
 
   // 'idle' | 'creating' | 'waiting' | 'error'
   const [status, setStatus] = useState('idle');
+  // Every way this fails (create error, timeout, cancelled) ends in 'error'.
+  useEffect(() => { if (status === 'error') playSound('payFailed'); }, [status]);
   const [transaction, setTransaction] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   // null | 'back' | 'cancel-only'

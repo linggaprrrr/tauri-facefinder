@@ -11,6 +11,7 @@ export default function NavBar({ back, next }) {
       {back && (
         <button
           type="button"
+          data-sound="back"
           onClick={back.onClick}
           disabled={back.disabled}
           className="raised-tile flex items-center gap-2 sm:gap-3 rounded-full px-4 sm:px-6 py-2.5 sm:py-3 text-left transition-transform active:scale-[0.98] disabled:opacity-50 sm:min-w-[38%]"
@@ -26,6 +27,7 @@ export default function NavBar({ back, next }) {
       {next && (
         <button
           type="button"
+          data-sound="next"
           onClick={next.onClick}
           disabled={next.disabled}
           className="flex-1 flex items-center justify-between gap-3 rounded-full pl-5 sm:pl-8 pr-2 py-2 text-left text-white transition-transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
