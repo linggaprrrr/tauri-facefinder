@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Smile, Image as ImageIcon, Type, SlidersHorizontal, Sparkles,
   ChevronLeft, ChevronRight, Check,
-  Plus, Minus, Pencil, X, Loader2, QrCode,
+  Plus, Minus, Pencil, X, Loader2, QrCode, Printer,
 } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { clampPan, nextView } from '../../utils/viewTransform';
@@ -20,6 +20,8 @@ import SlotPhotoPicker from './SlotPhotoPicker';
 import UploadPanel from './UploadPanel';
 import PhoneUploadModal from './PhoneUploadModal';
 import EditorToolbar from './EditorToolbar';
+import PrintPanel from './PrintPanel';
+import { usePrintProducts } from '../../hooks/usePrintProducts';
 import PageHeader from '../common/PageHeader';
 import NavBar from '../common/NavBar';
 import ElementToolbar from './ElementToolbar';
@@ -542,6 +544,8 @@ const SIDEBAR_TOOLS = [
   { id: 'filters',  icon: SlidersHorizontal, labelKey: 'editor.tabFilters' },
   { id: 'ai',       icon: Sparkles,          labelKey: 'editor.tabAi' },
 ];
+// Only offered when this kiosk can actually print (see usePrintProducts).
+const PRINT_TOOL = { id: 'print', icon: Printer, labelKey: 'editor.tabPrint' };
 
 // Module-level counter so in-flight AI promises are correctly superseded even
 // when PhotoEditor unmounts and remounts (navigation away and back).
@@ -616,7 +620,11 @@ export default function PhotoEditor() {
   // Admin-configured per outlet (Branding Kiosk modal), boot-cached same as
   // colours/images — a toggle lands next reboot, not mid-session.
   const disabledTools = readCachedBranding(state.deviceConfig.outlet?.id)?.disabled_tools ?? [];
-  const visibleSidebarTools = SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id));
+  const { products: printProducts, canOffer: canPrint } = usePrintProducts();
+  const visibleSidebarTools = [
+    ...SIDEBAR_TOOLS.filter(({ id }) => !disabledTools.includes(id)),
+    ...(canPrint ? [PRINT_TOOL] : []),
+  ];
   // 'stickers' is the usual default panel (on load and whenever the editor
   // resets to a neutral tool), but if an outlet has disabled exactly that
   // tool, fall back to whatever's first available instead of landing on a
@@ -1225,6 +1233,28 @@ export default function PhotoEditor() {
   }
 
   // Toggle sidebar tool — clicking active tool collapses panel
+  // The Cetak panel previews the photo as edited right now. Rendered from the
+  // stage (debounced) rather than read from photoEdits, which only updates when
+  // the customer switches photo.
+  const [printSrc, setPrintSrc] = useState(null);
+  useEffect(() => {
+    if (activePanel !== 'print' || !stageRef.current) return undefined;
+    const timer = setTimeout(() => {
+      try { setPrintSrc(exportStage(stageRef.current)); } catch { setPrintSrc(null); }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activePanel, elements, filters, frame, photoIndex]);
+
+  // Reset this photo: stickers/text go through history (undoable), filters and
+  // frame back to none.
+  const canReset = elements.length > 0 || frame !== 'none' || filters.brightness !== 0 || filters.contrast !== 0 || (filters.list?.length ?? 0) > 0;
+  function resetPhoto() {
+    if (elements.length) pushHistory([]);
+    setFilters(DEFAULT_FILTERS);
+    setFrame('none');
+    setSelectedId(null);
+  }
+
   function handleSidebarTool(id) {
     setActivePanel((prev) => (prev === id ? null : id));
   }
@@ -1241,7 +1271,7 @@ export default function PhotoEditor() {
   }
 
   const isLast = photoIndex === selectedPhotos.length - 1;
-  const activeTool = SIDEBAR_TOOLS.find((s) => s.id === activePanel);
+  const activeTool = [...SIDEBAR_TOOLS, PRINT_TOOL].find((s) => s.id === activePanel);
 
   return (
     <div className="flex flex-col h-full gap-3 max-w-7xl mx-auto w-full">
@@ -1670,6 +1700,7 @@ export default function PhotoEditor() {
           <div className={isPortrait ? 'flex items-center gap-3 shrink-0' : 'contents'}>
           <EditorToolbar
             canUndo={canUndo} canRedo={canRedo}
+            onReset={resetPhoto} canReset={!isLayoutFrame && canReset}
             onUndo={undo} onRedo={redo}
             zoom={view.scale}
             onZoomIn={() => zoomTo(1.25, canvasCentre())}
@@ -1861,6 +1892,14 @@ export default function PhotoEditor() {
                 // No save inside a layout: there the whole collage is the
                 // output, committed by "Save as new photo" instead.
                 onSave={isLayoutFrame ? undefined : exportAndSave}
+              />
+            )}
+            {activePanel === 'print'    && (
+              <PrintPanel
+                products={printProducts}
+                photo={currentPhoto}
+                src={printSrc ?? state.photoEdits[currentPhoto.id]?.dataUrl ?? currentPhoto.proxyUrl ?? currentPhoto.url}
+                hasEdit={canReset}
               />
             )}
             {activePanel === 'ai'       && <AiTransformPanel templates={aiTemplates} loading={aiTemplatesLoading} onGenerate={startAiJob} aiTransformUsed={aiTransformUsed} generating={aiJob?.status === 'pending'} currentIsAi={currentIsDerived} faceCount={currentPhotoFaceCount} />}

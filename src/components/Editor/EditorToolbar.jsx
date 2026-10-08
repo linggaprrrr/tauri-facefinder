@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Plus, Minus, RotateCcw } from 'lucide-react';
+import { Undo2, Redo2, Plus, Minus, RotateCcw, Eraser } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 
 /**
@@ -18,7 +18,7 @@ import { useLang } from '../../i18n/LanguageContext';
  * the photo looks cropped, and no obvious way back. Reset is that way back.
  */
 export default function EditorToolbar({
-  canUndo, canRedo, onUndo, onRedo,
+  canUndo, canRedo, onUndo, onRedo, onReset, canReset,
   zoom = 1, onZoomIn, onZoomOut, onZoomReset, canZoomIn, canZoomOut,
 }) {
   const { t } = useLang();
@@ -41,6 +41,13 @@ export default function EditorToolbar({
       <button className={pill} onClick={onRedo} disabled={!canRedo} style={{ minHeight: 40, ...tone(canRedo) }}>
         <Redo2 size={16} /> {t('toolbar.redo')}
       </button>
+      {onReset && (
+        // Clears this photo's stickers, text, filter and frame. Stickers/text
+        // come back with Undo; filter and frame are one tap to re-pick.
+        <button className={pill} onClick={onReset} disabled={!canReset} style={{ minHeight: 40, ...tone(canReset) }}>
+          <Eraser size={16} /> {t('toolbar.reset')}
+        </button>
+      )}
 
       <span className="w-px self-stretch mx-0.5" style={{ background: 'var(--color-neutral-200)' }} />
 

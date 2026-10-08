@@ -49,12 +49,18 @@ function similarityLabel(score) {
 // search, and on a busy outlet uplink 20s was aborting scans that the server
 // went on to answer — the customer read that as "Koneksi terputus" while the
 // link was in fact up (the /health heartbeat kept passing right through it).
-export async function scanFace(base64Image, timeoutMs = 45000) {
+// Looser match for the gallery's "More photos?" rescan. `radius` is the
+// minimum cosine similarity Milvus returns, so lower = wider.
+// ponytail: 0.42 is a judgement call, not measured — too low starts surfacing
+// lookalike strangers. Tune against real outlet data.
+export const WIDE_SEARCH = { radius: 0.42, topK: 100 };
+
+export async function scanFace(base64Image, { radius = 0.5, topK = 50, timeoutMs = 45000 } = {}) {
   const blob = base64ToBlob(base64Image);
   const form = new FormData();
   form.append('file', blob, 'face.jpg');
-  form.append('radius', '0.50');
-  form.append('top_k', '50');
+  form.append('radius', String(radius));
+  form.append('top_k', String(topK));
   form.append('collection_name', 'face_embeddings');
 
   const controller = new AbortController();

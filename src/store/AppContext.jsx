@@ -42,6 +42,18 @@ export function reducer(state, action) {
       return { ...state, capturedFace: action.payload };
     case 'SET_PHOTOS':
       return { ...state, photos: action.payload, selectedPhotos: [], photoEdits: {}, layoutEdits: {}, aiTransformUsed: false, aiJob: null, printItems: [], uploadSessionId: crypto.randomUUID() };
+    // Extra matches from a wider rescan. Unlike SET_PHOTOS this keeps the
+    // customer's selection, edits and upload session — they are mid-flow, not
+    // starting over. Only photos not already listed are added.
+    case 'MERGE_PHOTOS': {
+      const known = new Set(state.photos.map((p) => p.id));
+      return { ...state, photos: [...state.photos, ...action.payload.filter((p) => !known.has(p.id))] };
+    }
+    // Empty the cart in one step. Not a loop of TOGGLE_PHOTO: removing a source
+    // already drops its AI/collage derivatives, so toggling each photo in turn
+    // could re-add a derivative that had just been removed.
+    case 'CLEAR_SELECTION':
+      return { ...state, selectedPhotos: [], printItems: [] };
     case 'SET_PRINT_ITEMS':
       return { ...state, printItems: action.payload };
     case 'SET_AI_JOB':

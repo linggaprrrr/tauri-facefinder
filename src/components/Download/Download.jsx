@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle, Hourglass, Home, Camera, ScanLine } from 'lucide-react';
+import { Clock, Download as DownloadIcon, Banknote, Smartphone, Check, Printer, RefreshCw, AlertTriangle, Hourglass, Home, Camera, ScanLine, ReceiptText, ChevronRight, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { clearPendingOrder } from '../../utils/pendingOrder';
@@ -15,6 +15,8 @@ import { resolvePrintSource } from '../../utils/resolvePrintSource';
 import ownizeLogo from '../../assets/ownize_logo.png';
 import Button from '../common/Button';
 import NavBar from '../common/NavBar';
+import { playSound } from '../../utils/sounds';
+import Modal from '../common/Modal';
 
 const DOWNLOAD_BASE = import.meta.env.VITE_DOWNLOAD_LINK ?? 'https://myphoto.com';
 
@@ -44,6 +46,11 @@ export default function Download() {
   const { order, deviceConfig, selectedPhotos, photoEdits } = state;
   const editedPhotos = selectedPhotos.filter((p) => photoEdits[p.id]?.dataUrl);
   const [receiptStatus, setReceiptStatus] = useState('idle'); // idle | printing | fail
+  const [showReceipt, setShowReceipt] = useState(false);
+
+  // One place for "payment done", whichever way the order was paid or granted
+  // (QRIS, ticket/voucher, staff) — they all land here with a paid order.
+  useEffect(() => { playSound('paySuccess'); }, []);
   const outletId = deviceConfig?.outlet?.id;
 
   // Auto-return to the welcome screen. This is a privacy control before it is
@@ -225,10 +232,11 @@ export default function Download() {
           });
           if (cancelled) return;
           enqueuePrint({ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: item.copies });
+          playSound('print');
           handleQueuedJobs([{ jobId: job.id, printerName, dataUrl: finalDataUrl, copies: item.copies }]);
         }
       } catch (err) {
-        if (!cancelled) setAddonPrintError(err.message);
+        if (!cancelled) { setAddonPrintError(err.message); playSound('error'); }
       }
     })();
 
@@ -263,9 +271,11 @@ export default function Download() {
     try {
       const newJob = await reprintPrintJob(job.jobId);
       enqueuePrint({ jobId: newJob.id, printerName: job.printerName, dataUrl: job.dataUrl, copies: job.copies });
+      playSound('print');
       setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, jobId: newJob.id, status: 'queued' } : j)));
     } catch {
       setPrintJobs((jobs) => jobs.map((j) => (j.jobId === job.jobId ? { ...j, status: 'failed' } : j)));
+      playSound('error');
     }
   }
 
@@ -357,6 +367,7 @@ export default function Download() {
         helpNumber: deviceConfig?.helpNumber,
       });
       await printImage(deviceConfig.receiptPrinterName, dataUrl, 1);
+      playSound('print');
       setReceiptStatus('idle');
       // The printed receipt carries the same download QR, so the customer is
       // no longer dependent on this screen — shorten the wait to free the
@@ -373,6 +384,7 @@ export default function Download() {
         setResetAt(Date.now() + AUTO_RESET_PRINTED_MS);
       }
     } catch {
+      playSound('error');
       setReceiptStatus('fail');
     }
   }
@@ -459,16 +471,48 @@ export default function Download() {
               {t('download.scanLabel')}
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="font-mono text-xs" style={{ color: 'var(--color-neutral-600)' }}>{trxCode}</span>
-              <span
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
-                style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
-              >
-                <Clock size={16} /> {t('download.valid24')}
-              </span>
-            </div>
           </section>
+
+          {/* What they bought, at a glance — first three thumbnails and a "+N"
+              tile, plus what the download is (full resolution, 7 days). From
+              selectedPhotos, not order.photos: the order carries only the
+              full-size originals, too heavy to load as thumbnails. */}
+          {selectedPhotos.length > 0 && (
+            <section className="card p-4 sm:p-5 flex flex-col gap-3" style={{ borderRadius: '1.75rem' }}>
+              <h2 className="text-lg font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
+                <ImageIcon size={20} style={{ color: 'var(--color-accent-600)' }} />
+                {t('download.yourPhotos', { count: selectedPhotos.length })}
+              </h2>
+              <div className="grid grid-cols-4 gap-2">
+                {selectedPhotos.slice(0, 4).map((p, i) => {
+                  const more = i === 3 ? selectedPhotos.length - 4 : 0;
+                  return (
+                    <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden" style={{ background: 'var(--color-neutral-100)' }}>
+                      <img src={photoEdits[p.id]?.dataUrl ?? p.thumbnail ?? p.url} alt="" className="w-full h-full object-cover" />
+                      {more > 0 && (
+                        <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white" style={{ background: 'rgba(14,31,77,0.55)' }}>
+                          +{more}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {[[Sparkles, 'download.hdTitle', 'download.hdDesc'], [Clock, 'download.availTitle', 'download.availDesc']].map(([Icon, title, desc]) => (
+                  <div key={title} className="flex items-center gap-2.5 min-w-0">
+                    <span className="raised-tile flex shrink-0 items-center justify-center w-10 h-10 rounded-xl" style={{ color: 'var(--color-primary)' }}>
+                      <Icon size={20} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black leading-tight" style={{ color: 'var(--color-neutral-900)' }}>{t(title)}</span>
+                      <span className="block text-xs leading-snug" style={{ color: 'var(--color-neutral-700)' }}>{t(desc)}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Locally-edited photos download */}
           {editedPhotos.length > 0 && (
@@ -598,130 +642,50 @@ export default function Download() {
 
         {/* ── Right: receipt + how to download ── */}
         <div className="flex flex-col gap-4 min-w-0">
-        {/* ── Right: Receipt ── */}
-        <div
-          className="card w-full overflow-hidden"
-          style={{ borderRadius: '1.75rem', minWidth: 0 }}
-        >
-          {/* Receipt header */}
-          <div
-            className="px-6 py-5"
-            style={{
-              background: 'var(--color-primary)',
-              color: '#fff',
-            }}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
-              <div>
-                <p className="font-black text-xl leading-tight">Ownize AI Studio</p>
-                {unitName && (
-                  <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
-                )}
+          {/* Transaction details. The full itemised receipt is one tap away
+              (View receipt) rather than taking the whole column. */}
+          <section className="card p-5 sm:p-6 flex flex-col gap-3" style={{ borderRadius: '1.75rem' }}>
+            <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
+              <ReceiptText size={22} style={{ color: 'var(--color-primary)' }} /> {t('download.trxTitle')}
+            </h2>
+            {[
+              ['download.trxId', <span key="id" className="font-mono font-bold">{trxCode}</span>],
+              ['download.dateTime', formatDate(order.created_at ?? order.paid_at)],
+              ['download.method', isCash ? t('download.cash') : t('download.qris')],
+            ].map(([label, value]) => (
+              <div key={label} className="flex items-baseline justify-between gap-3 text-sm py-1.5" style={{ borderBottom: '1px solid var(--color-neutral-200)' }}>
+                <span style={{ color: 'var(--color-neutral-700)' }}>{t(label)}</span>
+                <span className="text-right" style={{ color: 'var(--color-neutral-900)' }}>{value}</span>
               </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-3 pt-1">
+              <span className="font-bold" style={{ color: 'var(--color-neutral-800)' }}>{t('download.totalPaid')}</span>
+              <span className="text-2xl font-black" style={{ color: 'var(--color-accent-700)' }}>{formatRp(finalPrice)}</span>
             </div>
-            <div className="flex justify-between text-sm opacity-80">
-              <span>{t('download.code')} <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
-              <span>{formatDate(order.created_at ?? order.paid_at)}</span>
-            </div>
-          </div>
+          </section>
 
-          {/* Items */}
-          <div className="px-6 py-4">
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-600)' }}>
-              {t('download.itemsBought')}
-            </p>
-
-            <div className="flex flex-col gap-2">
-              {lineItems.length > 0 ? lineItems.map((item, i) => {
-                const isPrint = item.key.startsWith('print-');
-                return (
-                  <div
-                    key={item.key}
-                    className="flex items-center justify-between py-2"
-                    style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
-                        style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
-                      >
-                        {isPrint ? <Printer size={14} /> : i + 1}
-                      </div>
-                      <span
-                        className="text-sm truncate"
-                        style={{ color: 'var(--color-neutral-700)' }}
-                        title={item.name}
-                      >
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
-                      {formatRp(item.price)}
-                    </span>
-                  </div>
-                );
-              }) : (
-                <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('download.noItems')}</p>
-              )}
-            </div>
-
-            {/* Totals */}
-            <div className="mt-4 flex flex-col gap-1.5">
-              {discount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.discount')}</span>
-                  <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
-                </div>
-              )}
-              {order.promo_code_used && (
-                <div className="flex justify-between text-sm">
-                  <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.promoCode')}</span>
-                  <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
-                </div>
-              )}
-              <div
-                className="flex justify-between items-center pt-3 mt-1"
-                style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
-              >
-                <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
-                <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
-                  {formatRp(finalPrice)}
-                </span>
-              </div>
-            </div>
-
-            {/* Payment method badge */}
-            <div className="mt-4 flex items-center gap-2">
-              <span
-                className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5"
-                style={{
-                  background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
-                  color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
-                }}
-              >
-                {isCash ? <Banknote size={14} /> : <Smartphone size={14} />}
-                {isCash ? t('download.cash') : t('download.qris')}
+          {order.paid && (
+            <div className="card flex items-center gap-3 p-4" style={{ borderRadius: '1.5rem', background: 'var(--color-success-bg)', borderColor: 'transparent' }}>
+              <span className="flex shrink-0 items-center justify-center w-11 h-11 rounded-full text-white" style={{ background: 'var(--color-success)' }}>
+                <Check size={24} strokeWidth={3} />
               </span>
-              {order.paid && (
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
-                  style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
-                >
-                  <Check size={14} strokeWidth={3} /> {t('download.paid')}
-                </span>
-              )}
+              <span className="min-w-0">
+                <span className="block font-black text-lg leading-tight" style={{ color: 'var(--color-success)' }}>{t('download.paidTitle')}</span>
+                <span className="block text-xs" style={{ color: 'var(--color-neutral-700)' }}>{t('download.thanks')}</span>
+              </span>
             </div>
-          </div>
+          )}
 
-          {/* Footer */}
-          <div
-            className="px-6 py-4 text-center text-xs"
-            style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-600)', borderTop: '1px solid var(--color-neutral-100)' }}
+          <button
+            type="button"
+            onClick={() => setShowReceipt(true)}
+            className="card flex items-center gap-3 p-4 text-left active:scale-[0.99] transition-transform"
+            style={{ borderRadius: '1.5rem' }}
           >
-            {t('download.thanks')}
-          </div>
-        </div>
+            <ReceiptText size={24} style={{ color: 'var(--color-primary)' }} />
+            <span className="flex-1 font-black text-lg" style={{ color: 'var(--color-neutral-900)' }}>{t('download.viewReceipt')}</span>
+            <ChevronRight size={24} style={{ color: 'var(--color-neutral-700)' }} />
+          </button>
 
           <section className="card p-5 sm:p-6 flex flex-col gap-4" style={{ borderRadius: '1.75rem' }}>
             <h2 className="text-h3 font-black flex items-center gap-2" style={{ color: 'var(--color-neutral-900)' }}>
@@ -744,6 +708,136 @@ export default function Download() {
           </section>
         </div>
       </div>
+
+      {showReceipt && (
+        <Modal title={t('download.receiptTitle')} onClose={() => setShowReceipt(false)}>
+          <div className="p-4">
+          <div
+            className="card w-full overflow-hidden"
+            style={{ borderRadius: '1.75rem', minWidth: 0 }}
+          >
+            {/* Receipt header */}
+            <div
+              className="px-6 py-5"
+              style={{
+                background: 'var(--color-primary)',
+                color: '#fff',
+              }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <img src={ownizeLogo} alt="Ownize" className="w-10 h-10 object-contain brightness-0 invert" />
+                <div>
+                  <p className="font-black text-xl leading-tight">Ownize AI Studio</p>
+                  {unitName && (
+                    <p className="text-sm opacity-80">{unitName}{outletName ? ` — ${outletName}` : ''}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-between text-sm opacity-80">
+                <span>{t('download.code')} <strong className="font-mono text-white opacity-100">{trxCode}</strong></span>
+                <span>{formatDate(order.created_at ?? order.paid_at)}</span>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="px-6 py-4">
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--color-neutral-600)' }}>
+                {t('download.itemsBought')}
+              </p>
+
+              <div className="flex flex-col gap-2">
+                {lineItems.length > 0 ? lineItems.map((item, i) => {
+                  const isPrint = item.key.startsWith('print-');
+                  return (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between py-2"
+                      style={{ borderBottom: '1px solid var(--color-neutral-100)' }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
+                          style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}
+                        >
+                          {isPrint ? <Printer size={14} /> : i + 1}
+                        </div>
+                        <span
+                          className="text-sm truncate"
+                          style={{ color: 'var(--color-neutral-700)' }}
+                          title={item.name}
+                        >
+                          {item.name}
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold shrink-0 ml-4" style={{ color: 'var(--color-neutral-800)' }}>
+                        {formatRp(item.price)}
+                      </span>
+                    </div>
+                  );
+                }) : (
+                  <p className="text-sm" style={{ color: 'var(--color-neutral-600)' }}>{t('download.noItems')}</p>
+                )}
+              </div>
+
+              {/* Totals */}
+              <div className="mt-4 flex flex-col gap-1.5">
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.discount')}</span>
+                    <span style={{ color: 'var(--color-success)' }}>- {formatRp(discount)}</span>
+                  </div>
+                )}
+                {order.promo_code_used && (
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color: 'var(--color-neutral-600)' }}>{t('download.promoCode')}</span>
+                    <span className="font-mono" style={{ color: 'var(--color-neutral-700)' }}>{order.promo_code_used}</span>
+                  </div>
+                )}
+                <div
+                  className="flex justify-between items-center pt-3 mt-1"
+                  style={{ borderTop: '2px dashed var(--color-neutral-200)' }}
+                >
+                  <span className="font-bold text-base" style={{ color: 'var(--color-neutral-900)' }}>{t('common.total')}</span>
+                  <span className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>
+                    {formatRp(finalPrice)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment method badge */}
+              <div className="mt-4 flex items-center gap-2">
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5"
+                  style={{
+                    background: isCash ? 'var(--color-warning-bg)' : 'var(--color-primary-50)',
+                    color: isCash ? 'var(--color-warning)' : 'var(--color-primary)',
+                  }}
+                >
+                  {isCash ? <Banknote size={14} /> : <Smartphone size={14} />}
+                  {isCash ? t('download.cash') : t('download.qris')}
+                </span>
+                {order.paid && (
+                  <span
+                    className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+                    style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}
+                  >
+                    <Check size={14} strokeWidth={3} /> {t('download.paid')}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="px-6 py-4 text-center text-xs"
+              style={{ background: 'var(--color-neutral-50)', color: 'var(--color-neutral-600)', borderTop: '1px solid var(--color-neutral-100)' }}
+            >
+              {t('download.thanks')}
+            </div>
+          </div>
+          </div>
+        </Modal>
+      )}
 
       <div className="mt-auto">
         <NavBar
