@@ -18,7 +18,7 @@ import { useLang } from '../../i18n/LanguageContext';
  * the photo looks cropped, and no obvious way back. Reset is that way back.
  */
 export default function EditorToolbar({
-  canUndo, canRedo, onUndo, onRedo, onReset, canReset,
+  canUndo, canRedo, onUndo, onRedo, onReset, canReset, compact = false,
   zoom = 1, onZoomIn, onZoomOut, onZoomReset, canZoomIn, canZoomOut,
 }) {
   const { t } = useLang();
@@ -35,17 +35,19 @@ export default function EditorToolbar({
       className="flex flex-wrap justify-center items-center gap-1.5 self-center max-w-full p-1.5 rounded-[1.5rem] shrink-0"
       style={{ background: 'var(--color-card)', border: '1px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-md)' }}
     >
-      <button className={pill} onClick={onUndo} disabled={!canUndo} style={{ minHeight: 40, ...tone(canUndo) }}>
-        <Undo2 size={16} /> {t('toolbar.undo')}
+      {/* compact: icon-only, for when this pill shares a row with the
+          filmstrip — with labels it pushed the photo thumbnails out of view. */}
+      <button className={compact ? round : pill} onClick={onUndo} disabled={!canUndo} aria-label={t('toolbar.undo')} title={t('toolbar.undo')} style={{ minHeight: 40, ...tone(canUndo) }}>
+        <Undo2 size={compact ? 18 : 16} /> {!compact && t('toolbar.undo')}
       </button>
-      <button className={pill} onClick={onRedo} disabled={!canRedo} style={{ minHeight: 40, ...tone(canRedo) }}>
-        <Redo2 size={16} /> {t('toolbar.redo')}
+      <button className={compact ? round : pill} onClick={onRedo} disabled={!canRedo} aria-label={t('toolbar.redo')} title={t('toolbar.redo')} style={{ minHeight: 40, ...tone(canRedo) }}>
+        <Redo2 size={compact ? 18 : 16} /> {!compact && t('toolbar.redo')}
       </button>
       {onReset && (
         // Clears this photo's stickers, text, filter and frame. Stickers/text
         // come back with Undo; filter and frame are one tap to re-pick.
-        <button className={pill} onClick={onReset} disabled={!canReset} style={{ minHeight: 40, ...tone(canReset) }}>
-          <Eraser size={16} /> {t('toolbar.reset')}
+        <button className={compact ? round : pill} onClick={onReset} disabled={!canReset} aria-label={t('toolbar.reset')} title={t('toolbar.reset')} style={{ minHeight: 40, ...tone(canReset) }}>
+          <Eraser size={compact ? 18 : 16} /> {!compact && t('toolbar.reset')}
         </button>
       )}
 

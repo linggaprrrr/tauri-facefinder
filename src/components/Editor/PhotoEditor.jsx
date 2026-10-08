@@ -1332,7 +1332,7 @@ export default function PhotoEditor() {
                 <span
                   className="text-center"
                   style={{
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: isActive ? 800 : 600,
                     lineHeight: 1.15,
                     color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-600)',
@@ -1367,7 +1367,7 @@ export default function PhotoEditor() {
             }}
           >
             <X size={18} strokeWidth={!activePanel ? 2.5 : 1.8} />
-            <span style={{ fontSize: 9, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
+            <span style={{ fontSize: 12, fontWeight: !activePanel ? 700 : 500, lineHeight: 1, letterSpacing: 0.2 }}>
               {t('editor.toolClose')}
             </span>
           </button>
@@ -1662,6 +1662,7 @@ export default function PhotoEditor() {
           <EditorToolbar
             canUndo={canUndo} canRedo={canRedo}
             onReset={resetPhoto} canReset={!isLayoutFrame && canReset}
+            compact={mergeToolRow}
             onUndo={undo} onRedo={redo}
             zoom={view.scale}
             onZoomIn={() => zoomTo(1.25, canvasCentre())}

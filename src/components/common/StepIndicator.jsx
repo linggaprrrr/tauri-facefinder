@@ -38,7 +38,7 @@ export default function StepIndicator({ current }) {
               <span
                 className="uppercase text-center truncate max-w-full"
                 style={{
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: isActive ? 900 : 700,
                   letterSpacing: '0.02em',
                   color: isActive ? 'var(--color-primary)' : 'var(--color-neutral-800)',
