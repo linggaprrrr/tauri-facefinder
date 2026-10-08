@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, SearchX, X } from 'lucide-react';
+import { ArrowLeft, SearchX, X, Images } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import PhotoCard from './PhotoCard';
 import PhotoPreview from './PhotoPreview';
 import Button from '../common/Button';
 import EmptyState from '../common/EmptyState';
+import PageHeader from '../common/PageHeader';
+import NavBar from '../common/NavBar';
 
 // Default is `match` because the backend already ranks the search by
 // similarity — anything else would silently discard that ranking.
@@ -83,26 +85,17 @@ export default function Gallery() {
 
   const totalPrice = selectedPhotos.reduce((sum, p) => sum + p.price, 0);
 
-  // Max 4 thumbnails shown in footer strip
-  const STRIP_MAX = 4;
-  const stripPhotos = selectedPhotos.slice(0, STRIP_MAX);
-  const extraCount  = selectedPhotos.length - STRIP_MAX;
-
   return (
     <div className="flex flex-col h-full gap-4 max-w-8xl mx-auto w-full">
 
-      {/* Page header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-h1 font-black on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
-            {t('gallery.title')}
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--color-neutral-600)' }}>
-            {t('gallery.subtitle', { count: photos.length })}
-          </p>
-        </div>
+      <PageHeader
+        icon={Images}
+        title={t('gallery.title')}
+        subtitle={t('gallery.subtitle', { count: photos.length })}
+      />
 
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Sort + outlet filters on one row of chips */}
+      <div className="flex items-center gap-3 flex-wrap shrink-0">
           {/* Sort — chips, not a <select>. A native dropdown on a kiosk means
               an OS picker the outlet's touch driver renders however it likes,
               and it cannot be styled to match anything here. */}
@@ -119,10 +112,6 @@ export default function Gallery() {
             </div>
           </div>
 
-          <Button variant="ghost" onClick={() => navigate('/')}>
-            <ArrowLeft size={18} /> {t('gallery.rescan')}
-          </Button>
-        </div>
       </div>
 
       {/* Outlet filter chips with photo count */}
@@ -201,101 +190,19 @@ export default function Gallery() {
         </div>
       )}
 
-      {/* Sticky footer — always visible. `relative` so the hint can float over it. */}
-      <div className="relative shrink-0">
-
-        {/* Floating hint. Sits above the bar rather than inside it so it reads
-            as a prompt about the photos, not as a label for the footer, and
-            pointer-events-none keeps it from stealing a tap meant for a card. */}
-        {selectedPhotos.length === 0 && (
-          <div
-            className="pop-in pointer-events-none absolute left-1/2 -translate-x-1/2 -top-6 z-10
-              px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap"
-            style={{
-              background: 'var(--color-neutral-900)',
-              color: '#fff',
-              boxShadow: 'var(--shadow-lg)',
-            }}
-          >
-            {t('gallery.footerEmpty')}
-          </div>
-        )}
-
-        <div
-          className="flex items-center gap-3 rounded-xl px-4 py-3"
-          style={{
-            background: '#fff',
-            border: '1.5px solid var(--color-primary-100)',
-            boxShadow: 'var(--shadow-lg)',
-            minHeight: 68,
-          }}
-        >
-          {selectedPhotos.length === 0 ? (
-            /* pl reserve clears the fixed WhatsApp button on desktop; none on
-               mobile where the help FAB sits below the footer flow. */
-            <div className="flex-1 pl-0 sm:pl-[148px]" />
-          ) : (
-            /* Thumbnail strip */
-            <div className="flex items-center gap-2 flex-1 min-w-0 pl-0 sm:pl-[120px]">
-              {stripPhotos.map((p) => (
-                <div key={p.id} className="relative shrink-0 group">
-                  <img
-                    src={p.thumbnail}
-                    alt=""
-                    className="rounded-lg object-cover"
-                    style={{
-                      width: 44, height: 33,
-                      border: '2px solid var(--color-primary)',
-                    }}
-                  />
-                  {/* × deselect button */}
-                  <button
-                    onClick={() => handleToggle(p)}
-                    aria-label={t('gallery.removeAria')}
-                    className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full transition-all"
-                    style={{
-                      width: 16, height: 16,
-                      background: 'var(--color-error)',
-                      color: '#fff',
-                      border: '1.5px solid #fff',
-                      padding: 0,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <X size={8} strokeWidth={3} />
-                  </button>
-                </div>
-              ))}
-              {extraCount > 0 && (
-                <span className="text-sm font-semibold shrink-0" style={{ color: 'var(--color-neutral-600)' }}>
-                  +{extraCount}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Price + CTA */}
-          <div className="flex items-center gap-3 shrink-0">
-            {selectedPhotos.length > 0 && (
-              <div className="text-right">
-                <p className="text-xs font-semibold" style={{ color: 'var(--color-neutral-600)' }}>
-                  {t('gallery.selected', { count: selectedPhotos.length })}
-                </p>
-                <p className="text-lg font-black" style={{ color: 'var(--color-primary)' }}>
-                  Rp {totalPrice.toLocaleString('id-ID')}
-                </p>
-              </div>
-            )}
-            <Button
-              size="lg"
-              onClick={() => navigate('/editor')}
-              disabled={selectedPhotos.length === 0}
-            >
-              {t('gallery.continue')} <ArrowRight size={20} />
-            </Button>
-          </div>
-        </div>
-      </div>
+      {/* Back to rescan / on to the editor. With nothing picked yet, Next's
+          second line is the instruction itself instead of a floating hint. */}
+      <NavBar
+        back={{ label: t('nav.back'), sub: t('gallery.rescan'), onClick: () => navigate('/') }}
+        next={{
+          label: t('nav.next'),
+          sub: selectedPhotos.length
+            ? `${t('gallery.selected', { count: selectedPhotos.length })} · Rp ${totalPrice.toLocaleString('id-ID')}`
+            : t('gallery.footerEmpty'),
+          onClick: () => navigate('/editor'),
+          disabled: selectedPhotos.length === 0,
+        }}
+      />
 
       {/* Preview. Every prop here is required by PhotoPreview — it derives its
           counter and prev/next from `photos`, and carries the Select button

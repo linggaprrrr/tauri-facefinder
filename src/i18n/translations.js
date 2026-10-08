@@ -36,19 +36,20 @@ export const translations = {
   'recovery.dismiss':     { id: 'Nanti', en: 'Later' },
 
   // ── Step indicator ──────────────────────────────────────────────────────────
-  'step.scan':     { id: 'Pindai',    en: 'Scan' },
-  'step.gallery':  { id: 'Galeri',    en: 'Gallery' },
-  'step.editor':   { id: 'Edit',      en: 'Editor' },
-  'step.cart':     { id: 'Keranjang', en: 'Cart' },
-  'step.download': { id: 'Unduh',     en: 'Download' },
+  'nav.back':      { id: 'Kembali', en: 'Back' },
+  'nav.next':      { id: 'Lanjut',  en: 'Next' },
+  'step.scan':     { id: 'Pindai',     en: 'Scan' },
+  'step.gallery':  { id: 'Pilih',      en: 'Choose' },
+  'step.editor':   { id: 'Hias',       en: 'Customize' },
+  'step.cart':     { id: 'Bayar',      en: 'Pay' },
+  'step.download': { id: 'Ambil Foto', en: 'Get Photo' },
 
   // ── Face scan ───────────────────────────────────────────────────────────────
-  'scan.title':         { id: 'Temukan Foto Anda', en: 'Find Your Photos' },
-  'scan.positionPre':   { id: 'Posisikan wajah Anda di dalam oval lalu ketuk ', en: 'Position your face inside the oval and tap ' },
-  'scan.action':        { id: 'Pindai', en: 'Scan' },
   'scan.error':         { id: 'Terjadi kesalahan. Silakan coba lagi.', en: 'Something went wrong. Please try again.' },
   'scan.cameraError':   { id: 'Kamera belum siap. Pastikan izin kamera aktif, lalu coba lagi.', en: 'Camera not ready. Make sure camera access is allowed, then try again.' },
   'scan.cta':           { id: 'Pindai Wajah Saya', en: 'Scan My Face' },
+  'scan.ctaSub':        { id: 'Lihat ke kamera untuk menemukan foto Anda', en: 'Look at the camera to find your photos' },
+  'scan.live':          { id: 'LIVE', en: 'LIVE' },
   'scan.scanning':      { id: 'Memindai…', en: 'Scanning…' },
   'scan.scanningFace':  { id: 'Memindai wajah Anda…', en: 'Scanning your face…' },
   'scan.privacy':       { id: 'Tidak ada data yang disimpan — pindaian hanya untuk menemukan foto Anda', en: 'No data is stored — scans are used only to find your photos' },
@@ -61,13 +62,10 @@ export const translations = {
   'scan.tip2':          { id: 'Jangan gunakan masker', en: 'Do not wear a mask' },
   'scan.tip3':          { id: 'Jaga jarak ±50–70 cm', en: 'Stay about 50–70 cm away' },
   'scan.tip4':          { id: 'Pastikan cahaya cukup terang', en: 'Make sure the light is bright enough' },
-  'scan.benefitFastTitle':    { id: 'Cepat & Akurat', en: 'Fast & accurate' },
-  'scan.benefitFastDesc':     { id: 'Teknologi AI mencari foto Anda dalam hitungan detik.', en: 'AI finds your photos in seconds.' },
-  'scan.benefitPrivacyTitle': { id: 'Privasi Aman', en: 'Your privacy' },
   'overlay.align':      { id: 'Sejajarkan wajah Anda di sini', en: 'Align your face here' },
 
   // ── Gallery ─────────────────────────────────────────────────────────────────
-  'gallery.title':       { id: 'Foto Anda', en: 'Your Photos' },
+  'gallery.title':       { id: 'Pilih Foto Anda', en: 'Choose Your Photos' },
   'gallery.subtitle':    { id: '{count} foto ditemukan', en: '{count} photos found' },
   'gallery.selectAria':  { id: 'Pilih {name}', en: 'Select {name}' },
   'gallery.deselectAria':{ id: 'Hapus {name} dari pilihan', en: 'Remove {name} from selection' },
@@ -82,9 +80,7 @@ export const translations = {
   'gallery.rescan':      { id: 'Pindai Ulang', en: 'Rescan' },
   'gallery.all':         { id: 'Semua', en: 'All' },
   'gallery.selected':    { id: '{count} foto dipilih', en: '{count} photo(s) selected' },
-  'gallery.continue':    { id: 'Edit Foto', en: 'Edit Photos' },
   'gallery.footerEmpty': { id: 'Ketuk foto untuk memilih', en: 'Tap a photo to select' },
-  'gallery.removeAria':  { id: 'Hapus dari pilihan', en: 'Remove from selection' },
   'gallery.emptyTitle':  { id: 'Foto tidak ditemukan', en: 'No photos found' },
   'gallery.emptyDesc':   { id: 'Kami tidak menemukan foto yang cocok dengan wajah Anda. Silakan pindai ulang wajah Anda.', en: "We couldn't find any photos matching your face. Please scan your face again." },
 
@@ -93,8 +89,9 @@ export const translations = {
   'preview.select':   { id: 'Pilih', en: 'Select' },
 
   // ── Cart ────────────────────────────────────────────────────────────────────
-  'cart.title':      { id: 'Keranjang Anda', en: 'Your Cart' },
-  'cart.editor':     { id: 'Editor', en: 'Editor' },
+  'cart.title':      { id: 'Pesanan Anda', en: 'Your Order' },
+  'cart.subtitle':   { id: 'Periksa pesanan Anda, lalu bayar', en: 'Review your order, then pay' },
+  'cart.backSub':    { id: 'Hias foto', en: 'Customize photos' },
   'cart.empty':      { id: 'Keranjang Anda kosong', en: 'Your cart is empty' },
   'cart.browse':     { id: 'Lihat Foto', en: 'Browse Photos' },
   'cart.original':   { id: 'Asli', en: 'Original' },
@@ -210,8 +207,15 @@ export const translations = {
   // instruction with different words. One instruction, said once: the heading
   // tells them what to do, the caption below the QR says only what it adds.
   'download.scanInstr':      { id: 'Scan QR di bawah untuk mengambil foto Anda', en: 'Scan the QR below to get your photos' },
+  'download.readySub':       { id: 'Foto Anda siap diunduh!', en: 'Your photos are ready to download!' },
+  'download.getTitle':       { id: 'Ambil Foto Anda', en: 'Get Your Photos' },
+  'download.scanLabel':      { id: 'PINDAI UNTUK MENGUNDUH', en: 'SCAN TO DOWNLOAD' },
+  'download.howTitle':       { id: 'Cara Mengunduh', en: 'How to Download' },
+  'download.how1':           { id: 'Buka kamera HP atau aplikasi pemindai QR', en: 'Open your phone camera or a QR scanner' },
+  'download.how2':           { id: 'Pindai kode QR di layar ini', en: 'Scan the QR code on this screen' },
+  'download.how3':           { id: 'Buka tautannya lalu unduh foto Anda', en: 'Open the link and download your photos' },
+  'download.newSub':         { id: 'Selesai — mulai sesi baru', en: 'Done — start a new session' },
   'download.valid24':        { id: 'Berlaku 7 hari', en: 'Valid for 7 days' },
-  'download.cameraInstr':    { id: 'Buka kamera HP, arahkan ke QR, lalu ketuk tautan yang muncul.', en: 'Open your phone camera, point it at the QR, then tap the link that appears.' },
   'download.editedPhotos':   { id: 'FOTO HASIL EDITAN', en: 'EDITED PHOTOS' },
   'download.save':           { id: 'Simpan', en: 'Save' },
   'download.downloadAll':    { id: 'Unduh Semua ({count} foto)', en: 'Download All ({count} photos)' },
@@ -362,11 +366,10 @@ export const translations = {
   'about.errInstall':    { id: 'Gagal menginstal pembaruan.', en: 'Failed to install the update.' },
 
   // ── Editor ──────────────────────────────────────────────────────────────────
-  'editor.title':          { id: 'Edit Foto', en: 'Edit Photos' },
+  'editor.title':          { id: 'Hias Foto Anda', en: 'Customize Your Photo' },
+  'editor.backSub':        { id: 'Pilih foto', en: 'Choose photos' },
+  'editor.nextSub':        { id: 'Lanjut ke pembayaran', en: 'Continue to payment' },
   'editor.subtitle':       { id: 'Pilih alat lalu ketuk foto untuk mengedit', en: 'Choose a tool then tap the photo to edit' },
-  'editor.gallery':        { id: 'Galeri', en: 'Gallery' },
-  'editor.done':           { id: 'Selesai', en: 'Done' },
-  'editor.next':           { id: 'Lanjut', en: 'Next' },
   'editor.loadingPhoto':   { id: 'Memuat foto…', en: 'Loading photo…' },
   'editor.loadFailed':    { id: 'Foto gagal dimuat.', en: 'Couldn\'t load this photo.' },
   'editor.loadingSlots':   { id: 'Memuat konfigurasi slot…', en: 'Loading slot configuration…' },

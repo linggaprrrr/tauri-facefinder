@@ -33,7 +33,7 @@ export default function EditorToolbar({
   return (
     <div
       className="flex items-center gap-1.5 self-center p-1.5 rounded-full shrink-0"
-      style={{ background: '#fff', border: '1px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-md)' }}
+      style={{ background: 'var(--color-card)', border: '1px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-md)' }}
     >
       <button className={pill} onClick={onUndo} disabled={!canUndo} style={{ minHeight: 40, ...tone(canUndo) }}>
         <Undo2 size={16} /> {t('toolbar.undo')}

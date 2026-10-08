@@ -72,7 +72,7 @@ export default function Modal({
     >
       <div
         className={`pop-in w-full ${SIZES[size] ?? SIZES.md} ${className}
-          flex flex-col max-h-[90dvh] bg-white rounded-2xl overflow-hidden shadow-xl`}
+          flex flex-col max-h-[90dvh] bg-card rounded-2xl overflow-hidden shadow-xl`}
       >
         {title && (
           <div

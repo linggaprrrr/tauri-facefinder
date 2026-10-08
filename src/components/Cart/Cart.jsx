@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ShoppingCart, Check, X, Plus, Minus, Printer, ShieldCheck } from 'lucide-react';
+import { ShoppingCart, Check, X, Plus, Minus, Printer, ShieldCheck, Wallet } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { isTauri } from '../../native/print';
@@ -15,6 +15,8 @@ import Button from '../common/Button';
 import IconButton from '../common/IconButton';
 import Modal from '../common/Modal';
 import EmptyState from '../common/EmptyState';
+import PageHeader from '../common/PageHeader';
+import NavBar from '../common/NavBar';
 
 function SummaryRow({ label, value, muted }) {
   return (
@@ -151,15 +153,11 @@ export default function Cart() {
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 max-w-7xl mx-auto w-full min-h-full py-4 sm:py-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-h1 font-black on-bg-text" style={{ color: 'var(--color-neutral-900)' }}>
-          {t('cart.title')}
-        </h1>
-        <Button variant="ghost" onClick={() => navigate('/editor')}>
-          <ArrowLeft size={18} /> {t('cart.editor')}
-        </Button>
-      </div>
+    // Fills the panel: header on top, Back/Pay bar pinned to the bottom, and
+    // only the order between them scrolls — so the pay action never sits
+    // below the fold however long the order gets.
+    <div className="flex flex-col gap-4 sm:gap-5 max-w-7xl mx-auto w-full h-full">
+      <PageHeader icon={Wallet} title={t('cart.title')} subtitle={t('cart.subtitle')} />
 
       {selectedPhotos.length === 0 ? (
         <div className="flex justify-center py-10">
@@ -176,7 +174,7 @@ export default function Cart() {
            fold while the customer was still deciding. A portrait kiosk is too
            narrow for two columns, so there the summary docks to the bottom
            instead — same thumb zone as the gallery and editor action bars. */
-        <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] items-start flex-1 sm:portrait:grid-rows-[1fr_auto]">
+        <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] items-start flex-1 min-h-0 overflow-y-auto no-scrollbar sm:portrait:grid-rows-[1fr_auto]">
 
           {/* ── Left: order lines ── */}
           <div className="flex flex-col gap-3 min-w-0">
@@ -255,7 +253,7 @@ export default function Cart() {
                               onClick={() => addItem(product.printType, photo)}
                               className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl cursor-pointer transition-all active:scale-95"
                               style={{
-                                background: '#fff',
+                                background: 'var(--color-card)',
                                 border: '1.5px solid var(--color-primary-100)',
                                 boxShadow: 'var(--shadow-sm)',
                               }}
@@ -301,7 +299,7 @@ export default function Cart() {
                                 disabled={line.copies <= 1}
                                 aria-label={t('print.copies')}
                                 className="w-8 h-8 rounded-lg inline-flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed active:scale-90 transition-all"
-                                style={{ background: '#fff', color: 'var(--color-primary)' }}
+                                style={{ background: 'var(--color-card)', color: 'var(--color-primary)' }}
                               >
                                 <Minus size={15} strokeWidth={3} />
                               </button>
@@ -429,18 +427,21 @@ export default function Cart() {
               </span>
             </div>
 
-            <Button size="lg" className="w-full" onClick={() => navigate('/checkout')}>
-              {t('cart.payNow')} <ArrowRight size={20} />
-            </Button>
-
-            {/* Centred on portrait, where the docked summary is the last row and
-                the help FAB (bottom-left) would otherwise cover this line. */}
-            <p className="text-xs flex items-start sm:portrait:justify-center gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
+            <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-neutral-600)' }}>
               <ShieldCheck size={14} className="shrink-0 mt-0.5" /> {t('cart.secureNote')}
             </p>
           </aside>
         </div>
       )}
+
+      <NavBar
+        back={{ label: t('nav.back'), sub: t('cart.backSub'), onClick: () => navigate('/editor') }}
+        next={selectedPhotos.length ? {
+          label: t('cart.payNow'),
+          sub: `${t('common.total')} Rp ${(total + addonEstimate).toLocaleString('id-ID')}`,
+          onClick: () => navigate('/checkout'),
+        } : undefined}
+      />
 
       {/* Remove confirmation */}
       {confirmRemove && (

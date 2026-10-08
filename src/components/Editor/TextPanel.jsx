@@ -103,7 +103,7 @@ export default function TextPanel({ onAdd }) {
   return (
     <div
       className="rounded-2xl p-4 flex flex-col gap-4"
-      style={{ background: '#fff', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
+      style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-neutral-100)' }}
     >
       <h3 className="font-bold" style={{ color: 'var(--color-neutral-700)' }}>{t('text.title')}</h3>
 

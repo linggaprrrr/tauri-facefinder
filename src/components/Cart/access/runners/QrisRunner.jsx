@@ -6,6 +6,8 @@ import { useLang } from '../../../../i18n/LanguageContext';
 import { createTransaction, getTransaction, cancelTransaction } from '../../../../api/mockApi';
 import { savePendingOrder, updatePendingOrder, clearPendingOrder } from '../../../../utils/pendingOrder';
 import LoadingSpinner from '../../../common/LoadingSpinner';
+import PageHeader from '../../../common/PageHeader';
+import NavBar from '../../../common/NavBar';
 import Button from '../../../common/Button';
 
 const POLL_INTERVAL_MS = 3000;
@@ -174,23 +176,20 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8 max-w-6xl mx-auto w-full py-8">
+    <div className="flex flex-col items-center gap-8 max-w-6xl mx-auto w-full min-h-full">
 
       {/* ── Idle: summary + pay button ── */}
       {status === 'idle' && (
-        <div className="flex flex-col gap-5 w-full max-w-md">
-          <div className="text-center">
-            <h1 className="text-2xl font-black" style={{ color: 'var(--color-neutral-900)' }}>
-              {t('checkout.confirmTitle')}
-            </h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--color-neutral-600)' }}>
-              {t('checkout.photosSelected', { count: state.selectedPhotos.length })}
-            </p>
-          </div>
+        <div className="flex flex-col gap-5 w-full max-w-2xl flex-1">
+          <PageHeader
+            icon={QrCode}
+            title={t('checkout.confirmTitle')}
+            subtitle={t('checkout.photosSelected', { count: state.selectedPhotos.length })}
+          />
 
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: '#fff', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
+            style={{ background: 'var(--color-card)', border: '1.5px solid var(--color-neutral-200)', boxShadow: 'var(--shadow-sm)' }}
           >
             {state.selectedPhotos.map((photo, i) => (
               <div
@@ -259,12 +258,17 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
             </div>
           </div>
 
-          <Button size="lg" onClick={handleQrisPay} className="w-full">
-            <QrCode size={20} /> {t('checkout.payQris')}
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/cart')} className="w-full">
-            <ArrowLeft size={18} /> {t('checkout.backToCart')}
-          </Button>
+          <div className="mt-auto">
+            <NavBar
+              back={{ label: t('nav.back'), sub: t('checkout.backToCart'), onClick: () => navigate('/cart') }}
+              next={{
+                label: t('checkout.payQris'),
+                sub: `${t('common.total')} Rp ${displayTotal.toLocaleString('id-ID')}`,
+                onClick: handleQrisPay,
+                icon: <QrCode size={26} strokeWidth={2.4} />,
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -280,7 +284,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
           <div
             className="flex flex-col items-center gap-4 p-6 rounded-3xl shrink-0 w-full sm:w-auto sm:portrait:w-full"
             style={{
-              background: '#fff',
+              background: 'var(--color-card)',
               boxShadow: 'var(--shadow-xl)',
               border: '2px solid var(--color-primary-100)',
             }}
@@ -321,7 +325,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
           <div
             className="flex-1 flex flex-col rounded-3xl overflow-hidden"
             style={{
-              background: '#fff',
+              background: 'var(--color-card)',
               boxShadow: 'var(--shadow-lg)',
               border: '1.5px solid var(--color-neutral-100)',
             }}
@@ -411,7 +415,7 @@ export default function QrisRunner({ promoCode, discountAmount = 0 } = {}) {
         >
           <div
             className="flex flex-col gap-5 p-8 rounded-3xl w-full max-w-sm mx-4 text-center"
-            style={{ background: '#fff', boxShadow: 'var(--shadow-xl)' }}
+            style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-xl)' }}
           >
             <div className="flex justify-center" style={{ color: 'var(--color-warning)' }}>
               <AlertTriangle size={40} />

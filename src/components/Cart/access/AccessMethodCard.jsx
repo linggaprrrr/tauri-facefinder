@@ -17,7 +17,7 @@ export default function AccessMethodCard({ method, price, onSelect }) {
     <button
       onClick={() => onSelect(method)}
       className="relative flex flex-col w-full rounded-[28px] overflow-hidden text-left transition-all active:scale-[0.97]"
-      style={{ background: '#fff', boxShadow: 'var(--shadow-lg)', border: '1.5px solid var(--color-neutral-100)' }}
+      style={{ background: 'var(--color-card)', boxShadow: 'var(--shadow-lg)', border: '1.5px solid var(--color-neutral-100)' }}
     >
       {method.badge === 'recommended' && (
         <span
