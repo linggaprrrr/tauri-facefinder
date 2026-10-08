@@ -5,6 +5,7 @@ import './index.css';
 import App from './App.jsx';
 import { isTauri } from './native/print';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { installTapSound } from './utils/tapSound';
 
 // A 22" 1080x1920 kiosk is ~100ppi viewed standing, so laptop-sized UI reads
 // tiny. Page zoom scales every px/rem/icon at once and Konva follows it.
@@ -14,6 +15,10 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 if (isTauri() && screen.height > screen.width && screen.width >= 1000) {
   getCurrentWebview().setZoom(1.25).catch(() => {});
 }
+
+// Kiosk only: on a customer's own phone (mobile web) a page that clicks at
+// them is unwelcome, and the phone already gives its own touch feedback.
+if (isTauri()) installTapSound();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
